@@ -61,7 +61,7 @@ npm i -D eslint @types/node @typescript-eslint/eslint-plugin @typescript-eslint/
 **Install (Tailwind stack):**
 ```bash
 npm i -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
+node .\node_modules\tailwindcss\lib\cli.js init -p
 ```
 
 **Optional fonts/icons:**
@@ -74,6 +74,20 @@ npm i @fontsource-variable/inter @fontsource-variable/roboto-flex
 1. Wire Tailwind: set `content` paths and base layers, enable container sizes.
 2. Define design tokens (spacing, radii) in Tailwind config.
 3. Build the base layout: split pane (chat left, live resume preview right), stacks on mobile.
+
+---
+
+## 2.5) Landing Page & Initial Data Collection
+
+**Goal:** Collect basic user info before AI chat begins.
+
+**What to do:**
+1. Create a welcome form component with:
+   - Personal details (name, email, phone, location)
+2. Add form validation with Zod
+3. Pre-populate resume preview with collected data
+4. Add "Start Building with AI" button that transitions to chat
+5. Store initial data in Zustand store
 
 ---
 
