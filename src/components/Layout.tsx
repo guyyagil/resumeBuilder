@@ -25,10 +25,20 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
   const { 
     chatMessages, 
     addChatMessage, 
-    resume, 
+    resume,
+    // Enhanced resume control methods
     addSkills, 
     addOrUpdateExperience, 
-    setSummary 
+    setSummary,
+    removeExperience,
+    clearAllExperiences,
+    replaceAllExperiences,
+    removeSkills,
+    replaceSkills,
+    clearAllSkills,
+    clearSummary,
+    resetResume,
+    replaceEntireResume
   } = useAppStore();
   
   const [inputMessage, setInputMessage] = useState('');
@@ -69,28 +79,109 @@ To get started, tell me about your current job - what company do you work for an
       if (typeof aiResponse === 'object' && aiResponse.message) {
         addChatMessage(aiResponse.message, 'ai');
         
-        // Handle simplified resume updates
+        // Handle enhanced resume operations
         if (aiResponse.resumeUpdates) {
           const updates = aiResponse.resumeUpdates;
+          const operation = updates.operation || 'add';
           
-          // Handle experience updates
-          if (updates.experience) {
-            addOrUpdateExperience({
-              company: updates.experience.company || 'Company Name',
-              title: updates.experience.title || 'Job Title',
-              duration: updates.experience.duration || '2022 - Present',
-              description: updates.experience.description || ['Key responsibility']
-            });
-          }
+          console.log('AI Operation:', operation, updates);
           
-          // Handle skills
-          if (updates.skills && Array.isArray(updates.skills)) {
-            addSkills(updates.skills);
-          }
-          
-          // Handle summary
-          if (updates.summary) {
-            setSummary(updates.summary);
+          // Handle different operation types
+          switch (operation) {
+            case 'reset':
+              resetResume();
+              addChatMessage('🔄 Resume completely reset!', 'ai');
+              break;
+              
+            case 'redesign':
+              // Complete resume redesign
+              if (updates.completeResume) {
+                replaceEntireResume(updates.completeResume);
+                addChatMessage('🎨 Complete resume redesign applied!', 'ai');
+              }
+              break;
+              
+            case 'clear':
+              if (updates.clearSections && Array.isArray(updates.clearSections)) {
+                updates.clearSections.forEach((section: string) => {
+                  switch (section) {
+                    case 'experiences':
+                      clearAllExperiences();
+                      break;
+                    case 'skills':
+                      clearAllSkills();
+                      break;
+                    case 'summary':
+                      clearSummary();
+                      break;
+                  }
+                });
+                addChatMessage(`🗑️ Cleared sections: ${updates.clearSections.join(', ')}`, 'ai');
+              }
+              break;
+              
+            case 'remove':
+              // Remove specific experiences
+              if (updates.removeExperiences && Array.isArray(updates.removeExperiences)) {
+                updates.removeExperiences.forEach((company: string) => {
+                  removeExperience(company);
+                });
+                addChatMessage(`❌ Removed experiences: ${updates.removeExperiences.join(', ')}`, 'ai');
+              }
+              
+              // Remove specific skills
+              if (updates.removeSkills && Array.isArray(updates.removeSkills)) {
+                removeSkills(updates.removeSkills);
+                addChatMessage(`❌ Removed skills: ${updates.removeSkills.join(', ')}`, 'ai');
+              }
+              break;
+              
+            case 'replace':
+              // Replace all experiences
+              if (updates.experiences && Array.isArray(updates.experiences)) {
+                replaceAllExperiences(updates.experiences);
+                addChatMessage('🔄 Replaced all experiences with new ones!', 'ai');
+              }
+              
+              // Replace all skills
+              if (updates.skills && Array.isArray(updates.skills)) {
+                replaceSkills(updates.skills);
+                addChatMessage('🔄 Replaced all skills with new ones!', 'ai');
+              }
+              
+              // Replace summary
+              if (updates.summary) {
+                setSummary(updates.summary);
+                addChatMessage('📝 Updated professional summary!', 'ai');
+              }
+              break;
+              
+            case 'update':
+            case 'add':
+            default:
+              // Handle experience updates/additions
+              if (updates.experience) {
+                addOrUpdateExperience({
+                  company: updates.experience.company || 'Company Name',
+                  title: updates.experience.title || 'Job Title',
+                  duration: updates.experience.duration || '2022 - Present',
+                  description: updates.experience.description || ['Key responsibility']
+                });
+                addChatMessage(`✅ ${operation === 'update' ? 'Updated' : 'Added'} experience at ${updates.experience.company}!`, 'ai');
+              }
+              
+              // Handle skills additions
+              if (updates.skills && Array.isArray(updates.skills)) {
+                addSkills(updates.skills);
+                addChatMessage(`✅ Added ${updates.skills.length} new skills!`, 'ai');
+              }
+              
+              // Handle summary
+              if (updates.summary) {
+                setSummary(updates.summary);
+                addChatMessage('📝 Updated professional summary!', 'ai');
+              }
+              break;
           }
         }
       } else {

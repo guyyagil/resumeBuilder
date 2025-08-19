@@ -49,16 +49,33 @@ interface AppStore {
   // Simplified resume data
   resume: Resume;
   
-  // Simplified actions for AI
+  // Basic actions
   setUserBasicInfo: (data: WelcomeFormData) => void;
   goToChat: () => void;
   addChatMessage: (content: string, type: 'user' | 'ai') => void;
   
-  // Resume update actions (simplified for AI)
+  // Enhanced resume control actions for AI
   updateResume: (updates: Partial<Resume>) => void;
+  
+  // Experience management
   addOrUpdateExperience: (experience: Experience) => void;
+  removeExperience: (companyName: string) => void;
+  clearAllExperiences: () => void;
+  replaceAllExperiences: (experiences: Experience[]) => void;
+  
+  // Skills management
   addSkills: (newSkills: string[]) => void;
+  removeSkills: (skillsToRemove: string[]) => void;
+  replaceSkills: (newSkills: string[]) => void;
+  clearAllSkills: () => void;
+  
+  // Summary management
   setSummary: (summary: string) => void;
+  clearSummary: () => void;
+  
+  // Complete resume control
+  resetResume: () => void;
+  replaceEntireResume: (newResume: Resume) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -92,26 +109,24 @@ export const useAppStore = create<AppStore>((set) => ({
       ],
     })),
 
-  // Simplified resume actions for AI
+  // Enhanced resume actions for granular AI control
   updateResume: (updates) =>
     set((state) => ({
       resume: { ...state.resume, ...updates }
     })),
 
+  // Experience management
   addOrUpdateExperience: (newExperience) =>
     set((state) => {
-      // Check if experience with same company exists
       const existingIndex = state.resume.experiences.findIndex(
         exp => exp.company.toLowerCase() === newExperience.company.toLowerCase()
       );
       
       if (existingIndex !== -1) {
-        // Update existing experience
         const updatedExperiences = [...state.resume.experiences];
         updatedExperiences[existingIndex] = {
           ...updatedExperiences[existingIndex],
           ...newExperience,
-          // Merge descriptions
           description: [
             ...new Set([
               ...updatedExperiences[existingIndex].description,
@@ -127,7 +142,6 @@ export const useAppStore = create<AppStore>((set) => ({
           }
         };
       } else {
-        // Add new experience
         return {
           resume: {
             ...state.resume,
@@ -137,6 +151,33 @@ export const useAppStore = create<AppStore>((set) => ({
       }
     }),
 
+  removeExperience: (companyName) =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        experiences: state.resume.experiences.filter(
+          exp => exp.company.toLowerCase() !== companyName.toLowerCase()
+        )
+      }
+    })),
+
+  clearAllExperiences: () =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        experiences: []
+      }
+    })),
+
+  replaceAllExperiences: (experiences) =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        experiences
+      }
+    })),
+
+  // Skills management
   addSkills: (newSkills) =>
     set((state) => ({
       resume: {
@@ -145,8 +186,60 @@ export const useAppStore = create<AppStore>((set) => ({
       }
     })),
 
+  removeSkills: (skillsToRemove) =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        skills: state.resume.skills.filter(skill =>
+          !skillsToRemove.some(removeSkill =>
+            removeSkill.toLowerCase() === skill.toLowerCase()
+          )
+        )
+      }
+    })),
+
+  replaceSkills: (newSkills) =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        skills: newSkills
+      }
+    })),
+
+  clearAllSkills: () =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        skills: []
+      }
+    })),
+
+  // Summary management
   setSummary: (summary) =>
     set((state) => ({
       resume: { ...state.resume, summary }
+    })),
+
+  clearSummary: () =>
+    set((state) => ({
+      resume: {
+        ...state.resume,
+        summary: ''
+      }
+    })),
+
+  // Complete resume control
+  resetResume: () =>
+    set(() => ({
+      resume: {
+        experiences: [],
+        skills: [],
+        summary: ''
+      }
+    })),
+
+  replaceEntireResume: (newResume) =>
+    set(() => ({
+      resume: newResume
     })),
 }));
