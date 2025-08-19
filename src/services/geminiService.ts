@@ -10,7 +10,7 @@ if (!apiKey) {
 }
 
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
 // Language detection function
 const detectLanguage = (text: string): string => {
@@ -24,66 +24,69 @@ const detectLanguage = (text: string): string => {
 
 // Simplified system prompt
 type Experience = { company: string; title?: string; duration?: string; description?: string[] };
-type ResumeData = { experiences?: Experience[]; skills?: string[] };
+type Resume = { experiences?: Experience[]; skills?: string[]; summary?: string };
 
-const getSystemPrompt = (language: string, userContext: any, existingResumeData: ResumeData, conversationCount: number) => {
-  const currentExperiences: Experience[] = existingResumeData?.experiences || [];
-  const currentSkills: string[] = existingResumeData?.skills || [];
+const getSystemPrompt = (language: string, userContext: any, resume: Resume) => {
+  const currentExperiences: Experience[] = resume?.experiences || [];
+  const currentSkills: string[] = resume?.skills || [];
+  const currentSummary: string = resume?.summary || '';
 
   const prompts: Record<string, string> = {
     en: `You are a resume building assistant. Respond in English.
 
-Current resume has:
+CURRENT RESUME STATE:
 - ${currentExperiences.length} experiences: ${currentExperiences.map(e => e.company).join(', ')}
 - Skills: ${currentSkills.join(', ')}
+- Summary: ${currentSummary}
 
 User: ${userContext?.fullName || 'User'} - ${userContext?.currentRole || 'No role'}
 
-Rules:
-1. If user mentions existing company (${currentExperiences.map(e => e.company).join(', ')}), UPDATE don't create new
-2. Ask specific questions about work experience
-3. Extract concrete info to update resume
+IMPORTANT RULES:
+1. If user mentions existing company (${currentExperiences.map(e => e.company).join(', ')}), UPDATE existing entry
+2. Ask specific questions about work experience, achievements, skills
+3. Extract concrete information to build resume
 
-Respond normally in conversation, then add structured data at the end in this EXACT format:
+Response format: Normal conversation + data extraction in this EXACT format:
 
 [RESUME_DATA]
 {
-  "action": "add" or "update" or "none",
   "experience": {
     "company": "Company Name",
     "title": "Job Title", 
     "duration": "2022-Present",
     "description": ["Achievement 1", "Achievement 2"]
   },
-  "skills": ["new", "skills", "mentioned"]
+  "skills": ["skill1", "skill2"],
+  "summary": "Professional summary text"
 }
 [/RESUME_DATA]`,
 
     he: `אתה עוזר לבניית קורות חיים. ענה בעברית.
 
-בקורות החיים הנוכחיים יש:
+מצב קורות החיים הנוכחי:
 - ${currentExperiences.length} מקומות עבודה: ${currentExperiences.map(e => e.company).join(', ')}
 - כישורים: ${currentSkills.join(', ')}
+- תקציר: ${currentSummary}
 
 משתמש: ${userContext?.fullName || 'משתמש'} - ${userContext?.currentRole || 'ללא תפקיד'}
 
-כללים:
-1. אם המשתמש מזכיר חברה קיימת (${currentExperiences.map(e => e.company).join(', ')}), עדכן אל תיצור חדש
-2. שאל שאלות ספציפיות על ניסיון עבודה
-3. חלץ מידע קונקרטי לעדכון קורות החיים
+כללים חשובים:
+1. אם המשתמש מזכיר חברה קיימת (${currentExperiences.map(e => e.company).join(', ')}), עדכן רשומה קיימת
+2. שאל שאלות ספציפיות על ניסיון עבודה, הישגים, כישורים
+3. חלץ מידע קונקרטי לבניית קורות חיים
 
-ענה רגיל בשיחה, ואז הוסף מידע מובנה בסוף בפורמט המדויק הזה:
+פורמט תגובה: שיחה רגילה + חילוץ מידע בפורמט המדויק הזה:
 
 [RESUME_DATA]
 {
-  "action": "add" or "update" or "none",
   "experience": {
     "company": "שם החברה",
     "title": "תפקיד", 
     "duration": "2022-כיום",
     "description": ["הישג 1", "הישג 2"]
   },
-  "skills": ["כישורים", "חדשים", "שהוזכרו"]
+  "skills": ["כישור1", "כישור2"],
+  "summary": "תקציר מקצועי"
 }
 [/RESUME_DATA]`
   };
@@ -91,14 +94,14 @@ Respond normally in conversation, then add structured data at the end in this EX
   return prompts[language] || prompts.en;
 };
 
-export const sendMessageToAI = async (message: string, userContext?: any, conversationCount: number = 0, existingResumeData?: any) => {
+export const sendMessageToAI = async (message: string, userContext?: any, resumeData?: any) => {
   try {
     console.log('Attempting API call with message:', message);
     
     const userLanguage = detectLanguage(message);
     console.log('Detected language:', userLanguage);
     
-    const systemPrompt = getSystemPrompt(userLanguage, userContext, existingResumeData, conversationCount);
+    const systemPrompt = getSystemPrompt(userLanguage, userContext, resumeData);
     
     const fullPrompt = `${systemPrompt}
 
@@ -115,7 +118,7 @@ Important: Respond conversationally in ${userLanguage === 'he' ? 'Hebrew' : user
     // Extract conversation message and resume data separately
     const resumeDataMatch = text.match(/\[RESUME_DATA\]([\s\S]*?)\[\/RESUME_DATA\]/);
     let conversationMessage = text;
-    let resumeUpdates: { action?: string; [key: string]: any } = {};
+    let resumeUpdates: { [key: string]: any } = {};
     
     if (resumeDataMatch) {
       // Remove the resume data section from conversation
@@ -133,7 +136,6 @@ Important: Respond conversationally in ${userLanguage === 'he' ? 'Hebrew' : user
     
     return {
       message: conversationMessage,
-      action: resumeUpdates?.action || 'none',
       resumeUpdates: resumeUpdates
     };
     
@@ -143,14 +145,12 @@ Important: Respond conversationally in ${userLanguage === 'he' ? 'Hebrew' : user
     if (error instanceof Error) {
       return {
         message: `API Error: ${error.message}`,
-        action: 'none',
         resumeUpdates: {}
       };
     }
     
     return {
       message: 'An unknown API error occurred.',
-      action: 'none',
       resumeUpdates: {}
     };
   }

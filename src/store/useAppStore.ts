@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { z } from 'zod';
 
-// Same schema as your components
+// User form schema
 const welcomeFormSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
@@ -22,20 +22,18 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// Simplified data structures for easier AI access
 interface Experience {
-  id: string;
-  title: string;
   company: string;
+  title: string;
   duration: string;
   description: string[];
 }
 
-interface ResumeData {
-  personalInfo: WelcomeFormData | null;
-  professionalSummary: string;
+interface Resume {
   experiences: Experience[];
   skills: string[];
-  education: string[];
+  summary: string;
 }
 
 interface AppStore {
@@ -48,18 +46,19 @@ interface AppStore {
   // Chat data
   chatMessages: ChatMessage[];
   
-  // Resume data
-  resumeData: ResumeData;
+  // Simplified resume data
+  resume: Resume;
   
-  // Actions
+  // Simplified actions for AI
   setUserBasicInfo: (data: WelcomeFormData) => void;
   goToChat: () => void;
   addChatMessage: (content: string, type: 'user' | 'ai') => void;
-  updateResumeData: (updates: Partial<ResumeData>) => void;
-  addExperience: (experience: Experience) => void;
-  updateSkills: (skills: string[]) => void;
-  updateProfessionalSummary: (summary: string) => void;
-  updateExperience: (experienceId: string, updates: Partial<Experience>) => void; // Add this line
+  
+  // Resume update actions (simplified for AI)
+  updateResume: (updates: Partial<Resume>) => void;
+  addOrUpdateExperience: (experience: Experience) => void;
+  addSkills: (newSkills: string[]) => void;
+  setSummary: (summary: string) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -67,20 +66,15 @@ export const useAppStore = create<AppStore>((set) => ({
   currentScreen: 'welcome',
   userBasicInfo: null,
   chatMessages: [],
-  resumeData: {
-    personalInfo: null,
-    professionalSummary: '',
+  resume: {
     experiences: [],
     skills: [],
-    education: [],
+    summary: '',
   },
   
   // Actions
   setUserBasicInfo: (data) => 
-    set((state) => ({ 
-      userBasicInfo: data,
-      resumeData: { ...state.resumeData, personalInfo: data }
-    })),
+    set({ userBasicInfo: data }),
     
   goToChat: () => 
     set({ currentScreen: 'chat' }),
@@ -98,68 +92,61 @@ export const useAppStore = create<AppStore>((set) => ({
       ],
     })),
 
-  updateResumeData: (updates) =>
+  // Simplified resume actions for AI
+  updateResume: (updates) =>
     set((state) => ({
-      resumeData: { ...state.resumeData, ...updates }
+      resume: { ...state.resume, ...updates }
     })),
 
-  addExperience: (experience) =>
+  addOrUpdateExperience: (newExperience) =>
     set((state) => {
-      // Check if experience at same company already exists
-      const existingIndex = state.resumeData.experiences.findIndex(
-        exp => exp.company.toLowerCase() === experience.company.toLowerCase()
+      // Check if experience with same company exists
+      const existingIndex = state.resume.experiences.findIndex(
+        exp => exp.company.toLowerCase() === newExperience.company.toLowerCase()
       );
       
       if (existingIndex !== -1) {
-        // Update existing experience instead of adding new one
-        const updatedExperiences = [...state.resumeData.experiences];
+        // Update existing experience
+        const updatedExperiences = [...state.resume.experiences];
         updatedExperiences[existingIndex] = {
           ...updatedExperiences[existingIndex],
-          ...experience,
-          // Merge descriptions if both exist
+          ...newExperience,
+          // Merge descriptions
           description: [
             ...new Set([
               ...updatedExperiences[existingIndex].description,
-              ...experience.description
+              ...newExperience.description
             ])
           ]
         };
         
         return {
-          resumeData: {
-            ...state.resumeData,
+          resume: {
+            ...state.resume,
             experiences: updatedExperiences
           }
         };
       } else {
         // Add new experience
         return {
-          resumeData: {
-            ...state.resumeData,
-            experiences: [...state.resumeData.experiences, experience]
+          resume: {
+            ...state.resume,
+            experiences: [...state.resume.experiences, newExperience]
           }
         };
       }
     }),
 
-  // Add function to update existing experience
-  updateExperience: (experienceId: string, updates: Partial<Experience>) =>
+  addSkills: (newSkills) =>
     set((state) => ({
-      resumeData: {
-        ...state.resumeData,
-        experiences: state.resumeData.experiences.map(exp =>
-          exp.id === experienceId ? { ...exp, ...updates } : exp
-        )
+      resume: {
+        ...state.resume,
+        skills: [...new Set([...state.resume.skills, ...newSkills])]
       }
     })),
 
-  updateSkills: (skills) =>
+  setSummary: (summary) =>
     set((state) => ({
-      resumeData: { ...state.resumeData, skills }
-    })),
-
-  updateProfessionalSummary: (summary) =>
-    set((state) => ({
-      resumeData: { ...state.resumeData, professionalSummary: summary }
+      resume: { ...state.resume, summary }
     })),
 }));

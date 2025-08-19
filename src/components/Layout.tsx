@@ -25,19 +25,15 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
   const { 
     chatMessages, 
     addChatMessage, 
-    resumeData, 
-    updateSkills, 
-    addExperience, 
-    updateProfessionalSummary,
-    updateExperience  // Add this line
+    resume, 
+    addSkills, 
+    addOrUpdateExperience, 
+    setSummary 
   } = useAppStore();
   
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const initialMessageSent = useRef(false);
-
-  // Track conversation count for AI prompting
-  const conversationCount = chatMessages.filter(msg => msg.type === 'user').length;
 
   // Add initial AI greeting when component mounts
   useEffect(() => {
@@ -67,47 +63,34 @@ To get started, tell me about your current job - what company do you work for an
       const aiResponse = await sendMessageToAI(
         userMessage, 
         userBasicInfo, 
-        conversationCount,
-        resumeData // Pass current resume state
+        resume // Use simplified resume structure
       );
       
       if (typeof aiResponse === 'object' && aiResponse.message) {
         addChatMessage(aiResponse.message, 'ai');
         
-        // Handle smart updates based on AI's action
+        // Handle simplified resume updates
         if (aiResponse.resumeUpdates) {
           const updates = aiResponse.resumeUpdates;
           
-          // Handle experience updates vs additions
+          // Handle experience updates
           if (updates.experience) {
-            if (aiResponse.action === 'update' && updates.experience.id) {
-              // Update existing experience
-              updateExperience(updates.experience.id, updates.experience);
-            } else if (aiResponse.action === 'add') {
-              // Add new experience
-              addExperience({
-                id: Date.now().toString(),
-                ...updates.experience
-              });
-            }
+            addOrUpdateExperience({
+              company: updates.experience.company || 'Company Name',
+              title: updates.experience.title || 'Job Title',
+              duration: updates.experience.duration || '2022 - Present',
+              description: updates.experience.description || ['Key responsibility']
+            });
           }
           
-          // Handle skills (only add new ones)
+          // Handle skills
           if (updates.skills && Array.isArray(updates.skills)) {
-            const currentSkills = resumeData.skills;
-            const newSkills = updates.skills.filter((skill: string) => 
-              !currentSkills.some(existing => 
-                existing.toLowerCase() === skill.toLowerCase()
-              )
-            );
-            if (newSkills.length > 0) {
-              updateSkills([...currentSkills, ...newSkills]);
-            }
+            addSkills(updates.skills);
           }
           
-          // Update summary
-          if (updates.professionalSummary) {
-            updateProfessionalSummary(updates.professionalSummary);
+          // Handle summary
+          if (updates.summary) {
+            setSummary(updates.summary);
           }
         }
       } else {
@@ -134,11 +117,11 @@ To get started, tell me about your current job - what company do you work for an
   // Combine skills from user input and AI suggestions
   const allSkills = [...new Set([
     ...(userBasicInfo?.keySkills?.split(',').map(s => s.trim()).filter(s => s) || []),
-    ...resumeData.skills
+    ...resume.skills
   ])];
 
   // Use professional summary from AI or generate default
-  const professionalSummary = resumeData.professionalSummary || 
+  const professionalSummary = resume.summary || 
     (userBasicInfo?.experienceYears 
       ? `Experienced ${userBasicInfo.currentRole?.toLowerCase()} with ${userBasicInfo.experienceYears} of experience${userBasicInfo.industry ? ` in ${userBasicInfo.industry}` : ''}. Ready to contribute expertise and drive results in a dynamic environment.`
       : `Professional ${userBasicInfo?.currentRole || 'individual'} ready to contribute expertise and drive results in a dynamic environment.`
@@ -239,12 +222,12 @@ To get started, tell me about your current job - what company do you work for an
                   <h2 className="text-lg font-semibold text-gray-900 mb-2">Experience</h2>
                   <div className="space-y-3">
                     {/* AI-generated experiences */}
-                    {resumeData.experiences.map((exp) => (
-                      <div key={exp.id}>
+                    {resume.experiences.map((exp: any) => (
+                      <div key={exp.id || exp.company}>
                         <h3 className="font-medium text-gray-900">{exp.title}</h3>
                         <p className="text-sm text-gray-600">{exp.company} • {exp.duration}</p>
                         <ul className="text-sm text-gray-700 mt-1 ml-4">
-                          {exp.description.map((desc, index) => (
+                          {exp.description.map((desc: string, index: number) => (
                             <li key={index}>• {desc}</li>
                           ))}
                         </ul>
@@ -252,7 +235,7 @@ To get started, tell me about your current job - what company do you work for an
                     ))}
                     
                     {/* Default experience if none added yet */}
-                    {resumeData.experiences.length === 0 && (
+                    {resume.experiences.length === 0 && (
                       <div>
                         <h3 className="font-medium text-gray-900">
                           {userBasicInfo?.currentRole || 'Current Role'}
