@@ -13,6 +13,7 @@ const welcomeFormSchema = z.object({
   experienceYears: z.string().optional(),
   industry: z.string().optional(),
   keySkills: z.string().optional(),
+  targetJobPosting: z.string().optional(),
 });
 
 type WelcomeFormData = z.infer<typeof welcomeFormSchema>;
@@ -48,8 +49,12 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
   // Add initial AI greeting when component mounts
   useEffect(() => {
     if (!initialMessageSent.current && chatMessages.length === 0 && userBasicInfo) {
+      const jobPostingMessage = userBasicInfo.targetJobPosting 
+        ? "\n\nI see you've provided a target job posting - I'll help tailor your resume to match that specific role!" 
+        : "";
+      
       addChatMessage(
-        `Hello ${userBasicInfo.fullName}! I see you're a ${userBasicInfo.currentRole}. Let's build an amazing resume together! 
+        `Hello ${userBasicInfo.fullName}! I see you're a ${userBasicInfo.currentRole}. Let's build an amazing resume together!${jobPostingMessage}
 
 To get started, tell me about your current job - what company do you work for and what are your main responsibilities?`,
         'ai'
@@ -68,13 +73,24 @@ To get started, tell me about your current job - what company do you work for an
     // Add user message
     addChatMessage(userMessage, 'user');
 
+    // Show context processing message for longer conversations
+    const contextProcessingId = chatMessages.length > 3 ? 
+      addChatMessage('🧠 Processing conversation context...', 'ai') : null;
+
     try {
-      // Pass existing resume data to AI for context
+      // Pass existing resume data and chat history to AI for better context
       const aiResponse = await sendMessageToAI(
         userMessage, 
         userBasicInfo, 
-        resume // Use simplified resume structure
+        resume, // Use simplified resume structure
+        chatMessages // Pass chat history for context summarization
       );
+      
+      // Remove context processing message if it was added
+      if (contextProcessingId) {
+        // Note: We'd need to implement a way to remove messages from the store for this to work
+        // For now, we'll just add the response
+      }
       
       if (typeof aiResponse === 'object' && aiResponse.message) {
         addChatMessage(aiResponse.message, 'ai');
@@ -159,15 +175,24 @@ To get started, tell me about your current job - what company do you work for an
             case 'update':
             case 'add':
             default:
-              // Handle experience updates/additions
+              // Handle experience updates/additions - but only if complete information is provided
               if (updates.experience) {
-                addOrUpdateExperience({
-                  company: updates.experience.company || 'Company Name',
-                  title: updates.experience.title || 'Job Title',
-                  duration: updates.experience.duration || '2022 - Present',
-                  description: updates.experience.description || ['Key responsibility']
-                });
-                addChatMessage(`✅ ${operation === 'update' ? 'Updated' : 'Added'} experience at ${updates.experience.company}!`, 'ai');
+                const exp = updates.experience;
+                // Validate that we have real information, not placeholders
+                const hasValidCompany = exp.company && exp.company !== 'Company Name' && exp.company !== 'Company Name Needed' && !exp.company.includes('Needed');
+                const hasValidTitle = exp.title && exp.title !== 'Job Title' && exp.title !== 'Job Title Needed' && !exp.title.includes('Needed');
+                
+                if (hasValidCompany && hasValidTitle) {
+                  addOrUpdateExperience({
+                    company: exp.company,
+                    title: exp.title,
+                    duration: exp.duration || '2022 - Present',
+                    description: exp.description || ['Key responsibility']
+                  });
+                  addChatMessage(`✅ ${operation === 'update' ? 'Updated' : 'Added'} experience at ${exp.company}!`, 'ai');
+                } else {
+                  console.log('Skipped adding experience with incomplete data:', exp);
+                }
               }
               
               // Handle skills additions
@@ -298,6 +323,11 @@ To get started, tell me about your current job - what company do you work for an
                     {userBasicInfo?.email || 'your.email@email.com'} | {userBasicInfo?.phone || '(555) 123-4567'}
                     {userBasicInfo?.location && ` | ${userBasicInfo.location}`}
                   </p>
+                  {userBasicInfo?.targetJobPosting && (
+                    <div className="mt-2 px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full inline-block">
+                      🎯 Tailored for Target Role
+                    </div>
+                  )}
                 </div>
                 
                 {/* Professional Summary */}

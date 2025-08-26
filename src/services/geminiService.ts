@@ -1,215 +1,349 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useAppStore } from '../store/useAppStore';
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-console.log('API Key loaded in service:', apiKey ? 'Yes' : 'No');
-console.log('API Key first 10 chars:', apiKey?.substring(0, 10));
-
-if (!apiKey) {
-  throw new Error('VITE_GEMINI_API_KEY is not set in environment variables');
-}
+if (!apiKey) throw new Error('VITE_GEMINI_API_KEY is not set in environment variables');
 
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
-// Language detection function
-const detectLanguage = (text: string): string => {
-  if (/[\u0590-\u05FF]/.test(text)) return 'he';
-  if (/[\u0600-\u06FF]/.test(text)) return 'ar';
-  if (/[\u4e00-\u9fff]/.test(text)) return 'zh';
-  if (/\b(soy|trabajo|empresa|experiencia|habilidades)\b/i.test(text)) return 'es';
-  if (/\b(je|travaille|entreprise|expérience|compétences)\b/i.test(text)) return 'fr';
-  return 'en';
+// ---------------- Language detection ----------------
+const detectLanguage = (text: string): 'he' | 'en' =>
+  /[֐-׿]/.test(text) ? 'he' : 'en';
+
+// ---------------- Types ----------------
+interface RawAIResumeData {
+  operation?: string;
+  experience?: any;
+  skills?: string[];
+  removeSkills?: string[];
+  removeExperiences?: string[];
+  clearSections?: string[];
+  summary?: string;
+  completeResume?: any;
+}
+
+interface NormalizedResumePatch {
+  operation: 'patch' | 'replace' | 'reset';
+  experience?: {
+    id?: string;
+    company?: string;
+    title?: string;
+    duration?: string;
+    description?: string[];
+  };
+  skills?: string[];
+  removeSkills?: string[];
+  removeExperiences?: string[];
+  clearSections?: string[];
+  summary?: string;
+  completeResume?: any;
+}
+
+// ---------------- Parsing helpers ----------------
+const safeJsonParse = (raw: string): any | null => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const cleaned = raw
+      .replace(/^[\s`]+|[\s`]+$/g, '')
+      .replace(/[“”]/g, '"')
+      .replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(cleaned); } catch { return null; }
+  }
 };
 
-// Simplified system prompt
+const extractJsonBlock = (text: string): { data: any | null; error?: string } => {
+  // 1. Full tagged block
+  const pair = text.match(/\[RESUME_DATA\]([\s\S]*?)\[\/RESUME_DATA\]/i);
+  if (pair) {
+    const parsed = safeJsonParse(pair[1].trim());
+    return { data: parsed, error: parsed ? undefined : 'Tagged JSON not parseable' };
+  }
+
+  // 2. Opening tag only -> attempt to find balanced braces after it
+  const openIdx = text.search(/\[RESUME_DATA\]/i);
+  if (openIdx !== -1) {
+    const after = text.slice(openIdx + '[RESUME_DATA]'.length);
+    const braceStart = after.indexOf('{');
+    if (braceStart !== -1) {
+      let depth = 0;
+      for (let i = braceStart; i < after.length; i++) {
+        if (after[i] === '{') depth++;
+        else if (after[i] === '}') {
+          depth--;
+          if (depth === 0) {
+            const candidate = after.slice(braceStart, i + 1);
+            const parsed = safeJsonParse(candidate);
+            if (parsed) return { data: parsed, error: 'Missing closing tag, recovered JSON' };
+            break;
+          }
+        }
+      }
+    }
+    return { data: null, error: 'Opening tag without JSON' };
+  }
+
+  // 3. Fenced block
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) {
+    const parsed = safeJsonParse(fence[1].trim());
+    return { data: parsed, error: parsed ? undefined : 'Fenced JSON not parseable' };
+  }
+
+  // 4. First top-level object fallback
+  const braceMatch = text.match(/\{[\s\S]*\}/);
+  if (braceMatch) {
+    const parsed = safeJsonParse(braceMatch[0]);
+    if (parsed) return { data: parsed, error: 'Used untagged JSON fallback' };
+  }
+
+  return { data: null, error: 'No JSON found' };
+};
+
+const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch => {
+  const patch: NormalizedResumePatch = {
+    operation: raw.operation === 'replace' || raw.operation === 'reset'
+      ? raw.operation
+      : 'patch'
+  };
+
+  // Experience normalization
+  let expSource = raw.experience;
+  if (expSource && typeof expSource === 'object') {
+    const nestedKey = ['education', 'work', 'job', 'role', 'position'].find(k => expSource[k]);
+    if (nestedKey) expSource = expSource[nestedKey];
+    if (Array.isArray(expSource)) expSource = expSource[0];
+    if (expSource && typeof expSource === 'object') {
+      patch.experience = {
+        id: expSource.id,
+        company: expSource.company,
+        title: expSource.title,
+        duration: expSource.duration,
+        description: Array.isArray(expSource.description) ? expSource.description : []
+      };
+    }
+  }
+
+  if (Array.isArray(raw.skills)) patch.skills = raw.skills;
+  if (Array.isArray(raw.removeSkills)) patch.removeSkills = raw.removeSkills;
+  if (Array.isArray(raw.removeExperiences)) patch.removeExperiences = raw.removeExperiences;
+  if (Array.isArray(raw.clearSections)) patch.clearSections = raw.clearSections;
+  if (typeof raw.summary === 'string') patch.summary = raw.summary;
+  if (raw.operation === 'replace' && raw.completeResume) {
+    patch.completeResume = raw.completeResume;
+  }
+
+  return patch;
+};
+
+// ---------------- Apply patch to Zustand store ----------------
+export const applyResumePatch = (patch: NormalizedResumePatch) => {
+  const {
+    addOrUpdateExperience,
+    addSkills,
+    removeSkills,
+    replaceEntireResume,
+    resetResume,
+    removeExperience,
+    clearAllExperiences,
+    clearAllSkills,
+    setSummary,
+    clearSummary
+  } = useAppStore.getState();
+
+  console.log('Applying resume patch:', patch);
+
+  // Operation-level
+  if (patch.operation === 'reset') {
+    resetResume();
+    return;
+  }
+
+  if (patch.operation === 'replace' && patch.completeResume) {
+    replaceEntireResume({
+      experiences: patch.completeResume.experiences || [],
+      skills: patch.completeResume.skills || [],
+      summary: patch.completeResume.summary || ''
+    });
+    return;
+  }
+
+  // Clears
+  if (patch.clearSections?.includes('experiences')) clearAllExperiences();
+  if (patch.clearSections?.includes('skills')) clearAllSkills();
+  if (patch.clearSections?.includes('summary')) clearSummary();
+
+  // Experience add/update
+  if (patch.experience?.company) {
+    addOrUpdateExperience({
+      id: patch.experience.id,
+      company: patch.experience.company,
+      title: patch.experience.title || '',
+      duration: patch.experience.duration || '',
+      description: patch.experience.description || []
+    });
+  }
+
+  // Remove experiences
+  patch.removeExperiences?.forEach(key => removeExperience(key));
+
+  // Skills
+  if (patch.skills && patch.skills.length) addSkills(patch.skills);
+  if (patch.removeSkills && patch.removeSkills.length) removeSkills(patch.removeSkills);
+
+  // Summary
+  if (typeof patch.summary === 'string' && patch.summary.trim()) {
+    setSummary(patch.summary.trim());
+  }
+};
+
+// ---------------- Prompt builder ----------------
 type Experience = { company: string; title?: string; duration?: string; description?: string[] };
 type Resume = { experiences?: Experience[]; skills?: string[]; summary?: string };
 
-const getSystemPrompt = (language: string, userContext: any, resume: Resume) => {
+const getSystemPrompt = (
+  language: string,
+  userContext: any,
+  resume: Resume,
+  chatMessages?: any[]
+) => {
   const currentExperiences: Experience[] = resume?.experiences || [];
   const currentSkills: string[] = resume?.skills || [];
   const currentSummary: string = resume?.summary || '';
+  const targetJobPosting: string = userContext?.targetJobPosting || '';
 
-  const prompts: Record<string, string> = {
-    en: `You are an advanced resume building assistant with full control capabilities. Respond in English.
+  let conversationMemory = '';
 
-CURRENT RESUME STATE:
-- ${currentExperiences.length} experiences: ${currentExperiences.map(e => `${e.company} (${e.title})`).join(', ')}
-- Skills: ${currentSkills.join(', ')}
-- Summary: ${currentSummary}
-
-User: ${userContext?.fullName || 'User'} - ${userContext?.currentRole || 'No role'}
-
-ENHANCED CAPABILITIES:
-You can now perform sophisticated resume operations:
-1. ADD new information to existing sections
-2. UPDATE/EDIT existing entries by company name
-3. REMOVE specific experiences or skills
-4. REPLACE entire sections with new content
-5. CLEAR sections completely
-6. REDESIGN the entire resume structure
-
-OPERATION TYPES:
-- "add" - Add new content to existing data
-- "update" - Modify existing content (specify company for experiences)
-- "remove" - Delete specific items (specify what to remove)
-- "replace" - Replace entire sections with new content
-- "clear" - Empty specific sections completely
-- "reset" - Start completely fresh
-- "redesign" - Complete resume makeover with new structure
-
-RESPONSE RULES:
-- Keep responses VERY CONCISE (maximum 5 lines)
-- Be direct and actionable
-- Ask ONE specific question at a time
-- No lengthy explanations
-- Focus on immediate next steps
-
-Response format: Brief conversational response (max 5 lines) + data operations in this EXACT format:
-
-[RESUME_DATA]
-{
-  "operation": "add|update|remove|replace|clear|reset|redesign",
-  "experience": {
-    "company": "Company Name",
-    "title": "Job Title", 
-    "duration": "2022-Present",
-    "description": ["Achievement 1", "Achievement 2"]
-  },
-  "skills": ["skill1", "skill2"],
-  "summary": "Professional summary text",
-  "removeExperiences": ["Company Name to Remove"],
-  "removeSkills": ["skill to remove"],
-  "clearSections": ["experiences", "skills", "summary"],
-  "completeResume": {
-    "experiences": [...],
-    "skills": [...],
-    "summary": "..."
+  if (chatMessages?.length) {
+    const aiQ = chatMessages.filter(m => m.type === 'ai').slice(-12).map(m => m.content);
+    const userA = chatMessages.filter(m => m.type === 'user').slice(-12).map(m => m.content);
+    conversationMemory = language === 'he'
+      ? `זיכרון שיחה:
+שאלות AI: ${aiQ.join(' | ')}
+תשובות משתמש: ${userA.join(' | ')}`
+      : `CONVERSATION MEMORY:
+AI questions: ${aiQ.join(' | ')}
+User answers: ${userA.join(' | ')}`;
   }
-}
-[/RESUME_DATA]
 
-Ask specific questions and use your enhanced control to help build the perfect resume! Keep responses SHORT and FOCUSED!`,
+  const baseEnglish = `You are a decisive resume-building assistant. ALWAYS output a [RESUME_DATA] block (even if only one field changes).
+Current resume:
+Experiences(${currentExperiences.length}): ${currentExperiences.map(e => e.company + (e.title ? `(${e.title})` : '')).join(', ')}
+Skills: ${currentSkills.join(', ')}
+Summary: ${currentSummary || '(empty)'}
+User: ${userContext?.fullName || 'User'} (${userContext?.currentRole || 'role unknown'})`;
 
-    he: `אתה עוזר מתקדם לבניית קורות חיים עם יכולות שליטה מלאות. ענה בעברית.
+  const baseHebrew = `אתה עוזר לבניית קורות חיים. תמיד החזר בלוק [RESUME_DATA] (גם אם שדה יחיד משתנה).
+קורות חיים נוכחיים:
+ניסיון (${currentExperiences.length}): ${currentExperiences.map(e => e.company + (e.title ? `(${e.title})` : '')).join(', ')}
+כישורים: ${currentSkills.join(', ')}
+תקציר: ${currentSummary || '(ריק)'}
+משתמש: ${userContext?.fullName || 'משתמש'} (${userContext?.currentRole || 'תפקיד לא ידוע'})`;
 
-מצב קורות החיים הנוכחי:
-- ${currentExperiences.length} מקומות עבודה: ${currentExperiences.map(e => `${e.company} (${e.title})`).join(', ')}
-- כישורים: ${currentSkills.join(', ')}
-- תקציר: ${currentSummary}
+  const jobContext = targetJobPosting
+    ? (language === 'he'
+        ? `התאם את הכל למשרה:\n${targetJobPosting}`
+        : `Tailor everything to this job posting:\n${targetJobPosting}`)
+    : '';
 
-משתמש: ${userContext?.fullName || 'משתמש'} - ${userContext?.currentRole || 'ללא תפקיד'}
+  const rulesEn = `
+RESPONSE RULES:
+- <= 6 lines narrative before the data block.
+- Ask ONE clarifying question if needed.
+- ALWAYS include [RESUME_DATA] with operation ("patch" unless full replacement or reset).
+- Provide only changed fields.
+- DO NOT mention the exact target role title or company names from the job posting inside the summary or bullet descriptions. Keep content role-agnostic. Company names only appear in the structured "company" field.
 
-יכולות מתקדמות:
-אתה יכול לבצע פעולות מתוחכמות על קורות החיים:
-1. הוסף מידע חדש לחלקים קיימים
-2. עדכן/ערוך רשומות קיימות (לפי שם חברה)
-3. הסר ניסיונות עבודה או כישורים ספציפיים
-4. החלף חלקים שלמים בתוכן חדש
-5. נקה חלקים לגמרי
-6. עצב מחדש את כל מבנה קורות החיים
-
-סוגי פעולות:
-- "add" - הוסף תוכן חדש למידע קיים
-- "update" - שנה תוכן קיים (ציין חברה לניסיון עבודה)
-- "remove" - מחק פריטים ספציפיים (ציין מה למחוק)
-- "replace" - החלף חלקים שלמים בתוכן חדש
-- "clear" - רוקן חלקים ספציפיים לגמרי
-- "reset" - התחל מחדש לגמרי
-
-כללי תגובה:
-- שמור על תגובות קצרות מאוד (מקסימום 5 שורות)
-- היה ישיר ומעשי
-- שאל שאלה ספציפית אחת בכל פעם
-- ללא הסברים ארוכים
-- התמקד בצעדים הבאים
-
-פורמט תגובה: תגובה שיחתית קצרה (מקס 5 שורות) + פעולות מידע בפורמט המדויק הזה:
-
+FORMAT EXAMPLE:
 [RESUME_DATA]
 {
-  "operation": "add|update|remove|replace|clear|reset",
+  "operation": "patch",
   "experience": {
-    "company": "שם החברה",
-    "title": "תפקיד", 
-    "duration": "2022-כיום",
-    "description": ["הישג 1", "הישג 2"]
+    "company": "Harvard University",
+    "title": "BSc in Computer Science",
+    "duration": "2021-2025",
+    "description": ["Built CNN project achieving 99% MNIST accuracy"]
   },
-  "skills": ["כישור1", "כישור2"],
-  "summary": "תקציר מקצועי",
-  "removeExperiences": ["שם חברה להסרה"],
-  "removeSkills": ["כישור להסרה"],
-  "clearSections": ["experiences", "skills", "summary"]
+  "skills": ["Deep Learning","CNN"],
+  "summary": "Computer science graduate focused on ML."
 }
-[/RESUME_DATA]
+[/RESUME_DATA]`;
 
-שאל שאלות ספציפיות והשתמש ביכולות המתקדמות שלך כדי לעזור לבנות קורות חיים מושלמים! שמור על קצר וממוקד!`
-  };
+  const rulesHe = `
+כללי תגובה:
+- עד 6 שורות טקסט לפני בלוק הנתונים.
+- שאלה אחת בלבד.
+- תמיד [RESUME_DATA] עם operation ("patch" אלא אם החלפה מלאה או reset).
+- החזר רק שדות שעודכנו.
 
-  return prompts[language] || prompts.en;
+דוגמה:
+[RESUME_DATA]
+{
+  "operation": "patch",
+  "experience": {
+    "company": "Harvard University",
+    "title": "BSc in Computer Science",
+    "duration": "2021-2025",
+    "description": ["בניית פרויקט CNN עם 99% דיוק MNIST"]
+  },
+  "skills": ["Deep Learning","CNN"]
+}
+[/RESUME_DATA]`;
+
+  return language === 'he'
+    ? `${baseHebrew}\n${conversationMemory}\n${jobContext}\n${rulesHe}`
+    : `${baseEnglish}\n${conversationMemory}\n${jobContext}\n${rulesEn}`;
 };
 
-export const sendMessageToAI = async (message: string, userContext?: any, resumeData?: any) => {
+// ---------------- Public API ----------------
+export const sendMessageToAI = async (
+  message: string,
+  userContext?: any,
+  resumeData?: Resume,
+  chatMessages?: any[]
+) => {
   try {
-    console.log('Attempting API call with message:', message);
-    
-    const userLanguage = detectLanguage(message);
-    console.log('Detected language:', userLanguage);
-    
-    const systemPrompt = getSystemPrompt(userLanguage, userContext, resumeData);
-    
+    const lang = detectLanguage(message);
+    const systemPrompt = getSystemPrompt(lang, userContext, resumeData || {}, chatMessages);
+
     const fullPrompt = `${systemPrompt}
 
 User message: "${message}"
 
-CRITICAL: Keep your response SHORT and CONCISE (maximum 5 lines). Be direct and actionable. Ask ONE specific question at a time.
-
-Important: Respond conversationally in ${userLanguage === 'he' ? 'Hebrew' : userLanguage === 'ar' ? 'Arabic' : 'English'}, then add the [RESUME_DATA] section if you extract any resume information.`;
+Remember: ALWAYS include [RESUME_DATA] even for single-field updates.`;
 
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const text = response.text();
 
-    console.log('Full AI Response:', text);
-    
-    // Extract conversation message and resume data separately
-    const resumeDataMatch = text.match(/\[RESUME_DATA\]([\s\S]*?)\[\/RESUME_DATA\]/);
-    let conversationMessage = text;
-    let resumeUpdates: { [key: string]: any } = {};
-    
-    if (resumeDataMatch) {
-      // Remove the resume data section from conversation
-      conversationMessage = text.replace(/\[RESUME_DATA\][\s\S]*?\[\/RESUME_DATA\]/, '').trim();
-      
-      try {
-        const jsonData = resumeDataMatch[1].trim();
-        console.log('Extracted JSON:', jsonData);
-        resumeUpdates = JSON.parse(jsonData);
-        console.log('Parsed resume updates:', resumeUpdates);
-      } catch (e) {
-        console.log('Could not parse resume data JSON:', e);
-      }
+    console.log('Raw AI text:', text);
+
+    let conversationMessage = text.trim();
+    let resumeUpdates: NormalizedResumePatch | undefined;
+
+    const { data: parsedData, error: parseError } = extractJsonBlock(text);
+    if (parseError) console.warn('Resume parse note:', parseError);
+
+    if (parsedData) {
+      console.log('Raw parsed JSON:', parsedData);
+      resumeUpdates = normalizeResumeData(parsedData);
+      conversationMessage = conversationMessage
+        .replace(/\[RESUME_DATA\][\s\S]*?\[\/RESUME_DATA\]/i, '')
+        .replace(/```(?:json)?[\s\S]*?```/i, '')
+        .trim();
+      applyResumePatch(resumeUpdates);
+    } else {
+      console.warn('No parsable resume block found.', parseError);
     }
-    
-    return {
-      message: conversationMessage,
-      resumeUpdates: resumeUpdates
-    };
-    
+
+    return { message: conversationMessage, resumeUpdates: resumeUpdates || {} };
   } catch (error) {
-    console.error('Full error details:', error);
-    
-    if (error instanceof Error) {
-      return {
-        message: `API Error: ${error.message}`,
-        resumeUpdates: {}
-      };
-    }
-    
+    console.error('AI error:', error);
     return {
-      message: 'An unknown API error occurred.',
+      message: error instanceof Error ? `API Error: ${error.message}` : 'Unknown API error.',
       resumeUpdates: {}
     };
   }
 };
+

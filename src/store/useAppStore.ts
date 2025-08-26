@@ -11,6 +11,7 @@ const welcomeFormSchema = z.object({
   experienceYears: z.string().optional(),
   industry: z.string().optional(),
   keySkills: z.string().optional(),
+  targetJobPosting: z.string().optional(),
 });
 
 type WelcomeFormData = z.infer<typeof welcomeFormSchema>;
@@ -22,11 +23,11 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-// Simplified data structures for easier AI access
 interface Experience {
+  id?: string;
   company: string;
   title: string;
-  duration: string;
+  duration?: string; // made optional
   description: string[];
 }
 
@@ -36,49 +37,53 @@ interface Resume {
   summary: string;
 }
 
+// Incoming resume patch (from model JSON)
+interface ResumeDataPatch {
+  operation?: 'patch' | 'replace';
+  experiences?: Array<{
+    id?: string;
+    company?: string;
+    title?: string;
+    duration?: string | null;
+    description?: string[] | string | null;
+  }>;
+  skills?: string[];
+  summary?: string;
+}
+
 interface AppStore {
-  // App state
   currentScreen: 'welcome' | 'chat';
-  
-  // User data
   userBasicInfo: WelcomeFormData | null;
-  
-  // Chat data
   chatMessages: ChatMessage[];
-  
-  // Simplified resume data
   resume: Resume;
-  
-  // Basic actions
+
   setUserBasicInfo: (data: WelcomeFormData) => void;
   goToChat: () => void;
   addChatMessage: (content: string, type: 'user' | 'ai') => void;
-  
-  // Enhanced resume control actions for AI
+
   updateResume: (updates: Partial<Resume>) => void;
-  
-  // Experience management
+
   addOrUpdateExperience: (experience: Experience) => void;
-  removeExperience: (companyName: string) => void;
+  removeExperience: (idOrCompany: string) => void;
   clearAllExperiences: () => void;
   replaceAllExperiences: (experiences: Experience[]) => void;
-  
-  // Skills management
+
   addSkills: (newSkills: string[]) => void;
   removeSkills: (skillsToRemove: string[]) => void;
   replaceSkills: (newSkills: string[]) => void;
   clearAllSkills: () => void;
-  
-  // Summary management
+
   setSummary: (summary: string) => void;
   clearSummary: () => void;
-  
-  // Complete resume control
+
   resetResume: () => void;
   replaceEntireResume: (newResume: Resume) => void;
+  applyResumeDataPatch: (patch: ResumeDataPatch) => void;
 }
 
-export const useAppStore = create<AppStore>((set) => ({
+const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+export const useAppStore = create<AppStore>((set, get) => ({
   // Initial state
   currentScreen: 'welcome',
   userBasicInfo: null,
@@ -88,20 +93,20 @@ export const useAppStore = create<AppStore>((set) => ({
     skills: [],
     summary: '',
   },
-  
+
   // Actions
-  setUserBasicInfo: (data) => 
+  setUserBasicInfo: (data) =>
     set({ userBasicInfo: data }),
-    
-  goToChat: () => 
+
+  goToChat: () =>
     set({ currentScreen: 'chat' }),
-    
-  addChatMessage: (content, type) => 
+
+  addChatMessage: (content, type) =>
     set((state) => ({
       chatMessages: [
         ...state.chatMessages,
         {
-          id: Date.now().toString(),
+          id: makeId(),
           type,
           content,
           timestamp: new Date(),
@@ -109,137 +114,190 @@ export const useAppStore = create<AppStore>((set) => ({
       ],
     })),
 
-  // Enhanced resume actions for granular AI control
   updateResume: (updates) =>
     set((state) => ({
-      resume: { ...state.resume, ...updates }
+      resume: { ...state.resume, ...updates },
     })),
 
-  // Experience management
-  addOrUpdateExperience: (newExperience) =>
+  addOrUpdateExperience: (incoming) =>
     set((state) => {
-      const existingIndex = state.resume.experiences.findIndex(
-        exp => exp.company.toLowerCase() === newExperience.company.toLowerCase()
+      const exp: Experience = {
+        ...incoming,
+        id: incoming.id || makeId(),
+        description: Array.from(new Set(incoming.description || [])),
+      };
+
+      const idx = state.resume.experiences.findIndex(e =>
+        (exp.id && e.id && e.id === exp.id) ||
+        (e.company && exp.company &&
+          e.company.trim().toLowerCase() === exp.company.trim().toLowerCase())
       );
-      
-      if (existingIndex !== -1) {
-        const updatedExperiences = [...state.resume.experiences];
-        updatedExperiences[existingIndex] = {
-          ...updatedExperiences[existingIndex],
-          ...newExperience,
-          description: [
-            ...new Set([
-              ...updatedExperiences[existingIndex].description,
-              ...newExperience.description
-            ])
-          ]
+
+      if (idx !== -1) {
+        const prev = state.resume.experiences[idx];
+        const merged: Experience = {
+          ...prev,
+            ...exp,
+          id: prev.id || exp.id,
+          description: Array.from(
+            new Set([...(prev.description || []), ...(exp.description || [])])
+          ),
         };
-        
-        return {
-          resume: {
-            ...state.resume,
-            experiences: updatedExperiences
-          }
-        };
-      } else {
-        return {
-          resume: {
-            ...state.resume,
-            experiences: [...state.resume.experiences, newExperience]
-          }
-        };
+        const experiences = [...state.resume.experiences];
+        experiences[idx] = merged;
+        return { resume: { ...state.resume, experiences } };
       }
+
+      return {
+        resume: {
+          ...state.resume,
+          experiences: [...state.resume.experiences, exp],
+        },
+      };
     }),
 
-  removeExperience: (companyName) =>
+  removeExperience: (idOrCompany) =>
     set((state) => ({
       resume: {
         ...state.resume,
         experiences: state.resume.experiences.filter(
-          exp => exp.company.toLowerCase() !== companyName.toLowerCase()
-        )
-      }
+          e =>
+            !(
+              (e.id && e.id === idOrCompany) ||
+              e.company.trim().toLowerCase() === idOrCompany.trim().toLowerCase()
+            )
+        ),
+      },
     })),
 
   clearAllExperiences: () =>
     set((state) => ({
-      resume: {
-        ...state.resume,
-        experiences: []
-      }
+      resume: { ...state.resume, experiences: [] },
     })),
 
   replaceAllExperiences: (experiences) =>
     set((state) => ({
-      resume: {
-        ...state.resume,
-        experiences
-      }
+      resume: { ...state.resume, experiences },
     })),
 
-  // Skills management
   addSkills: (newSkills) =>
     set((state) => ({
       resume: {
         ...state.resume,
-        skills: [...new Set([...state.resume.skills, ...newSkills])]
-      }
+        skills: Array.from(
+          new Set([
+            ...state.resume.skills,
+            ...newSkills.map(s => s.trim()).filter(Boolean),
+          ])
+        ),
+      },
     })),
 
   removeSkills: (skillsToRemove) =>
-    set((state) => ({
-      resume: {
-        ...state.resume,
-        skills: state.resume.skills.filter(skill =>
-          !skillsToRemove.some(removeSkill =>
-            removeSkill.toLowerCase() === skill.toLowerCase()
-          )
-        )
-      }
-    })),
+    set((state) => {
+      const toRemove = skillsToRemove.map(s => s.toLowerCase().trim());
+      return {
+        resume: {
+          ...state.resume,
+          skills: state.resume.skills.filter(
+            s => !toRemove.includes(s.toLowerCase().trim())
+          ),
+        },
+      };
+    }),
 
   replaceSkills: (newSkills) =>
     set((state) => ({
       resume: {
         ...state.resume,
-        skills: newSkills
-      }
+        skills: newSkills.map(s => s.trim()).filter(Boolean),
+      },
     })),
 
   clearAllSkills: () =>
     set((state) => ({
-      resume: {
-        ...state.resume,
-        skills: []
-      }
+      resume: { ...state.resume, skills: [] },
     })),
 
-  // Summary management
   setSummary: (summary) =>
     set((state) => ({
-      resume: { ...state.resume, summary }
+      resume: { ...state.resume, summary },
     })),
 
   clearSummary: () =>
     set((state) => ({
-      resume: {
-        ...state.resume,
-        summary: ''
-      }
+      resume: { ...state.resume, summary: '' },
     })),
 
-  // Complete resume control
   resetResume: () =>
     set(() => ({
       resume: {
         experiences: [],
         skills: [],
-        summary: ''
-      }
+        summary: '',
+      },
     })),
 
   replaceEntireResume: (newResume) =>
     set(() => ({
-      resume: newResume
+      resume: newResume,
     })),
+
+  applyResumeDataPatch: (patch) => {
+    if (!patch || typeof patch !== 'object') return;
+    const op = patch.operation || 'patch';
+    const current = get().resume;
+
+    // Normalize experiences helper
+    const normalizeExperiences = (list: ResumeDataPatch['experiences']): Experience[] => {
+      if (!Array.isArray(list)) return [];
+      return list
+        .filter(e => e && (e.company || e.title))
+        .map(e => {
+          const descArr = Array.isArray(e.description)
+            ? e.description
+            : (typeof e.description === 'string' ? [e.description] : []);
+          return {
+            id: e.id,
+            company: (e.company || 'Unknown').trim(),
+            title: (e.title || '').trim(),
+            duration: e.duration || undefined,
+            description: Array.from(
+              new Set(
+                descArr
+                  .filter(Boolean)
+                  .map(d => d.trim())
+              )
+            ),
+          };
+        });
+    };
+
+    if (op === 'replace') {
+      const newResume: Resume = {
+        experiences: normalizeExperiences(patch.experiences) || current.experiences,
+        skills: Array.isArray(patch.skills)
+          ? Array.from(new Set(patch.skills.map(s => s.trim()).filter(Boolean)))
+          : current.skills,
+        summary: typeof patch.summary === 'string'
+          ? patch.summary.trim()
+          : current.summary,
+      };
+      set({ resume: newResume });
+      return;
+    }
+
+    // Patch (merge)
+    if (Array.isArray(patch.experiences)) {
+      normalizeExperiences(patch.experiences).forEach(exp => {
+        get().addOrUpdateExperience(exp);
+      });
+    }
+    if (Array.isArray(patch.skills)) {
+      get().addSkills(patch.skills);
+    }
+    if (typeof patch.summary === 'string' && patch.summary.trim()) {
+      get().setSummary(patch.summary.trim());
+    }
+  },
 }));

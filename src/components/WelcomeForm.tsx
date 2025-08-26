@@ -11,6 +11,7 @@ const welcomeFormSchema = z.object({
   experienceYears: z.string().optional(),
   industry: z.string().optional(),
   keySkills: z.string().optional(),
+  targetJobPosting: z.string().min(1, 'Target job posting is required'),
 });
 
 type WelcomeFormData = z.infer<typeof welcomeFormSchema>;
@@ -29,6 +30,7 @@ const WelcomeForm: React.FC<WelcomeFormProps> = ({ onComplete }) => {
     experienceYears: '',
     industry: '',
     keySkills: '',
+    targetJobPosting: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -212,6 +214,21 @@ const WelcomeForm: React.FC<WelcomeFormProps> = ({ onComplete }) => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
                 placeholder="React, TypeScript, Node.js, Python, etc."
               />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Target Job Posting (Optional)
+              </label>
+              <textarea
+                value={formData.targetJobPosting}
+                onChange={(e) => handleInputChange('targetJobPosting', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-32"
+                placeholder="Paste the job posting or description here. The AI will tailor your resume to match this specific role..."
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Including a job posting helps the AI create a more targeted resume for that specific role.
+              </p>
             </div>
           </div>
 
