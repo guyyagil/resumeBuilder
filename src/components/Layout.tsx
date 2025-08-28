@@ -3,6 +3,62 @@ import { z } from 'zod';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
 
+// ---- Add these type declarations ----
+type ResumeOperation = 'reset' | 'redesign' | 'clear' | 'remove' | 'replace' | 'update' | 'add';
+
+interface ExperienceInput {
+  id?: string;
+  company?: string;
+  title?: string;
+  duration?: string;
+  description?: string[];
+}
+
+interface ResumeExperience {
+  id?: string;
+  company: string;
+  title: string;
+  duration: string;
+  description: string[];
+}
+
+interface CompleteResume {
+  experiences?: ResumeExperience[];
+  skills?: string[];
+  summary?: string;
+}
+
+interface ResumeUpdates {
+  operation?: ResumeOperation;
+  completeResume?: CompleteResume;
+  clearSections?: ('experiences' | 'skills' | 'summary')[];
+  removeExperiences?: string[];
+  removeSkills?: string[];
+  experiences?: ExperienceInput[];
+  skills?: string[];
+  summary?: string;
+  experience?: ExperienceInput;
+}
+
+type AIResponse = string | {
+  message: string;
+  resumeUpdates?: ResumeUpdates;
+};
+
+// Helper to normalize experiences into required shape
+const normalizeExperiences = (items: ExperienceInput[] = []) =>
+  items
+    .filter(e => e.company && e.title) // ensure required
+    .map(e => ({
+      id: e.id || (typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).slice(2)),
+      company: e.company!, // safe due to filter
+      title: e.title!,
+      duration: e.duration || '2022 - Present',
+      description: e.description && e.description.length > 0
+        ? e.description
+        : ['Add measurable accomplishment or responsibility']
+    }));
+
 // Use the same Zod schema as WelcomeForm
 const welcomeFormSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
@@ -82,9 +138,9 @@ To get started, tell me about your current job - what company do you work for an
       const aiResponse = await sendMessageToAI(
         userMessage, 
         userBasicInfo, 
-        resume, // Use simplified resume structure
-        chatMessages // Pass chat history for context summarization
-      );
+        resume,
+        chatMessages
+      ) as AIResponse;
       
       // Remove context processing message if it was added
       if (contextProcessingId) {
@@ -97,12 +153,12 @@ To get started, tell me about your current job - what company do you work for an
         
         // Handle enhanced resume operations
         if (aiResponse.resumeUpdates) {
-          const updates = aiResponse.resumeUpdates;
-          const operation = updates.operation || 'add';
+          const updates = aiResponse.resumeUpdates as ResumeUpdates;
+          const operation: ResumeOperation = updates.operation || 'add';
           
           console.log('AI Operation:', operation, updates);
           
-          // Handle different operation types
+          // Handle different operats
           switch (operation) {
             case 'reset':
               resetResume();
@@ -110,9 +166,14 @@ To get started, tell me about your current job - what company do you work for an
               break;
               
             case 'redesign':
-              // Complete resume redesign
               if (updates.completeResume) {
-                replaceEntireResume(updates.completeResume);
+                const normalized = {
+                  experiences: normalizeExperiences(updates.completeResume.experiences || []),
+                  skills: updates.completeResume.skills || [],
+                  summary: updates.completeResume.summary || ''
+                };
+                // cast to any to satisfy store's stricter Resume type
+                replaceEntireResume(normalized as any);
                 addChatMessage('🎨 Complete resume redesign applied!', 'ai');
               }
               break;
@@ -153,19 +214,15 @@ To get started, tell me about your current job - what company do you work for an
               break;
               
             case 'replace':
-              // Replace all experiences
               if (updates.experiences && Array.isArray(updates.experiences)) {
-                replaceAllExperiences(updates.experiences);
+                const normalized = normalizeExperiences(updates.experiences);
+                replaceAllExperiences(normalized as any);
                 addChatMessage('🔄 Replaced all experiences with new ones!', 'ai');
               }
-              
-              // Replace all skills
               if (updates.skills && Array.isArray(updates.skills)) {
                 replaceSkills(updates.skills);
                 addChatMessage('🔄 Replaced all skills with new ones!', 'ai');
               }
-              
-              // Replace summary
               if (updates.summary) {
                 setSummary(updates.summary);
                 addChatMessage('📝 Updated professional summary!', 'ai');
@@ -175,33 +232,28 @@ To get started, tell me about your current job - what company do you work for an
             case 'update':
             case 'add':
             default:
-              // Handle experience updates/additions - but only if complete information is provided
               if (updates.experience) {
                 const exp = updates.experience;
-                // Validate that we have real information, not placeholders
-                const hasValidCompany = exp.company && exp.company !== 'Company Name' && exp.company !== 'Company Name Needed' && !exp.company.includes('Needed');
-                const hasValidTitle = exp.title && exp.title !== 'Job Title' && exp.title !== 'Job Title Needed' && !exp.title.includes('Needed');
-                
+                const hasValidCompany = exp.company && exp.company !== 'Company Name' && !exp.company.includes('Needed');
+                const hasValidTitle = exp.title && exp.title !== 'Job Title' && !exp.title.includes('Needed');
                 if (hasValidCompany && hasValidTitle) {
                   addOrUpdateExperience({
-                    company: exp.company,
-                    title: exp.title,
+                    company: exp.company!,   // assert non-undefined after validation
+                    title: exp.title!,
                     duration: exp.duration || '2022 - Present',
-                    description: exp.description || ['Key responsibility']
-                  });
+                    description: exp.description && exp.description.length
+                      ? exp.description
+                      : ['Key responsibility']
+                  } as any);
                   addChatMessage(`✅ ${operation === 'update' ? 'Updated' : 'Added'} experience at ${exp.company}!`, 'ai');
                 } else {
                   console.log('Skipped adding experience with incomplete data:', exp);
                 }
               }
-              
-              // Handle skills additions
               if (updates.skills && Array.isArray(updates.skills)) {
                 addSkills(updates.skills);
                 addChatMessage(`✅ Added ${updates.skills.length} new skills!`, 'ai');
               }
-              
-              // Handle summary
               if (updates.summary) {
                 setSummary(updates.summary);
                 addChatMessage('📝 Updated professional summary!', 'ai');
