@@ -109,7 +109,7 @@ const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch => {
   };
 
   // Experience normalization: accept "experience", "experiences" or nested forms
-  let expSource: any = raw.experience ?? raw.experiences ?? null;
+  let expSource: any = raw.experience ?? null;
 
   // If top-level object contains work/education keys, try to find them
   if (!expSource && raw && typeof raw === 'object') {
