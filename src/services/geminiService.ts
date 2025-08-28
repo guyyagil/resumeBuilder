@@ -5,7 +5,7 @@ const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 if (!apiKey) throw new Error('VITE_GEMINI_API_KEY is not set in environment variables');
 
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 // ---------------- Language detection ----------------
 const detectLanguage = (text: string): 'he' | 'en' =>
@@ -108,19 +108,49 @@ const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch => {
       : 'patch'
   };
 
-  // Experience normalization
-  let expSource = raw.experience;
+  // Experience normalization: accept "experience", "experiences" or nested forms
+  let expSource: any = raw.experience ?? raw.experiences ?? null;
+
+  // If top-level object contains work/education keys, try to find them
+  if (!expSource && raw && typeof raw === 'object') {
+    const possibleContainers = ['experience', 'experiences', 'work', 'education', 'job', 'role', 'position'];
+    for (const key of possibleContainers) {
+      if ((raw as any)[key]) {
+        expSource = (raw as any)[key];
+        break;
+      }
+    }
+  }
+
+  if (Array.isArray(expSource)) expSource = expSource[0];
+
   if (expSource && typeof expSource === 'object') {
-    const nestedKey = ['education', 'work', 'job', 'role', 'position'].find(k => expSource[k]);
-    if (nestedKey) expSource = expSource[nestedKey];
-    if (Array.isArray(expSource)) expSource = expSource[0];
+    // If the object itself wraps an array under common nested keys, unwrap
+    const nestedKey = ['education', 'work', 'job', 'role', 'position', 'experiences', 'experience']
+      .find(k => expSource[k]);
+    if (nestedKey) {
+      expSource = expSource[nestedKey];
+      if (Array.isArray(expSource)) expSource = expSource[0];
+    }
+
     if (expSource && typeof expSource === 'object') {
+      // Normalize description to array (accept string or array)
+      let desc: string[] = [];
+      if (Array.isArray(expSource.description)) desc = expSource.description;
+      else if (typeof expSource.description === 'string') {
+        // split lines / bullets / semicolons / commas, keep non-empty
+        desc = expSource.description
+          .split(/[\r\n•;,-]{1,}/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+      }
+
       patch.experience = {
         id: expSource.id,
-        company: expSource.company,
-        title: expSource.title,
-        duration: expSource.duration,
-        description: Array.isArray(expSource.description) ? expSource.description : []
+        company: (expSource.company || expSource.companyName || expSource.employer || '').trim(),
+        title: (expSource.title || expSource.position || '').trim(),
+        duration: expSource.duration || expSource.period || undefined,
+        description: Array.isArray(desc) ? desc : []
       };
     }
   }
