@@ -9,8 +9,6 @@ const welcomeFormSchema = z.object({
   location: z.string().optional(),
   currentRole: z.string().min(2, 'Please enter your current role'),
   experienceYears: z.string().optional(),
-  industry: z.string().optional(),
-  keySkills: z.string().optional(),
   targetJobPosting: z.string().min(1, 'Target job posting is required'),
 });
 
@@ -28,8 +26,6 @@ const WelcomeForm: React.FC<WelcomeFormProps> = ({ onComplete }) => {
     location: '',
     currentRole: '',
     experienceYears: '',
-    industry: '',
-    keySkills: '',
     targetJobPosting: '',
   });
 
@@ -190,32 +186,6 @@ const WelcomeForm: React.FC<WelcomeFormProps> = ({ onComplete }) => {
                 </select>
               </div>
             </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Industry/Field
-              </label>
-              <input
-                type="text"
-                value={formData.industry}
-                onChange={(e) => handleInputChange('industry', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Technology, Healthcare, Finance, etc."
-              />
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Key Skills (comma-separated)
-              </label>
-              <textarea
-                value={formData.keySkills}
-                onChange={(e) => handleInputChange('keySkills', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
-                placeholder="React, TypeScript, Node.js, Python, etc."
-              />
-            </div>
-
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Target Job Posting (Optional)
