@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { extractResumeFromPlainText } from '../services/geminiService';
 import * as pdfjsLib from 'pdfjs-dist';
-import 'pdfjs-dist/build/pdf.worker.mjs'; // ensure bundler can locate worker (Vite may need alias)
+import 'pdfjs-dist/build/pdf.worker.mjs';
 
 (pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.mjs',
@@ -23,31 +23,18 @@ const WelcomeForm: React.FC = () => {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const onSelectFile = (f: File) => {
-    if (f.type !== 'application/pdf') {
-      setError('נא להעלות קובץ PDF בלבד');
-      return;
-    }
-    if (f.size > MAX_SIZE_MB * 1024 * 1024) {
-      setError(`גודל קובץ גדול מ-${MAX_SIZE_MB}MB`);
-      return;
-    }
-    setError(null);
-    setFile(f);
+    if (f.type !== 'application/pdf') { setError('נא להעלות קובץ PDF בלבד'); return; }
+    if (f.size > MAX_SIZE_MB * 1024 * 1024) { setError(`גודל קובץ גדול מ-${MAX_SIZE_MB}MB`); return; }
+    setError(null); setFile(f);
   };
-
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) onSelectFile(e.target.files[0]);
   };
-
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files?.[0]) onSelectFile(e.dataTransfer.files[0]);
   }, []);
-
-  const prevent = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
+  const prevent = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
 
   const extractPdfText = async (f: File): Promise<string> => {
     const arrayBuf = await f.arrayBuffer();
@@ -56,7 +43,7 @@ const WelcomeForm: React.FC = () => {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const pageText = content.items.map((it: any) => it.str).join(' ');
+      const pageText = (content.items as any[]).map(it => it.str).join(' ');
       text += '\n' + pageText;
     }
     return text;
@@ -64,113 +51,135 @@ const WelcomeForm: React.FC = () => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError('נא לצרף קובץ PDF');
-      return;
-    }
-    setLoading(true);
-    setError(null);
+    if (!file) { setError('נא לצרף קובץ PDF'); return; }
+    setLoading(true); setError(null);
     try {
       const pdfText = await extractPdfText(file);
       setOriginalResumeText(pdfText);
       if (jobText.trim()) setTargetJobPosting(jobText.trim());
-
-      // Kick AI extraction
       const result = await extractResumeFromPlainText(pdfText);
-      if (!result.ok) {
-        setError('כשל בעיבוד ה-AI: ' + (result.error || ''));
-      } else {
-        // After successful parsing navigate to chat
-        goToChat();
-      }
+      if (!result.ok) setError('כשל בעיבוד ה-AI: ' + (result.error || ''));
+      else goToChat();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שגיאה לא צפויה בקריאת PDF');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
-    <div dir="rtl" className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-slate-50 px-4 py-12 font-[Heebo]">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-10 text-center">
-          <h1 className="text-3xl font-semibold text-gray-900">נתחיל מהקורות חיים הנוכחיים שלך</h1>
-          <p className="mt-3 text-gray-600">העלה PDF קיים והמערכת תחלץ ותשפר את הנתונים עבורך. הוסף גם טקסט משרה יעד כדי לחדד התאמה.</p>
+    <div dir="rtl" className="min-h-screen w-full bg-gradient-to-br from-indigo-50 via-white to-cyan-50 font-[Heebo] text-slate-800 relative">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_22%,rgba(56,189,248,0.25),transparent_60%)]" />
+      <div className="mx-auto max-w-5xl px-5 pt-14 pb-24 relative">
+        <header className="mb-14 text-center">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-l from-indigo-600 via-indigo-500 to-cyan-500 bg-clip-text text-transparent">
+            נתחיל מהקורות חיים שלך
+          </h1>
+          <p className="mt-4 max-w-2xl mx-auto leading-relaxed text-slate-600">
+            העלה PDF ונחלץ עבורך מידע מובנה. אפשר להוסיף טקסט של משרת יעד כדי לחדד התאמות חכמות.
+          </p>
         </header>
 
-        <form onSubmit={submit} className="rounded-2xl border border-gray-200 bg-white/80 p-6 md:p-8 shadow-lg shadow-indigo-100 space-y-8">
-          
-          {/* Upload */}
-            <div
-              onDrop={onDrop}
-              onDragOver={prevent}
-              onDragEnter={prevent}
-              onDragLeave={prevent}
-              className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-14 text-center transition
-              ${file ? 'border-indigo-400 bg-indigo-50/40' : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/30'}
-              `}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={handleFileInput}
-              />
-              <div className="flex flex-col items-center gap-3">
-                <div className="rounded-full bg-indigo-100 p-4 text-indigo-600">
-                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
-                  </svg>
+        <form onSubmit={submit} className="relative group mx-auto max-w-3xl">
+          <div className="absolute -inset-[2px] rounded-3xl bg-gradient-to-r from-indigo-300/50 via-indigo-200/40 to-cyan-200/50 opacity-0 blur-xl transition group-hover:opacity-100" />
+          <div className="relative rounded-3xl border border-indigo-100 bg-white/90 backdrop-blur-sm px-8 py-10 shadow-[0_4px_20px_-5px_rgba(99,102,241,0.15),0_10px_30px_-10px_rgba(14,165,233,0.15)]">
+            <div className="grid gap-10">
+              {/* Upload */}
+              <div
+                onDrop={onDrop}
+                onDragOver={prevent}
+                onDragEnter={prevent}
+                onDragLeave={prevent}
+                className={`rounded-2xl border-2 border-dashed px-8 py-16 transition flex flex-col items-center text-center
+                  ${file
+                    ? 'border-indigo-300 bg-gradient-to-br from-indigo-50 to-white'
+                    : 'border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/60'}
+                `}
+              >
+                <input ref={inputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileInput} />
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 animate-ping rounded-full bg-indigo-300/40" />
+                    <div className="relative rounded-full bg-gradient-to-br from-indigo-500 to-cyan-400 p-4 text-white shadow-lg shadow-indigo-300/40">
+                      <svg width="34" height="34" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 16V4m0 0L8 8m4-4 4 4" />
+                        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                      </svg>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    {file ? (
+                      <span className="font-semibold text-indigo-600">{file.name}</span>
+                    ) : (
+                      <>
+                        גרור ושחרר כאן את קובץ ה־PDF
+                        <br />
+                        <span className="text-xs text-slate-400">או לחץ לבחירה ידנית</span>
+                      </>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => inputRef.current?.click()}
+                      className="rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-500 to-cyan-500 px-7 py-2.5 text-sm font-medium text-white shadow hover:brightness-105 active:scale-[.97] focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    >
+                      בחר קובץ
+                    </button>
+                    {file && (
+                      <button
+                        type="button"
+                        onClick={() => setFile(null)}
+                        className="rounded-lg border border-indigo-200 bg-white/70 px-4 py-2 text-xs text-slate-600 hover:bg-indigo-50"
+                      >
+                        הסרה
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400">PDF עד {MAX_SIZE_MB}MB</p>
                 </div>
-                <p className="text-sm text-gray-700">
-                  {file ? <span className="font-medium text-indigo-700">{file.name}</span> : 'גרור ושחרר את קובץ ה-PDF של הקורות חיים כאן'}
-                </p>
+              </div>
+
+              {/* Job posting */}
+              <div className="space-y-3">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <span className="h-2 w-2 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400" />
+                  טקסט משרת יעד (אופציונלי)
+                </label>
+                <div className="relative">
+                  <textarea
+                    dir="rtl"
+                    rows={7}
+                    className="w-full resize-none rounded-xl border border-indigo-100 bg-white/70 px-5 py-4 text-sm leading-relaxed text-slate-700 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-slate-400"
+                    placeholder="הדבק כאן דרישות / מודעת משרה..."
+                    value={jobText}
+                    onChange={e => setJobText(e.target.value)}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500">משפיע על תקציר, נקודות ומיומנויות.</p>
+              </div>
+
+              {error && (
+                <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  type="submit"
+                  disabled={loading || !file}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 px-9 py-3 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 >
-                  בחר קובץ
+                  {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
+                  {loading ? 'מעבד...' : 'המשך לצ׳אט'}
                 </button>
-                <p className="text-xs text-gray-400">PDF עד {MAX_SIZE_MB}MB</p>
+                {!file && <span className="text-xs text-slate-500">נדרש קובץ PDF כדי להמשיך</span>}
               </div>
             </div>
-
-          {/* Job posting */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">מודעת משרה / טקסט דרישות (אופציונלי)</label>
-            <textarea
-              dir="rtl"
-              rows={6}
-              className="w-full rounded-xl border border-gray-300 bg-white/60 px-4 py-3 text-sm leading-relaxed shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              placeholder="הדבק כאן מודעת משרה או תיאור תפקיד יעד..."
-              value={jobText}
-              onChange={e => setJobText(e.target.value)}
-            />
-            <p className="text-[11px] text-gray-500">הטקסט ישמש להתאמה מוש intelligent של התקציר והנקודות.</p>
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-            <button
-              type="submit"
-              disabled={loading || !file}
-              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-8 py-3 text-sm font-medium text-white shadow-md shadow-indigo-400/30 transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? 'מעבד...' : 'המשך לצ׳אט'}
-            </button>
-            {!file && <span className="text-xs text-gray-500">נדרש קובץ PDF כדי להמשיך</span>}
           </div>
         </form>
 
-        <footer className="mt-10 text-center text-xs text-gray-400">
-          הנתונים מעובדים מקומית לפני שליחה ל-AI. ודא שאין מידע רגיש במיוחד.
+        <footer className="mt-14 text-center text-[11px] text-slate-500">
+          עיבוד ראשוני בדפדפן לפני שליחה ל-AI. הימנע ממידע רגיש מאוד.
         </footer>
       </div>
     </div>

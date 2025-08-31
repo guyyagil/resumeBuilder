@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
-// lightweight fallback translation mapping (no react-i18next dependency)
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // ---- Add these type declarations ----
 type ResumeOperation = 'reset' | 'redesign' | 'clear' | 'remove' | 'replace' | 'update' | 'add';
@@ -80,14 +81,6 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
-  const t = (key: string) => {
-    const translations: Record<string, string> = {
-      chatPlaceholder: 'Type a message...',
-      resumePreview: 'Resume Preview',
-      experiences: 'Experiences'
-    };
-    return translations[key] || key;
-  };
   const { 
     chatMessages, 
     addChatMessage, 
@@ -109,7 +102,9 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
   
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const initialMessageSent = useRef(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Add initial AI greeting when component mounts
   useEffect(() => {
@@ -124,7 +119,14 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
       );
       initialMessageSent.current = true;
     }
-  }, [chatMessages.length, addChatMessage]);
+  }, [chatMessages.length, addChatMessage, resume.fullName, userBasicInfo]);
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -141,12 +143,11 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
       addChatMessage('🧠 Processing conversation context...', 'ai') : null;
 
     try {
-      // Pass existing resume data and chat history to AI for better context
+      // Pass chat history and resume to AI for better context (match service signature)
       const aiResponse = await sendMessageToAI(
-        userMessage, 
-        userBasicInfo, 
-        resume,
-        chatMessages
+        userMessage,
+        chatMessages,
+        resume
       ) as AIResponse;
       
       // Remove context processing message if it was added
@@ -303,167 +304,306 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
       : `Professional ${userBasicInfo?.currentRole || 'individual'} ready to contribute expertise and drive results in a dynamic environment.`
     );
 
-  return (
-    <div dir="rtl" className="min-h-screen bg-gray-50 font-[Heebo]">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 dir="rtl" className="text-2xl font-bold text-gray-900">בונה קורות חיים חכם</h1>
-        </div>
-      </header>
+  const handleExportPdf = async () => {
+    if (exporting) return;
+    setExporting(true);
 
-      {/* Main Content - Split Pane Layout */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-120px)]">
+    try {
+      // Create a simple temporary container
+      const tempContainer = document.createElement('div');
+      tempContainer.style.cssText = `
+        position: absolute;
+        top: -10000px;
+        left: 0;
+        width: 210mm;
+        background-color: #ffffff;
+        font-family: 'Heebo', Arial, sans-serif;
+        direction: rtl;
+        padding: 20mm;
+        box-sizing: border-box;
+        font-size: 12pt;
+        line-height: 1.4;
+        color: #111827;
+      `;
+
+      // Build simple clean HTML
+      const { fullName, title, email, phone, location, summary, experiences, skills } = resume;
+      const allSkills = [...new Set([
+        ...(userBasicInfo?.keySkills?.split(',').map(s => s.trim()).filter(s => s) || []),
+        ...skills
+      ])];
+
+      const contactInfo = [email, phone, location].filter(Boolean).join(' | ');
+
+      tempContainer.innerHTML = `
+        <div>
+          <!-- Header -->
+          <div style="text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 15px; margin-bottom: 20px;">
+            <h1 style="font-size: 24pt; font-weight: bold; margin: 0 0 8px 0;">${fullName || 'שם מלא'}</h1>
+            ${title ? `<p style="font-size: 14pt; margin: 4px 0; color: #666;">${title}</p>` : ''}
+            ${contactInfo ? `<p style="font-size: 11pt; color: #666; margin: 4px 0;">${contactInfo}</p>` : ''}
+          </div>
+
+          <!-- Professional Summary -->
+          <div style="margin-bottom: 25px;">
+            <h2 style="font-size: 16pt; font-weight: bold; margin: 0 0 10px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px;">תקציר מקצועי</h2>
+            <p style="margin: 0; text-align: justify;">${summary || professionalSummary}</p>
+          </div>
+
+          <!-- Experience -->
+          <div style="margin-bottom: 25px;">
+            <h2 style="font-size: 16pt; font-weight: bold; margin: 0 0 15px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px;">ניסיון</h2>
+            ${experiences.map(exp => `
+              <div style="margin-bottom: 20px;">
+                <h3 style="font-size: 14pt; font-weight: bold; margin: 0 0 4px 0;">${exp.title || ''}</h3>
+                <p style="font-size: 12pt; color: #666; margin: 0 0 8px 0;">${exp.company || ''} • ${exp.duration || ''}</p>
+                ${exp.description.map(desc => {
+                  const cleanDesc = desc.replace(/^[•\-\s]+/, '');
+                  return `<p style="margin: 4px 0 4px 15px; text-indent: -15px;">• ${cleanDesc}</p>`;
+                }).join('')}
+              </div>
+            `).join('')}
+            ${experiences.length === 0 ? '<p style="color: #666;">אין ניסיון להציג</p>' : ''}
+          </div>
+
+          <!-- Skills -->
+          <div>
+            <h2 style="font-size: 16pt; font-weight: bold; margin: 0 0 15px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px;">כישורים</h2>
+            <p style="margin: 0;">${allSkills.join(' • ')}</p>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(tempContainer);
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Simple canvas generation
+      const canvas = await html2canvas(tempContainer, {
+        scale: 1.2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        allowTaint: true,
+        logging: false
+      });
+
+      document.body.removeChild(tempContainer);
+
+      // Simple PDF creation
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      
+      const imgWidth = pageWidth - (margin * 2);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      if (imgHeight <= pageHeight - (margin * 2)) {
+        // Fits on one page
+        pdf.addImage(
+          canvas.toDataURL('image/png'),
+          'PNG',
+          margin,
+          margin,
+          imgWidth,
+          imgHeight
+        );
+      } else {
+        // Split into pages
+        const pageRatio = (pageHeight - margin * 2) / imgHeight;
+        const pageCanvasHeight = canvas.height * pageRatio;
+        let position = 0;
+
+        while (position < canvas.height) {
+          const currentHeight = Math.min(pageCanvasHeight, canvas.height - position);
           
-          {/* Chat Panel - Left Side */}
-          <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-lg p-6 flex flex-col text-right">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">שיחה עם ה-AI</h2>
+          const pageCanvas = document.createElement('canvas');
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = currentHeight;
+          
+          const ctx = pageCanvas.getContext('2d')!;
+          ctx.drawImage(canvas, 0, position, canvas.width, currentHeight, 0, 0, canvas.width, currentHeight);
+
+          if (position > 0) pdf.addPage();
+          
+          const finalHeight = (currentHeight * imgWidth) / canvas.width;
+          pdf.addImage(
+            pageCanvas.toDataURL('image/png'),
+            'PNG',
+            margin,
+            margin,
+            imgWidth,
+            finalHeight
+          );
+
+          position += currentHeight;
+          if (position >= canvas.height) break;
+        }
+      }
+
+      const fileName = `${(resume.fullName || 'קורות_חיים').replace(/[^\w\u0590-\u05FF\s]+/g, '_')}.pdf`;
+      pdf.save(fileName);
+
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      alert('שגיאה ביצוא PDF. אנא נסה שוב.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div dir="rtl" className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 font-['Heebo'] text-slate-800">
+      <div className="mx-auto max-w-7xl px-5 py-6 grid gap-6 lg:grid-cols-2 h-screen">
+        
+        {/* צ'אט - עכשיו ראשון כדי להיות בצד שמאל ב-RTL */}
+        <div className="order-1 lg:order-1 rounded-2xl border border-indigo-100 bg-white/80 backdrop-blur-sm shadow-lg flex flex-col h-[calc(100vh-3rem)]">
+          <div className="p-4 border-b border-indigo-100 flex-shrink-0">
+            <h2 className="font-bold text-lg bg-gradient-to-l from-indigo-600 to-cyan-500 bg-clip-text text-transparent">שיחה עם ה-AI</h2>
+          </div>
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#c7d2fe #f1f5f9' }}
+          >
+            {/* הודעות */}
+            {chatMessages.map((message) => (
+              <div
+                key={message.id}
+                className={`rounded-lg p-3 max-w-[85%] ${
+                  message.type === 'ai' 
+                    ? 'bg-blue-50 text-blue-900 border border-blue-100' 
+                    : 'bg-white mr-auto text-gray-900 border border-gray-200 shadow-sm'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 max-w-[85%]">
+                <p className="text-sm text-blue-900">AI חושב...</p>
+              </div>
+            )}
+          </div>
+          <div className="p-4 border-t border-indigo-100 flex gap-3 flex-shrink-0">
+            <input
+              dir="rtl"
+              type="text" 
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="כתוב הודעה או הוסף פרטים..." 
+              className="flex-1 rounded-xl border border-indigo-200 bg-white/70 px-4 py-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 placeholder:text-slate-400"
+              disabled={isLoading}
+            />
+            <button
+              type="button"
+              onClick={handleSendMessage}
+              className="rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              disabled={!inputMessage.trim() || isLoading}
+            >
+              שלח
+            </button>
+          </div>
+        </div>
+
+        {/* כרטיס קורות חיים - עכשיו שני כדי להיות בצד ימין ב-RTL */}
+        <div className="order-2 lg:order-2 rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col h-[calc(100vh-3rem)]">
+          
+          {/* שורת כותרת + כפתור ייצוא */}
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-4 flex-shrink-0">
+            <h1 className="text-lg font-bold text-gray-900">
+              קורות חיים
+            </h1>
+            <button
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-xs font-medium text-white shadow hover:from-indigo-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              {exporting ? 'מכין PDF...' : 'ייצוא PDF'}
+            </button>
+          </div>
+
+          {/* תוכן קורות החיים עם גלילה */}
+          <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: 'thin', scrollbarColor: '#c7d2fe #f1f5f9' }}>
             
-            {/* Chat Messages Area */}
-            <div className="flex-1 bg-gray-50 rounded-xl p-4 mb-4 overflow-y-auto max-h-96 text-right leading-relaxed">
+            {/* Header Section */}
+            <div className="text-center border-b border-gray-200 pb-4 mb-6">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+               {resume.fullName?.trim() || 'שם מלא'}
+              </h1>
+              {resume.title?.trim() && (
+                <p className="text-lg text-gray-600 mb-2">
+                 {resume.title}
+                </p>
+              )}
+              <p className="text-sm text-gray-500">
+               {[resume.email, resume.phone, resume.location].filter(Boolean).join(' | ')}
+              </p>
+              {userBasicInfo?.targetJobPosting && (
+                <div className="mt-3 px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full inline-block">
+                  🎯 מותאם למשרה המבוקשת
+                </div>
+              )}
+            </div>
+            
+            {/* Professional Summary */}
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">תקציר מקצועי</h2>
+              <p className="text-gray-700 text-sm leading-relaxed text-justify">
+                {professionalSummary}
+              </p>
+            </div>
+            
+            {/* Experience Section */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">ניסיון</h3>
               <div className="space-y-4">
-                {chatMessages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`rounded-lg p-3 max-w-sm ${
-                      message.type === 'ai' 
-                        ? 'bg-blue-100 text-blue-900' 
-                        : 'bg-white ml-auto text-gray-900 border'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                {/* AI-generated experiences */}
+                {resume.experiences.map((exp: any) => (
+                  <div key={exp.id || exp.company} className="mb-4">
+                    <h3 className="font-semibold text-gray-900">{exp.title}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{exp.company} • {exp.duration}</p>
+                    <div className="text-sm text-gray-700 space-y-1">
+                      {exp.description.map((desc: string, index: number) => {
+                        const cleanDesc = desc.replace(/^[•\-\s]+/, '');
+                        return (
+                          <div key={index} className="flex items-start gap-2">
+                            <span className="text-gray-400 mt-1 text-xs">•</span>
+                            <span className="flex-1">{cleanDesc}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 ))}
-                {isLoading && (
-                  <div className="bg-blue-100 rounded-lg p-3 max-w-sm">
-                    <p className="text-sm text-blue-900">AI is thinking...</p>
+                
+                {/* Default experience if none added yet */}
+                {resume.experiences.length === 0 && (
+                  <div className="text-gray-500 text-sm italic text-center py-4">
+                    <p>ספר לי על הניסיון המקצועי שלך כדי למלא חלק זה</p>
                   </div>
                 )}
               </div>
             </div>
             
-            {/* Chat Input */}
-            <div className="flex gap-2">
-              <input
-                dir="rtl"
-                type="text" 
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="כתוב הודעה או הוסף פרטים..." 
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isLoading}
-              />
-              <button 
-                onClick={handleSendMessage}
-                disabled={isLoading || !inputMessage.trim()}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
-              >
-                שלח
-              </button>
-            </div>
-          </div>
-
-          {/* Resume Preview - Right Side */}
-          <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-lg p-6 flex flex-col text-right">
-            <h2 className="font-semibold text-gray-800">תצוגת קורות חיים</h2>
-            
-            {/* Resume Content */}
-            <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 overflow-y-auto text-right leading-relaxed">
-              <div className="space-y-6">
-                {/* Header Section */}
-                <div className="text-center border-b pb-4">
-                  <h1 className="text-xl font-semibold text-center">
-                   {resume.fullName?.trim() || 'שם מלא'}
-                  </h1>
-                  <p className="text-sm text-center text-gray-600">
-                   {resume.title?.trim() || ''}
+            {/* Skills Section */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">כישורים</h2>
+              <div className="text-gray-700">
+                {allSkills.length > 0 ? (
+                  <p className="text-sm leading-relaxed">
+                    {allSkills.join(' • ')}
                   </p>
-                  <p className="text-xs text-center text-gray-500">
-                   {[resume.email, resume.phone, resume.location].filter(Boolean).join(' | ')}
+                ) : (
+                  <p className="text-gray-500 text-sm italic text-center py-4 w-full">
+                    שתף את הכישורים שלך בצ'אט כדי למלא חלק זה
                   </p>
-                  {userBasicInfo?.targetJobPosting && (
-                    <div className="mt-2 px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full inline-block">
-                      🎯 Tailored for Target Role
-                    </div>
-                  )}
-                </div>
-                
-                {/* Professional Summary */}
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">תקציר מקצועי</h2>
-                  <p className="text-gray-700 text-sm">
-                    {professionalSummary}
-                  </p>
-                </div>
-                
-                {/* Experience Section */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">ניסיון</h3>
-                  <div className="space-y-3">
-                    {/* AI-generated experiences */}
-                    {resume.experiences.map((exp: any) => (
-                      <div key={exp.id || exp.company}>
-                        <h3 className="font-medium text-gray-900">{exp.title}</h3>
-                        <p className="text-sm text-gray-600">{exp.company} • {exp.duration}</p>
-                        <ul className="text-sm text-gray-700 mt-1 ml-4">
-                          {exp.description.map((desc: string, index: number) => (
-                            <li key={index}>• {desc}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                    
-                    {/* Default experience if none added yet */}
-                    {resume.experiences.length === 0 && (
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {userBasicInfo?.currentRole || 'Current Role'}
-                        </h3>
-                        <p className="text-sm text-gray-600">Company Name • 2022 - Present</p>
-                        <ul className="text-sm text-gray-700 mt-1 ml-4">
-                          <li>• Tell me about your current role to populate this section</li>
-                          <li>• Share your achievements and responsibilities</li>
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Skills Section */}
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">כישורים</h2>
-                  <div className="flex flex-wrap gap-2">
-                    {allSkills.length > 0 ? (
-                      allSkills.map((skill, index) => (
-                        <span 
-                          key={index}
-                          className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                        >
-                          {skill}
-                        </span>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-sm">Share your skills in the chat to populate this section</p>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
-            </div>
-            
-            {/* Action Buttons */}
-            <div className="flex gap-2 mt-4">
-              <button className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                Export PDF
-              </button>
-              <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                Templates
-              </button>
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 };
