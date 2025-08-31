@@ -10,6 +10,13 @@ export interface ResumeDataPatch {
   }>;
   skills?: string[];
   summary?: string;
+  contact?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    title?: string;
+  };
 }
 
 interface ParseResult {
@@ -88,6 +95,15 @@ export function parseResumeData(raw: string): ParseResult {
 
     if (Array.isArray(parsed.skills)) patch.skills = parsed.skills;
     if (typeof parsed.summary === 'string') patch.summary = parsed.summary;
+    if (parsed.contact && typeof parsed.contact === 'object') {
+      patch.contact = {
+        fullName: parsed.contact.fullName,
+        email: parsed.contact.email,
+        phone: parsed.contact.phone,
+        location: parsed.contact.location,
+        title: parsed.contact.title
+      };
+    }
 
     return { patch, cleanedText: raw.trim(), rawJson: cleanedJson };
   } catch (e) {

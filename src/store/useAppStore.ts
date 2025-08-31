@@ -1,19 +1,10 @@
 import { create } from 'zustand';
 import { z } from 'zod';
 
-// User form schema
+// Simplified onboarding schema
 const welcomeFormSchema = z.object({
-  fullName: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email address'),
-  phone: z.string().optional(),
-  location: z.string().optional(),
-  currentRole: z.string().min(2, 'Please enter your current role'),
-  experienceYears: z.string().optional(),
-  industry: z.string().optional(),
-  keySkills: z.string().optional(),
   targetJobPosting: z.string().optional(),
 });
-
 type WelcomeFormData = z.infer<typeof welcomeFormSchema>;
 
 interface ChatMessage {
@@ -27,7 +18,7 @@ interface Experience {
   id?: string;
   company: string;
   title: string;
-  duration?: string; // made optional
+  duration?: string;
   description: string[];
 }
 
@@ -35,9 +26,13 @@ interface Resume {
   experiences: Experience[];
   skills: string[];
   summary: string;
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  title?: string; // headline / current role
 }
 
-// Incoming resume patch (from model JSON)
 interface ResumeDataPatch {
   operation?: 'patch' | 'replace';
   experiences?: Array<{
@@ -49,6 +44,13 @@ interface ResumeDataPatch {
   }>;
   skills?: string[];
   summary?: string;
+  contact?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    title?: string;
+  };
 }
 
 interface AppStore {
@@ -56,10 +58,14 @@ interface AppStore {
   userBasicInfo: WelcomeFormData | null;
   chatMessages: ChatMessage[];
   resume: Resume;
+  targetJobPosting?: string;
+  originalResumeText?: string;
 
   setUserBasicInfo: (data: WelcomeFormData) => void;
   goToChat: () => void;
   addChatMessage: (content: string, type: 'user' | 'ai') => void;
+  setTargetJobPosting: (text: string) => void;
+  setOriginalResumeText: (text: string) => void;
 
   updateResume: (updates: Partial<Resume>) => void;
 
@@ -79,9 +85,14 @@ interface AppStore {
   resetResume: () => void;
   replaceEntireResume: (newResume: Resume) => void;
   applyResumeDataPatch: (patch: ResumeDataPatch) => void;
+
+  setContactInfo: (
+    c: Partial<Pick<Resume, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>
+  ) => void;
 }
 
-const makeId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const makeId = () =>
+  Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 export const useAppStore = create<AppStore>((set, get) => ({
   // Initial state
@@ -92,32 +103,54 @@ export const useAppStore = create<AppStore>((set, get) => ({
     experiences: [],
     skills: [],
     summary: '',
+    fullName: '',
+    email: '',
+    phone: '',
+    location: '',
+    title: '',
   },
+  targetJobPosting: undefined,
+  originalResumeText: undefined,
 
   // Actions
-  setUserBasicInfo: (data) =>
-    set({ userBasicInfo: data }),
+  setUserBasicInfo: (data) => set({ userBasicInfo: data }),
 
-  goToChat: () =>
-    set({ currentScreen: 'chat' }),
+  setTargetJobPosting: (text) =>
+    set((state) => ({
+      targetJobPosting: text,
+      userBasicInfo: {
+        ...(state.userBasicInfo || {}),
+        targetJobPosting: text,
+      } as WelcomeFormData,
+    })),
+
+  setOriginalResumeText: (text) => set({ originalResumeText: text }),
+
+  goToChat: () => set({ currentScreen: 'chat' }),
 
   addChatMessage: (content, type) =>
     set((state) => ({
       chatMessages: [
         ...state.chatMessages,
-        {
-          id: makeId(),
-          type,
-          content,
-          timestamp: new Date(),
-        },
+        { id: makeId(), type, content, timestamp: new Date() },
       ],
     })),
 
-  updateResume: (updates) =>
+  setContactInfo: (c) =>
     set((state) => ({
-      resume: { ...state.resume, ...updates },
+      resume: { ...state.resume, ...c },
+      userBasicInfo: {
+        ...(state.userBasicInfo || {}),
+        ...(c.fullName ? { fullName: c.fullName } : {}),
+        ...(c.title ? { currentRole: c.title } : {}),
+        ...(c.email ? { email: c.email } : {}),
+        ...(c.phone ? { phone: c.phone } : {}),
+        ...(c.location ? { location: c.location } : {}),
+      },
     })),
+
+  updateResume: (updates) =>
+    set((state) => ({ resume: { ...state.resume, ...updates } })),
 
   addOrUpdateExperience: (incoming) =>
     set((state) => {
@@ -127,17 +160,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
         description: Array.from(new Set(incoming.description || [])),
       };
 
-      const idx = state.resume.experiences.findIndex(e =>
-        (exp.id && e.id && e.id === exp.id) ||
-        (e.company && exp.company &&
-          e.company.trim().toLowerCase() === exp.company.trim().toLowerCase())
+      const idx = state.resume.experiences.findIndex(
+        (e) =>
+          (exp.id && e.id && e.id === exp.id) ||
+          (e.company &&
+            exp.company &&
+            e.company.trim().toLowerCase() === exp.company.trim().toLowerCase())
       );
 
       if (idx !== -1) {
         const prev = state.resume.experiences[idx];
         const merged: Experience = {
           ...prev,
-            ...exp,
+          ...exp,
           id: prev.id || exp.id,
           description: Array.from(
             new Set([...(prev.description || []), ...(exp.description || [])])
@@ -151,7 +186,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return {
         resume: {
           ...state.resume,
-          experiences: [...state.resume.experiences, exp],
+            experiences: [...state.resume.experiences, exp],
         },
       };
     }),
@@ -161,10 +196,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
       resume: {
         ...state.resume,
         experiences: state.resume.experiences.filter(
-          e =>
+          (e) =>
             !(
               (e.id && e.id === idOrCompany) ||
-              e.company.trim().toLowerCase() === idOrCompany.trim().toLowerCase()
+              e.company.trim().toLowerCase() ===
+                idOrCompany.trim().toLowerCase()
             )
         ),
       },
@@ -187,7 +223,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         skills: Array.from(
           new Set([
             ...state.resume.skills,
-            ...newSkills.map(s => s.trim()).filter(Boolean),
+            ...newSkills.map((s) => s.trim()).filter(Boolean),
           ])
         ),
       },
@@ -195,12 +231,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   removeSkills: (skillsToRemove) =>
     set((state) => {
-      const toRemove = skillsToRemove.map(s => s.toLowerCase().trim());
+      const toRemove = skillsToRemove.map((s) => s.toLowerCase().trim());
       return {
         resume: {
           ...state.resume,
           skills: state.resume.skills.filter(
-            s => !toRemove.includes(s.toLowerCase().trim())
+            (s) => !toRemove.includes(s.toLowerCase().trim())
           ),
         },
       };
@@ -210,7 +246,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set((state) => ({
       resume: {
         ...state.resume,
-        skills: newSkills.map(s => s.trim()).filter(Boolean),
+        skills: newSkills.map((s) => s.trim()).filter(Boolean),
       },
     })),
 
@@ -235,6 +271,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
         experiences: [],
         skills: [],
         summary: '',
+        fullName: '',
+        email: '',
+        phone: '',
+        location: '',
+        title: '',
       },
     })),
 
@@ -248,26 +289,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const op = patch.operation || 'patch';
     const current = get().resume;
 
-    // Normalize experiences helper
-    const normalizeExperiences = (list: ResumeDataPatch['experiences']): Experience[] => {
+    const normalizeExperiences = (
+      list: ResumeDataPatch['experiences']
+    ): Experience[] => {
       if (!Array.isArray(list)) return [];
       return list
-        .filter(e => e && (e.company || e.title))
-        .map(e => {
+        .filter((e) => e && (e.company || e.title))
+        .map((e) => {
           const descArr = Array.isArray(e.description)
             ? e.description
-            : (typeof e.description === 'string' ? [e.description] : []);
+            : typeof e.description === 'string'
+            ? [e.description]
+            : [];
           return {
             id: e.id,
             company: (e.company || 'Unknown').trim(),
             title: (e.title || '').trim(),
             duration: e.duration || undefined,
             description: Array.from(
-              new Set(
-                descArr
-                  .filter(Boolean)
-                  .map(d => d.trim())
-              )
+              new Set(descArr.filter(Boolean).map((d) => d.trim()))
             ),
           };
         });
@@ -275,21 +315,32 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     if (op === 'replace') {
       const newResume: Resume = {
-        experiences: normalizeExperiences(patch.experiences) || current.experiences,
+        experiences:
+          normalizeExperiences(patch.experiences) || current.experiences,
         skills: Array.isArray(patch.skills)
-          ? Array.from(new Set(patch.skills.map(s => s.trim()).filter(Boolean)))
+          ? Array.from(
+              new Set(patch.skills.map((s) => s.trim()).filter(Boolean))
+            )
           : current.skills,
-        summary: typeof patch.summary === 'string'
-          ? patch.summary.trim()
-          : current.summary,
+        summary:
+          typeof patch.summary === 'string'
+            ? patch.summary.trim()
+            : current.summary,
+        fullName:
+          patch.contact?.fullName?.trim() ?? current.fullName ?? undefined,
+        email: patch.contact?.email?.trim() ?? current.email ?? undefined,
+        phone: patch.contact?.phone?.trim() ?? current.phone ?? undefined,
+        location:
+          patch.contact?.location?.trim() ?? current.location ?? undefined,
+        title: patch.contact?.title?.trim() ?? current.title ?? undefined,
       };
       set({ resume: newResume });
       return;
     }
 
-    // Patch (merge)
+    // Patch merge
     if (Array.isArray(patch.experiences)) {
-      normalizeExperiences(patch.experiences).forEach(exp => {
+      normalizeExperiences(patch.experiences).forEach((exp) => {
         get().addOrUpdateExperience(exp);
       });
     }
@@ -298,6 +349,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     if (typeof patch.summary === 'string' && patch.summary.trim()) {
       get().setSummary(patch.summary.trim());
+    }
+    if (patch.contact) {
+      get().setContactInfo(patch.contact);
     }
   },
 }));

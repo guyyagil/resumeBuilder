@@ -7,9 +7,7 @@ if (!apiKey) throw new Error('VITE_GEMINI_API_KEY is not set in environment vari
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-// ---------------- Language detection ----------------
-const detectLanguage = (text: string): 'he' | 'en' =>
-  /[֐-׿]/.test(text) ? 'he' : 'en';
+const FORCE_LANG: 'he' = 'he';
 
 // ---------------- Types ----------------
 interface RawAIResumeData {
@@ -21,6 +19,13 @@ interface RawAIResumeData {
   clearSections?: string[];
   summary?: string;
   completeResume?: any;
+  contact?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    title?: string;
+  };
 }
 
 interface NormalizedResumePatch {
@@ -38,6 +43,13 @@ interface NormalizedResumePatch {
   clearSections?: string[];
   summary?: string;
   completeResume?: any;
+  contact?: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    title?: string;
+  };
 }
 
 // ---------------- Parsing helpers ----------------
@@ -163,6 +175,19 @@ const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch => {
   if (raw.operation === 'replace' && raw.completeResume) {
     patch.completeResume = raw.completeResume;
   }
+  if (raw.contact && typeof raw.contact === 'object') {
+    patch.contact = {
+      fullName: raw.contact.fullName?.trim(),
+      email: raw.contact.email?.trim(),
+      phone: raw.contact.phone?.trim(),
+      location: raw.contact.location?.trim(),
+      title: raw.contact.title?.trim()
+    };
+  }
+  // Also allow contact nested inside completeResume
+  if (!patch.contact && raw.completeResume?.contact) {
+    patch.contact = raw.completeResume.contact;
+  }
 
   return patch;
 };
@@ -179,7 +204,8 @@ export const applyResumePatch = (patch: NormalizedResumePatch) => {
     clearAllExperiences,
     clearAllSkills,
     setSummary,
-    clearSummary
+    clearSummary,
+    setContactInfo
   } = useAppStore.getState();
 
   console.log('Applying resume patch:', patch);
@@ -194,7 +220,12 @@ export const applyResumePatch = (patch: NormalizedResumePatch) => {
     replaceEntireResume({
       experiences: patch.completeResume.experiences || [],
       skills: patch.completeResume.skills || [],
-      summary: patch.completeResume.summary || ''
+      summary: patch.completeResume.summary || '',
+      fullName: patch.completeResume.contact?.fullName || patch.completeResume.fullName || '',
+      email: patch.completeResume.contact?.email || '',
+      phone: patch.completeResume.contact?.phone || '',
+      location: patch.completeResume.contact?.location || '',
+      title: patch.completeResume.contact?.title || ''
     });
     return;
   }
@@ -226,6 +257,9 @@ export const applyResumePatch = (patch: NormalizedResumePatch) => {
   if (typeof patch.summary === 'string' && patch.summary.trim()) {
     setSummary(patch.summary.trim());
   }
+  if (patch.contact) {
+    setContactInfo(patch.contact);
+  }
 };
 
 // ---------------- Prompt builder ----------------
@@ -233,6 +267,7 @@ type Experience = { company: string; title?: string; duration?: string; descript
 type Resume = { experiences?: Experience[]; skills?: string[]; summary?: string };
 
 const getSystemPrompt = (
+  // language is now always 'he'
   language: string,
   userContext: any,
   resume: Resume,
@@ -264,17 +299,31 @@ Skills: ${currentSkills.join(', ')}
 Summary: ${currentSummary || '(empty)'}
 User: ${userContext?.fullName || 'User'} (${userContext?.currentRole || 'role unknown'})`;
 
-  const baseHebrew = `אתה עוזר לבניית קורות חיים. תמיד החזר בלוק [RESUME_DATA] (גם אם שדה יחיד משתנה).
-קורות חיים נוכחיים:
-ניסיון (${currentExperiences.length}): ${currentExperiences.map(e => e.company + (e.title ? `(${e.title})` : '')).join(', ')}
-כישורים: ${currentSkills.join(', ')}
-תקציר: ${currentSummary || '(ריק)'}
-משתמש: ${userContext?.fullName || 'משתמש'} (${userContext?.currentRole || 'תפקיד לא ידוע'})`;
+  const plainTextCV = buildPlainTextResume(resume);
+  const baseHebrew = `אתה מדריך לשיפור קורות חיים (Career Resume Improvement Guide).
+מטרתך: לשפר בהדרגה את קורות החיים הקיימים כדי שיותאמו בצורה הטובה ביותר למשרה / דרישות היעד.
+
+הנכנס:
+{CURRENT_CV_TEXT}:
+------------------
+${plainTextCV || '(קורות חיים ריקים)'}
+
+{TARGET_JOB}:
+------------------
+${targetJobPosting || '(לא סופק טקסט משרה)'}
+
+הנחיות התאמה:
+- שפר ניסוח, הוסף תוצאות מדידות, מיקוד תועלת ודיוק מינוח.
+- שמור שמות טכנולוגיות / ספריות / חברות כפי שהן (באנגלית אם כך מופיעות).
+- אל תמציא חברות או טכנולוגיות שלא הופיעו או שלא נאמרו במפורש ע"י המשתמש אלא אם ביקש להוסיף.
+- אל תחליף תאריכים קיימים בלי הצדקה.
+- בצע שינויים מדורגים: כל תשובה משנה רק מה שבאמת נדרש כעת לפי טקסט המשרה.
+- אם אין לך שיפור ממשי לשדה מסוים – אל תחזיר אותו (חסוך רעש).
+- תמיד החזר בלוק [RESUME_DATA] עם operation ("patch" אלא אם אתה מחזיר גרסה מלאה משופרת לגמרי ואז "replace").
+- שאל שאלה הבהרה אחת בלבד כשחסר מידע קריטי (או אל תשאל אם מספיק ברור).`;
 
   const jobContext = targetJobPosting
-    ? (language === 'he'
-        ? `התאם את הכל למשרה:\n${targetJobPosting}`
-        : `Tailor everything to this job posting:\n${targetJobPosting}`)
+    ? `התאם את הכל למשרה:\n${targetJobPosting}`
     : '';
 
   const rulesEn = `
@@ -301,29 +350,45 @@ FORMAT EXAMPLE:
 [/RESUME_DATA]`;
 
   const rulesHe = `
-כללי תגובה:
-- עד 6 שורות טקסט לפני בלוק הנתונים.
-- שאלה אחת בלבד.
-- תמיד [RESUME_DATA] עם operation ("patch" אלא אם החלפה מלאה או reset).
-- החזר רק שדות שעודכנו.
+ כללי תגובה:
+ - עד 6 שורות טקסט לפני בלוק הנתונים.
+ - שאלה אחת בלבד.
+ - תמיד [RESUME_DATA] עם operation ("patch" אלא אם החלפה מלאה או reset).
+ - החזר רק שדות שעודכנו.
+ - skills: עבור כישורי רכות / ניהול כתוב בעברית; שמות טכנולוגיות, מסגרות, שפות ומוצרים באנגלית.
+ - כל התיאורים והתקציר בעברית, טכנולוגיות באנגלית.
+ - שפר ניסוח: שקילות לערך עסקי / תוצאה מדידה (אחוזי שיפור, חיסכון זמן, הפחתת תקלות) רק אם ניתן להסיק בבטחה או המשתמש סיפק.
+ - אין להמציא מספרים מדויקים אם לא נמסרו; אפשר לנסח "שיפור משמעותי" במקום.
+ - אם אין שינוי נחוץ – החזר בלוק עם שאלה / עדכון מינורי בלבד.
+ 
+ דוגמה:
+ [RESUME_DATA]
+ {
+   "operation": "patch",
+   "experience": {
+     "company": "Company",
+     "title": "Security Operations Lead",
+     "duration": "2022-2024",
+     "description": ["ניהול צוות משמרת 8 אנליסטים", "יישום נהלי תגובה שאיצבו זמני טיפול"]
+   },
+   "skills": ["ניהול צוות","Incident Response","SIEM","Leadership"]
+ }
+ [/RESUME_DATA]`;
 
-דוגמה:
-[RESUME_DATA]
-{
-  "operation": "patch",
-  "experience": {
-    "company": "Harvard University",
-    "title": "BSc in Computer Science",
-    "duration": "2021-2025",
-    "description": ["בניית פרויקט CNN עם 99% דיוק MNIST"]
-  },
-  "skills": ["Deep Learning","CNN"]
-}
-[/RESUME_DATA]`;
+  // Force Hebrew prompt + add translation requirement
+  const translationRule = `
+הוראות שפה:
+- כל הטקסט החופשי (תיאור תפקידים, תקציר, שאלות הבהרה) בעברית תקנית.
+- אין לתרגם שמות חברות, טכנולוגיות, שמות כלי פיתוח או שמות תארים רשמיים (React, AWS, Node.js, Harvard).
+- כישורים (skills) להישאר בפורמט מקובל (בדרך כלל באנגלית) אלא אם המשתמש כתב אותם במפורש בעברית.
+- אם המשתמש כותב באנגלית – תתרגם לעברית בתוצר, חוץ משמות proper nouns כפי שמוגדר לעיל.
+`;
 
-  return language === 'he'
-    ? `${baseHebrew}\n${conversationMemory}\n${jobContext}\n${rulesHe}`
-    : `${baseEnglish}\n${conversationMemory}\n${jobContext}\n${rulesEn}`;
+  return `${baseHebrew}
+ ${conversationMemory}
+ ${jobContext}
+ ${translationRule}
+${rulesHe}`;
 };
 
 // ---------------- Public API ----------------
@@ -334,14 +399,14 @@ export const sendMessageToAI = async (
   chatMessages?: any[]
 ) => {
   try {
-    const lang = detectLanguage(message);
+    const lang = FORCE_LANG;
     const systemPrompt = getSystemPrompt(lang, userContext, resumeData || {}, chatMessages);
 
     const fullPrompt = `${systemPrompt}
+    
+הודעת משתמש (יתכן באנגלית או בעברית – התוצר בעברית): "${message}"
 
-User message: "${message}"
-
-Remember: ALWAYS include [RESUME_DATA] even for single-field updates.`;
+זכור: תמיד לכלול בלוק [RESUME_DATA] גם אם עדכון יחיד.`;
 
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
@@ -375,5 +440,98 @@ Remember: ALWAYS include [RESUME_DATA] even for single-field updates.`;
       resumeUpdates: {}
     };
   }
+};
+
+export const extractResumeFromPlainText = async (rawText: string) => {
+  try {
+    // Local quick contact extraction before AI (best-effort)
+    const quickExtract = (text: string) => {
+      const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
+      const phone =
+        text.match(/(?:\+972[-\s]?|0)(?:5\d[-\s]?\d{3}[-\s]?\d{4})/)?.[0] ||
+        text.match(/(?:\+?\d{1,3}[-\s]?)?(?:\d{2,4}[-\s]?){2,4}\d{2,4}/)?.[0];
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const firstLines = lines.slice(0, 8).filter(l => l.length < 50);
+      const namePattern = /^[\u0590-\u05FFA-Za-z]+([ '\-][\u0590-\u05FFA-Za-z]{2,}){0,3}$/;
+      let fullName = firstLines.find(l => namePattern.test(l) && !/@/.test(l) && l.split(' ').length <= 4);
+      // If still not found, try first line that has 2 words and no digits
+      if (!fullName) {
+        fullName = firstLines.find(l => /^\D+$/.test(l) && l.split(/\s+/).length === 2);
+      }
+      return { email, phone, fullName };
+    };
+    const heur = quickExtract(rawText);
+    if (heur.fullName || heur.email || heur.phone) {
+      useAppStore.getState().setContactInfo({
+        fullName: heur.fullName,
+        email: heur.email,
+        phone: heur.phone,
+      });
+    }
+
+    const prompt = `אתה ממיר טקסט קורות חיים (PDF -> טקסט) לפלט אחד בעברית.
+החזר אך ורק בלוק [RESUME_DATA] יחיד עם:
+operation = "replace"
+completeResume.contact: { fullName, title, email, phone, location }
+completeResume.experiences: עד 6 חוויות. description: עד 4 נקודות קצרות (עברית; טכנולוגיות באנגלית).
+completeResume.skills: מערך ייחודי (React, Node.js, AWS...).
+completeResume.summary: 2–3 משפטים בעברית, ללא מידע רגיש אישי נוסף.
+contact.fullName חובה; אם לא מזוהה במפורש – הסק מהשורה העליונה בעלת 2–4 מילים ללא מספרים.
+אל תוסיף טקסט מחוץ לבלוק. שמור שמות חברות וטכנולוגיות בשפתן המקורית.
+
+[SOURCE_RESUME_TEXT]
+${rawText.slice(0, 25000)}
+[/SOURCE_RESUME_TEXT]`;
+
+    const result = await model.generateContent(prompt);
+    const text = (await result.response).text();
+    const { data: parsed } = extractJsonBlock(text);
+    if (parsed) {
+      const patch = normalizeResumeData(parsed);
+      applyResumePatch(patch);
+      // Optional: if contact name still missing, trigger a minimal follow‑up request
+      if (!patch.contact?.fullName) {
+        const state = useAppStore.getState();
+        if (!state.resume.fullName) {
+          // Fire and forget (no await) to avoid blocking UX
+          sendMessageToAI('אנא ספק רק contact עם fullName ו title אם חסר, בלי לשנות חלקים אחרים.', 
+            { targetJobPosting: state.targetJobPosting },
+            state.resume,
+            state.chatMessages
+          );
+        }
+      }
+      return { ok: true, raw: text, patch };
+    }
+    return { ok: false, error: 'NO_JSON', raw: text };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : 'UNKNOWN',
+    };
+  }
+};
+
+const buildPlainTextResume = (resume: any): string => {
+  const lines: string[] = [];
+  if (resume.fullName || resume.title) {
+    lines.push(`${resume.fullName || ''} ${resume.title ? '— ' + resume.title : ''}`.trim());
+  }
+  if (resume.summary) {
+    lines.push('--- תקציר ---');
+    lines.push(resume.summary);
+  }
+  if (resume.experiences?.length) {
+    lines.push('--- ניסיון ---');
+    resume.experiences.forEach((e: any, i: number) => {
+      lines.push(`${i + 1}. ${e.company || ''}${e.title ? ' – ' + e.title : ''}${e.duration ? ' (' + e.duration + ')' : ''}`);
+      (e.description || []).slice(0, 8).forEach((d: string) => lines.push('• ' + d));
+    });
+  }
+  if (resume.skills?.length) {
+    lines.push('--- כישורים ---');
+    lines.push(resume.skills.join(', '));
+  }
+  return lines.join('\n');
 };
 

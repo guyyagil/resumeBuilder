@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
+// lightweight fallback translation mapping (no react-i18next dependency)
 
 // ---- Add these type declarations ----
 type ResumeOperation = 'reset' | 'redesign' | 'clear' | 'remove' | 'replace' | 'update' | 'add';
@@ -79,6 +80,14 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
+  const t = (key: string) => {
+    const translations: Record<string, string> = {
+      chatPlaceholder: 'Type a message...',
+      resumePreview: 'Resume Preview',
+      experiences: 'Experiences'
+    };
+    return translations[key] || key;
+  };
   const { 
     chatMessages, 
     addChatMessage, 
@@ -104,20 +113,18 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
 
   // Add initial AI greeting when component mounts
   useEffect(() => {
-    if (!initialMessageSent.current && chatMessages.length === 0 && userBasicInfo) {
-      const jobPostingMessage = userBasicInfo.targetJobPosting 
-        ? "\n\nI see you've provided a target job posting - I'll help tailor your resume to match that specific role!" 
-        : "";
-      
+    if (!initialMessageSent.current && chatMessages.length === 0) {
+      const name =
+        (resume.fullName && resume.fullName.trim()) ||
+        (userBasicInfo as any)?.fullName?.trim() ||
+        'משתמש';
       addChatMessage(
-        `Hello ${userBasicInfo.fullName}! I see you're a ${userBasicInfo.currentRole}. Let's build an amazing resume together!${jobPostingMessage}
-
-To get started, tell me about your current job - what company do you work for and what are your main responsibilities?`,
+        `היי ${name}! אני כאן לעזור לך לערוך את קורות החיים שלך ולהתאים אותם בצורה הטובה ביותר למשרה המבוקשת!`,
         'ai'
       );
       initialMessageSent.current = true;
     }
-  }, [userBasicInfo, chatMessages.length, addChatMessage]);
+  }, [chatMessages.length, addChatMessage]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -287,6 +294,7 @@ To get started, tell me about your current job - what company do you work for an
     ...(userBasicInfo?.keySkills?.split(',').map(s => s.trim()).filter(s => s) || []),
     ...resume.skills
   ])];
+  
 
   // Use professional summary from AI or generate default
   const professionalSummary = resume.summary || 
@@ -296,11 +304,11 @@ To get started, tell me about your current job - what company do you work for an
     );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div dir="rtl" className="min-h-screen bg-gray-50 font-[Heebo]">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Resume Builder AI</h1>
+          <h1 dir="rtl" className="text-2xl font-bold text-gray-900">בונה קורות חיים חכם</h1>
         </div>
       </header>
 
@@ -309,11 +317,11 @@ To get started, tell me about your current job - what company do you work for an
         <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-120px)]">
           
           {/* Chat Panel - Left Side */}
-          <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-lg p-6 flex flex-col">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">Chat with AI</h2>
+          <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-lg p-6 flex flex-col text-right">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">שיחה עם ה-AI</h2>
             
             {/* Chat Messages Area */}
-            <div className="flex-1 bg-gray-50 rounded-xl p-4 mb-4 overflow-y-auto max-h-96">
+            <div className="flex-1 bg-gray-50 rounded-xl p-4 mb-4 overflow-y-auto max-h-96 text-right leading-relaxed">
               <div className="space-y-4">
                 {chatMessages.map((message) => (
                   <div
@@ -337,13 +345,14 @@ To get started, tell me about your current job - what company do you work for an
             
             {/* Chat Input */}
             <div className="flex gap-2">
-              <input 
+              <input
+                dir="rtl"
                 type="text" 
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Tell me about your experience..." 
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="כתוב הודעה או הוסף פרטים..." 
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isLoading}
               />
               <button 
@@ -351,29 +360,28 @@ To get started, tell me about your current job - what company do you work for an
                 disabled={isLoading || !inputMessage.trim()}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
               >
-                Send
+                שלח
               </button>
             </div>
           </div>
 
           {/* Resume Preview - Right Side */}
-          <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-lg p-6 flex flex-col">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">Live Resume Preview</h2>
+          <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-lg p-6 flex flex-col text-right">
+            <h2 className="font-semibold text-gray-800">תצוגת קורות חיים</h2>
             
             {/* Resume Content */}
-            <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 overflow-y-auto">
+            <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 overflow-y-auto text-right leading-relaxed">
               <div className="space-y-6">
                 {/* Header Section */}
                 <div className="text-center border-b pb-4">
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    {userBasicInfo?.fullName || 'Your Name'}
+                  <h1 className="text-xl font-semibold text-center">
+                   {resume.fullName?.trim() || 'שם מלא'}
                   </h1>
-                  <p className="text-gray-600">
-                    {userBasicInfo?.currentRole || 'Your Title'}
+                  <p className="text-sm text-center text-gray-600">
+                   {resume.title?.trim() || ''}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    {userBasicInfo?.email || 'your.email@email.com'} | {userBasicInfo?.phone || '(555) 123-4567'}
-                    {userBasicInfo?.location && ` | ${userBasicInfo.location}`}
+                  <p className="text-xs text-center text-gray-500">
+                   {[resume.email, resume.phone, resume.location].filter(Boolean).join(' | ')}
                   </p>
                   {userBasicInfo?.targetJobPosting && (
                     <div className="mt-2 px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full inline-block">
@@ -384,7 +392,7 @@ To get started, tell me about your current job - what company do you work for an
                 
                 {/* Professional Summary */}
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Professional Summary</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">תקציר מקצועי</h2>
                   <p className="text-gray-700 text-sm">
                     {professionalSummary}
                   </p>
@@ -392,7 +400,7 @@ To get started, tell me about your current job - what company do you work for an
                 
                 {/* Experience Section */}
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Experience</h2>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">ניסיון</h3>
                   <div className="space-y-3">
                     {/* AI-generated experiences */}
                     {resume.experiences.map((exp: any) => (
@@ -425,7 +433,7 @@ To get started, tell me about your current job - what company do you work for an
                 
                 {/* Skills Section */}
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2">Skills</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-2">כישורים</h2>
                   <div className="flex flex-wrap gap-2">
                     {allSkills.length > 0 ? (
                       allSkills.map((skill, index) => (
