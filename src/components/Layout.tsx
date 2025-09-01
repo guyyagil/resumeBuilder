@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
 // ---- Add these type declarations ----
 type ResumeOperation = 'reset' | 'redesign' | 'clear' | 'remove' | 'replace' | 'update' | 'add';
@@ -102,7 +100,6 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
   
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const initialMessageSent = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -304,151 +301,169 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
       : `Professional ${userBasicInfo?.currentRole || 'individual'} ready to contribute expertise and drive results in a dynamic environment.`
     );
 
-  const handleExportPdf = async () => {
-    if (exporting) return;
-    setExporting(true);
-
-    try {
-      // Create a simple temporary container
-      const tempContainer = document.createElement('div');
-      tempContainer.style.cssText = `
-        position: absolute;
-        top: -10000px;
-        left: 0;
-        width: 210mm;
-        background-color: #ffffff;
-        font-family: 'Heebo', Arial, sans-serif;
-        direction: rtl;
-        padding: 20mm;
-        box-sizing: border-box;
-        font-size: 12pt;
-        line-height: 1.4;
-        color: #111827;
-      `;
-
-      // Build simple clean HTML
-      const { fullName, title, email, phone, location, summary, experiences, skills } = resume;
-      const allSkills = [...new Set([
-        ...(userBasicInfo?.keySkills?.split(',').map(s => s.trim()).filter(s => s) || []),
-        ...skills
-      ])];
-
-      const contactInfo = [email, phone, location].filter(Boolean).join(' | ');
-
-      tempContainer.innerHTML = `
-        <div>
-          <!-- Header -->
-          <div style="text-align: center; border-bottom: 2px solid #ccc; padding-bottom: 15px; margin-bottom: 20px;">
-            <h1 style="font-size: 24pt; font-weight: bold; margin: 0 0 8px 0;">${fullName || 'שם מלא'}</h1>
-            ${title ? `<p style="font-size: 14pt; margin: 4px 0; color: #666;">${title}</p>` : ''}
-            ${contactInfo ? `<p style="font-size: 11pt; color: #666; margin: 4px 0;">${contactInfo}</p>` : ''}
-          </div>
-
-          <!-- Professional Summary -->
-          <div style="margin-bottom: 25px;">
-            <h2 style="font-size: 16pt; font-weight: bold; margin: 0 0 10px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px;">תקציר מקצועי</h2>
-            <p style="margin: 0; text-align: justify;">${summary || professionalSummary}</p>
-          </div>
-
-          <!-- Experience -->
-          <div style="margin-bottom: 25px;">
-            <h2 style="font-size: 16pt; font-weight: bold; margin: 0 0 15px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px;">ניסיון</h2>
-            ${experiences.map(exp => `
-              <div style="margin-bottom: 20px;">
-                <h3 style="font-size: 14pt; font-weight: bold; margin: 0 0 4px 0;">${exp.title || ''}</h3>
-                <p style="font-size: 12pt; color: #666; margin: 0 0 8px 0;">${exp.company || ''} • ${exp.duration || ''}</p>
-                ${exp.description.map(desc => {
-                  const cleanDesc = desc.replace(/^[•\-\s]+/, '');
-                  return `<p style="margin: 4px 0 4px 15px; text-indent: -15px;">• ${cleanDesc}</p>`;
-                }).join('')}
-              </div>
-            `).join('')}
-            ${experiences.length === 0 ? '<p style="color: #666;">אין ניסיון להציג</p>' : ''}
-          </div>
-
-          <!-- Skills -->
-          <div>
-            <h2 style="font-size: 16pt; font-weight: bold; margin: 0 0 15px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px;">כישורים</h2>
-            <p style="margin: 0;">${allSkills.join(' • ')}</p>
-          </div>
-        </div>
-      `;
-
-      document.body.appendChild(tempContainer);
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Simple canvas generation
-      const canvas = await html2canvas(tempContainer, {
-        scale: 1.2,
-        backgroundColor: '#ffffff',
-        useCORS: true,
-        allowTaint: true,
-        logging: false
-      });
-
-      document.body.removeChild(tempContainer);
-
-      // Simple PDF creation
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      
-      const imgWidth = pageWidth - (margin * 2);
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      if (imgHeight <= pageHeight - (margin * 2)) {
-        // Fits on one page
-        pdf.addImage(
-          canvas.toDataURL('image/png'),
-          'PNG',
-          margin,
-          margin,
-          imgWidth,
-          imgHeight
-        );
-      } else {
-        // Split into pages
-        const pageRatio = (pageHeight - margin * 2) / imgHeight;
-        const pageCanvasHeight = canvas.height * pageRatio;
-        let position = 0;
-
-        while (position < canvas.height) {
-          const currentHeight = Math.min(pageCanvasHeight, canvas.height - position);
-          
-          const pageCanvas = document.createElement('canvas');
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = currentHeight;
-          
-          const ctx = pageCanvas.getContext('2d')!;
-          ctx.drawImage(canvas, 0, position, canvas.width, currentHeight, 0, 0, canvas.width, currentHeight);
-
-          if (position > 0) pdf.addPage();
-          
-          const finalHeight = (currentHeight * imgWidth) / canvas.width;
-          pdf.addImage(
-            pageCanvas.toDataURL('image/png'),
-            'PNG',
-            margin,
-            margin,
-            imgWidth,
-            finalHeight
-          );
-
-          position += currentHeight;
-          if (position >= canvas.height) break;
-        }
-      }
-
-      const fileName = `${(resume.fullName || 'קורות_חיים').replace(/[^\w\u0590-\u05FF\s]+/g, '_')}.pdf`;
-      pdf.save(fileName);
-
-    } catch (error) {
-      console.error('PDF export failed:', error);
-      alert('שגיאה ביצוא PDF. אנא נסה שוב.');
-    } finally {
-      setExporting(false);
+  const handlePrint = () => {
+    const source = document.getElementById('resume-pane');
+    if (!source) {
+      alert('Resume content not found');
+      return;
     }
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Please allow popups for printing');
+      return;
+    }
+
+    // Get all existing stylesheets and inline styles
+    const allStyles = Array.from(document.head.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(element => {
+        if (element.tagName === 'STYLE') {
+          return `<style>${element.innerHTML}</style>`;
+        } else if (element.tagName === 'LINK') {
+          return element.outerHTML;
+        }
+        return '';
+      })
+      .join('\n');
+
+    // Enhanced print-specific styles
+    const printStyles = `
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
+        
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        html, body {
+          background: white !important;
+          color: #111827 !important;
+          font-family: 'Heebo', Arial, sans-serif !important;
+          direction: rtl !important;
+          line-height: 1.5;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        
+        @page {
+          size: A4;
+          margin: 15mm;
+        }
+        
+        .print-container {
+          max-width: 100% !important;
+          width: 100% !important;
+          background: white !important;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+          padding: 20px !important;
+          overflow: visible !important;
+          height: auto !important;
+        }
+        
+        /* Hide any unnecessary elements */
+        .no-print,
+        .flex-shrink-0,
+        button,
+        .border-b.border-gray-200.flex.items-center.justify-between {
+          display: none !important;
+        }
+        
+        /* Ensure proper typography */
+        h1 { font-size: 24pt !important; font-weight: 700 !important; margin-bottom: 8px !important; }
+        h2 { font-size: 16pt !important; font-weight: 600 !important; margin-bottom: 12px !important; }
+        h3 { font-size: 14pt !important; font-weight: 600 !important; margin-bottom: 6px !important; }
+        p { font-size: 11pt !important; margin-bottom: 6px !important; }
+        
+        /* Section spacing */
+        .mb-6 { margin-bottom: 20px !important; }
+        .mb-4 { margin-bottom: 16px !important; }
+        .mb-3 { margin-bottom: 12px !important; }
+        .mb-2 { margin-bottom: 8px !important; }
+        
+        /* Ensure bullets display properly */
+        .space-y-1 > div {
+          margin-bottom: 4px !important;
+          display: flex !important;
+          align-items: flex-start !important;
+        }
+        
+        /* Page break control */
+        h1, h2, h3 { page-break-after: avoid; }
+        .mb-6 { page-break-inside: avoid; }
+        
+        /* Make sure colors are preserved */
+        .text-gray-900 { color: #111827 !important; }
+        .text-gray-700 { color: #374151 !important; }
+        .text-gray-600 { color: #4B5563 !important; }
+        .text-gray-500 { color: #6B7280 !important; }
+        .text-gray-400 { color: #9CA3AF !important; }
+        
+        /* Border colors */
+        .border-gray-200 { border-color: #E5E7EB !important; }
+        .border-b { border-bottom: 1px solid #E5E7EB !important; }
+        .pb-1 { padding-bottom: 4px !important; }
+      </style>
+    `;
+
+    // Clone the resume content and prepare it for printing
+    const resumeContent = source.cloneNode(true) as HTMLElement;
+    
+    // Remove the header with title and button
+    const header = resumeContent.querySelector('.flex.items-center.justify-between');
+    if (header) {
+      header.remove();
+    }
+    
+    // Get only the scrollable content (the actual resume)
+    const scrollableContent = resumeContent.querySelector('.flex-1.overflow-y-auto');
+    const finalContent = scrollableContent ? scrollableContent.innerHTML : resumeContent.innerHTML;
+
+    // Write the complete document
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="he" dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>קורות חיים - ${resume.fullName || 'Resume'}</title>
+        ${allStyles}
+        ${printStyles}
+      </head>
+      <body>
+        <div class="print-container">
+          ${finalContent}
+        </div>
+        <script>
+          window.addEventListener('load', function() {
+            // Small delay to ensure styles are applied
+            setTimeout(function() {
+              window.print();
+              
+              // Close window after printing (or if user cancels)
+              window.addEventListener('afterprint', function() {
+                window.close();
+              });
+              
+              // Fallback: close after 10 seconds if still open
+              setTimeout(function() {
+                try {
+                  window.close();
+                } catch(e) {
+                  console.log('Could not auto-close window');
+                }
+              }, 10000);
+            }, 300);
+          });
+        </script>
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
   };
 
   return (
@@ -507,7 +522,7 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
         </div>
 
         {/* כרטיס קורות חיים - עכשיו שני כדי להיות בצד ימין ב-RTL */}
-        <div className="order-2 lg:order-2 rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col h-[calc(100vh-3rem)]">
+        <div id="resume-pane" className="order-2 lg:order-2 rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col h-[calc(100vh-3rem)]">
           
           {/* שורת כותרת + כפתור ייצוא */}
           <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-4 flex-shrink-0">
@@ -515,11 +530,10 @@ const Layout: React.FC<LayoutProps> = ({ userBasicInfo }) => {
               קורות חיים
             </h1>
             <button
-              onClick={handleExportPdf}
-              disabled={exporting}
-              className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-xs font-medium text-white shadow hover:from-indigo-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              onClick={handlePrint}
+              className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-xs font-medium text-white shadow hover:from-indigo-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
             >
-              {exporting ? 'מכין PDF...' : 'ייצוא PDF'}
+              הדפס \ ייצא PDF
             </button>
           </div>
 
