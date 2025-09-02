@@ -16,18 +16,50 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
   const initialMessageSent = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Add initial AI greeting
+  // Auto-fetch first AI message via hidden "hi"
   useEffect(() => {
     if (!initialMessageSent.current && chatMessages.length === 0) {
-      const name = (resume.fullName && resume.fullName.trim()) ||
-        userBasicInfo?.fullName?.trim() || 'משתמש';
-      addChatMessage(
-        `היי ${name}! אני כאן לעזור לך לערוך את קורות החיים שלך ולהתאים אותם בצורה הטובה ביותר למשרה המבוקשת!`,
-        'ai'
-      );
       initialMessageSent.current = true;
+      (async () => {
+        setIsLoading(true);
+        try {
+          const userContext = {
+            ...userBasicInfo,
+            targetJobPosting: targetJobPosting || userBasicInfo?.targetJobPosting,
+            fullName: resume.fullName || userBasicInfo?.fullName,
+          };
+          
+          // Send hidden "hi" - not added to chat messages
+          const aiResponse = await sendMessageToAI(
+            'hi',           
+            userContext,
+            resume,
+            []
+          ) as AIResponse;
+          
+          // Only show AI response to user
+          if (typeof aiResponse === 'object' && 'message' in aiResponse) {
+            addChatMessage(aiResponse.message, 'ai');
+            
+            if (aiResponse.resumeUpdates) {
+              await handleResumeUpdates(aiResponse.resumeUpdates, addChatMessage);
+            }
+          }
+        } catch (err) {
+          console.error('Initial AI greeting error:', err);
+          // Fallback to static message on error
+          const name = (resume.fullName && resume.fullName.trim()) ||
+            userBasicInfo?.fullName?.trim() || 'משתמש';
+          addChatMessage(
+            `היי ${name}! אני כאן לעזור לך לערוך את קורות החיים שלך ולהתאים אותם בצורה הטובה ביותר למשרה המבוקשת!`,
+            'ai'
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      })();
     }
-  }, [chatMessages.length, addChatMessage, resume.fullName, userBasicInfo]);
+  }, [chatMessages.length, addChatMessage, resume, userBasicInfo, targetJobPosting]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {

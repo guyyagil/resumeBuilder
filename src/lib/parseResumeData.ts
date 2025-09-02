@@ -1,6 +1,6 @@
 // src/lib/parseResumeData.ts
 export interface ResumeDataPatch {
-  operation?: 'patch' | 'replace';
+  operation?: 'patch' | 'replace' | 'reset'; // added 'reset'
   experiences?: Array<{
     id?: string;
     company?: string;
@@ -17,6 +17,24 @@ export interface ResumeDataPatch {
     location?: string;
     title?: string;
   };
+  completeResume?: {
+    contact?: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      location?: string;
+      title?: string;
+    };
+    experiences?: Array<{
+      id?: string;
+      company?: string;
+      title?: string;
+      duration?: string | null;
+      description?: string[] | string | null;
+    }>;
+    skills?: string[];
+    summary?: string;
+  };
 }
 
 interface ParseResult {
@@ -24,9 +42,11 @@ interface ParseResult {
   cleanedText: string;
   rawJson?: string;
   error?: string;
+  messageText?: string; // narration without the JSON block
 }
 
 function extractFirstBalancedObject(text: string): string | null {
+  // Skip any leading non-brace noise (RTL markers, bullets, etc.)
   let start = text.indexOf('{');
   if (start === -1) return null;
   let depth = 0;
@@ -66,7 +86,7 @@ export function parseResumeData(raw: string): ParseResult {
   }
 
   if (!candidate) {
-    return { cleanedText: raw.trim(), error: 'NO_JSON_FOUND' };
+    return { cleanedText: raw.trim(), error: 'NO_JSON_FOUND', messageText: raw.trim() };
   }
 
   let jsonText = candidate.trim();
@@ -82,8 +102,25 @@ export function parseResumeData(raw: string): ParseResult {
     const parsed = JSON.parse(cleanedJson);
 
     const patch: ResumeDataPatch = {};
-    if (parsed.operation && (parsed.operation === 'patch' || parsed.operation === 'replace')) {
+    if (parsed.operation && ['patch','replace','reset'].includes(parsed.operation)) {
       patch.operation = parsed.operation;
+    }
+    
+    // Handle completeResume first (full extraction scenario)
+    if (parsed.completeResume && typeof parsed.completeResume === 'object') {
+      patch.completeResume = {};
+      if (Array.isArray(parsed.completeResume.experiences)) {
+        patch.completeResume.experiences = parsed.completeResume.experiences;
+      }
+      if (Array.isArray(parsed.completeResume.skills)) {
+        patch.completeResume.skills = parsed.completeResume.skills;
+      }
+      if (typeof parsed.completeResume.summary === 'string') {
+        patch.completeResume.summary = parsed.completeResume.summary;
+      }
+      if (parsed.completeResume.contact && typeof parsed.completeResume.contact === 'object') {
+        patch.completeResume.contact = { ...parsed.completeResume.contact };
+      }
     }
 
     // experiences normalization: accept "experiences" or singular "experience"
@@ -105,8 +142,48 @@ export function parseResumeData(raw: string): ParseResult {
       };
     }
 
-    return { patch, cleanedText: raw.trim(), rawJson: cleanedJson };
+    // If top-level fields missing but exist inside completeResume, expose them for downstream helpers
+    if (!patch.experiences && patch.completeResume?.experiences) {
+      patch.experiences = patch.completeResume.experiences;
+    }
+    if (!patch.skills && patch.completeResume?.skills) {
+      patch.skills = patch.completeResume.skills;
+    }
+    if (!patch.summary && patch.completeResume?.summary) {
+      patch.summary = patch.completeResume.summary;
+    }
+    if (!patch.contact && patch.completeResume?.contact) {
+      patch.contact = patch.completeResume.contact;
+    }
+    // If operation declared replace but no completeResume provided, keep data but allow fallback
+    if (patch.operation === 'replace' && !patch.completeResume) {
+      // We still treat as replace with synthesized completeResume
+      patch.completeResume = {
+        contact: patch.contact,
+        experiences: patch.experiences,
+        skills: patch.skills,
+        summary: patch.summary
+      };
+    }
+
+    // Build messageText (raw without the JSON candidate / wrapper artifacts)
+    const jsonIndex = raw.indexOf(candidate);
+    let messageText = raw;
+    if (jsonIndex !== -1) {
+      messageText =
+        raw.slice(0, jsonIndex) +
+        raw.slice(jsonIndex + candidate.length);
+    }
+    // Remove tags / fences leftovers
+    messageText = messageText
+      .replace(/\[RESUME_DATA\]/gi, '')
+      .replace(/\[\/RESUME_DATA\]/gi, '')
+      .replace(/```(?:json)?/gi, '')
+      .replace(/```/g, '')
+      .trim();
+
+    return { patch, cleanedText: raw.trim(), rawJson: cleanedJson, messageText };
   } catch (e) {
-    return { cleanedText: raw.trim(), rawJson: jsonText, error: 'JSON_PARSE_ERROR' };
+    return { cleanedText: raw.trim(), rawJson: jsonText, error: 'JSON_PARSE_ERROR', messageText: raw.trim() };
   }
 }

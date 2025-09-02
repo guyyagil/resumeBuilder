@@ -314,28 +314,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
     };
 
     if (op === 'replace') {
-      const newResume: Resume = {
-        experiences:
-          normalizeExperiences(patch.experiences) || current.experiences,
-        skills: Array.isArray(patch.skills)
-          ? Array.from(
-              new Set(patch.skills.map((s) => s.trim()).filter(Boolean))
-            )
-          : current.skills,
-        summary:
-          typeof patch.summary === 'string'
-            ? patch.summary.trim()
-            : current.summary,
-        fullName:
-          patch.contact?.fullName?.trim() ?? current.fullName ?? undefined,
-        email: patch.contact?.email?.trim() ?? current.email ?? undefined,
-        phone: patch.contact?.phone?.trim() ?? current.phone ?? undefined,
-        location:
-          patch.contact?.location?.trim() ?? current.location ?? undefined,
-        title: patch.contact?.title?.trim() ?? current.title ?? undefined,
-      };
-      set({ resume: newResume });
-      return;
+      // If completeResume present prefer it; else synthesize from supplied top-level arrays
+      if ((patch as any).completeResume) {
+        const cr = (patch as any).completeResume;
+        const newResume: Resume = {
+          experiences: normalizeExperiences(cr.experiences) || [],
+          skills: Array.isArray(cr.skills)
+            ? Array.from(new Set(cr.skills.map((s: string) => s.trim()).filter(Boolean)))
+            : [],
+          summary: typeof cr.summary === 'string' ? cr.summary.trim() : '',
+          fullName: cr.contact?.fullName?.trim() || '',
+          email: cr.contact?.email?.trim() || '',
+          phone: cr.contact?.phone?.trim() || '',
+          location: cr.contact?.location?.trim() || '',
+          title: cr.contact?.title?.trim() || '',
+        };
+        set({ resume: newResume });
+        return;
+      } else {
+        const newResume: Resume = {
+          experiences: normalizeExperiences(patch.experiences) || current.experiences,
+          skills: Array.isArray(patch.skills)
+            ? Array.from(new Set(patch.skills.map((s) => s.trim()).filter(Boolean)))
+            : current.skills,
+          summary: typeof patch.summary === 'string' ? patch.summary.trim() : current.summary,
+          fullName: patch.contact?.fullName?.trim() ?? current.fullName ?? '',
+          email: patch.contact?.email?.trim() ?? current.email ?? '',
+            phone: patch.contact?.phone?.trim() ?? current.phone ?? '',
+          location: patch.contact?.location?.trim() ?? current.location ?? '',
+          title: patch.contact?.title?.trim() ?? current.title ?? '',
+        };
+        set({ resume: newResume });
+        return;
+      }
     }
 
     // Patch merge
