@@ -34,7 +34,14 @@ interface Resume {
 }
 
 interface ResumeDataPatch {
-  operation?: 'patch' | 'replace';
+  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign';
+  experience?: {
+    id?: string;
+    company?: string;
+    title?: string;
+    duration?: string | null;
+    description?: string[] | string | null;
+  };
   experiences?: Array<{
     id?: string;
     company?: string;
@@ -51,6 +58,27 @@ interface ResumeDataPatch {
     location?: string;
     title?: string;
   };
+  completeResume?: {
+    contact?: {
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      location?: string;
+      title?: string;
+    };
+    experiences?: Array<{
+      id?: string;
+      company?: string;
+      title?: string;
+      duration?: string | null;
+      description?: string[] | string | null;
+    }>;
+    skills?: string[];
+    summary?: string;
+  };
+  removeSkills?: string[];
+  removeExperiences?: string[];
+  clearSections?: string[];
 }
 
 interface AppStore {
@@ -154,7 +182,7 @@ const filterEnglishDescriptions = (descriptions: string[]): string[] => {
   return out;
 };
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = create<AppStore>((set) => ({
   // Initial state
   currentScreen: 'welcome',
   userBasicInfo: null,
@@ -196,18 +224,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
       ],
     })),
 
-  setContactInfo: (c) =>
-    set((state) => ({
-      resume: { ...state.resume, ...c },
-      userBasicInfo: {
-        ...(state.userBasicInfo || {}),
-        ...(c.fullName ? { fullName: c.fullName } : {}),
-        ...(c.title ? { currentRole: c.title } : {}),
-        ...(c.email ? { email: c.email } : {}),
-        ...(c.phone ? { phone: c.phone } : {}),
-        ...(c.location ? { location: c.location } : {}),
-      },
-    })),
+  setContactInfo: (c) => {
+    console.log('=== setContactInfo called ===');
+    console.log('Contact data received:', c);
+    
+    set((state) => {
+      const updatedResume = { ...state.resume, ...c };
+      console.log('Resume before update:', state.resume);
+      console.log('Resume after update:', updatedResume);
+      
+      return {
+        resume: updatedResume,
+        userBasicInfo: {
+          ...(state.userBasicInfo || {}),
+          ...(c.fullName ? { fullName: c.fullName } : {}),
+          ...(c.title ? { currentRole: c.title } : {}),
+          ...(c.email ? { email: c.email } : {}),
+          ...(c.phone ? { phone: c.phone } : {}),
+          ...(c.location ? { location: c.location } : {}),
+        },
+      };
+    });
+  },
 
   updateResume: (updates) =>
     set((state) => ({ resume: { ...state.resume, ...updates } })),
@@ -222,7 +260,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const exp: Experience = {
         ...incoming,
         id: incoming.id || makeId(),
-        description: Array.from(new Set(filteredDescriptions.length > 0 ? filteredDescriptions : ['תיאור התפקיד יתווסף בהמשך.'])),
+        description: Array.from(new Set(filteredDescriptions.length > 0 ? filteredDescriptions : [`ביצעתי משימות ${incoming.title ? `בתפקיד ${incoming.title}` : 'מקצועיות'} בחברת ${incoming.company}.`])),
       };
 
       const idx = state.resume.experiences.findIndex(
@@ -244,7 +282,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           ...prev,
           ...exp,
           id: prev.id || exp.id,
-          description: filteredMerged.length > 0 ? filteredMerged : ['תיאור התפקיד יתווסף בהמשך.'],
+          description: filteredMerged.length > 0 ? filteredMerged : [`ביצעתי משימות מקצועיות בתפקיד ${prev.title || exp.title} בחברת ${prev.company || exp.company}.`],
         };
         const experiences = [...state.resume.experiences];
         experiences[idx] = merged;
@@ -362,86 +400,78 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
 
   applyResumeDataPatch: (patch) => {
-    if (!patch || typeof patch !== 'object') return;
-    const op = patch.operation || 'patch';
-    const current = get().resume;
-
-    const normalizeExperiences = (
-      list: ResumeDataPatch['experiences']
-    ): Experience[] => {
-      if (!Array.isArray(list)) return [];
-      return list
-        .filter((e) => e && (e.company || e.title))
-        .map((e) => {
-          const descArr = Array.isArray(e.description)
-            ? e.description
-            : typeof e.description === 'string'
-            ? [e.description]
-            : [];
-          
-          // Filter English descriptions
-          const filteredDesc = filterEnglishDescriptions(descArr.filter(Boolean).map((d) => d.trim()));
-          
-          return {
-            id: e.id,
-            company: (e.company || 'Unknown').trim(),
-            title: (e.title || '').trim(),
-            duration: e.duration || undefined,
-            description: filteredDesc.length > 0 ? Array.from(new Set(filteredDesc)) : ['תיאור התפקיד יתווסף בהמשך.'],
-          };
-        });
-    };
-
-    if (op === 'replace') {
-      // If completeResume present prefer it; else synthesize from supplied top-level arrays
-      if ((patch as any).completeResume) {
-        const cr = (patch as any).completeResume;
+    console.log('=== applyResumeDataPatch called ===');
+    console.log('Patch received:', patch);
+    
+    set((state) => {
+      const currentResume = { ...state.resume };
+      
+      if (patch.operation === 'replace' && patch.completeResume) {
+        console.log('Applying complete resume replacement');
+        
+        // Properly normalize experiences to match Experience interface
+        const normalizedExperiences: Experience[] = (patch.completeResume.experiences || []).map(exp => ({
+          id: exp.id || makeId(),
+          company: exp.company || '',
+          title: exp.title || '',
+          duration: exp.duration || '',
+          description: Array.isArray(exp.description) 
+            ? exp.description.filter(Boolean) 
+            : exp.description 
+              ? [exp.description] 
+              : []
+        }));
+        
         const newResume: Resume = {
-          experiences: normalizeExperiences(cr.experiences) || [],
-          skills: Array.isArray(cr.skills)
-            ? Array.from(new Set(cr.skills.map((s: string) => s.trim()).filter(Boolean)))
-            : [],
-          summary: typeof cr.summary === 'string' ? cr.summary.trim() : '',
-          fullName: cr.contact?.fullName?.trim() || '',
-          email: cr.contact?.email?.trim() || '',
-          phone: cr.contact?.phone?.trim() || '',
-          location: cr.contact?.location?.trim() || '',
-          title: cr.contact?.title?.trim() || '',
+          experiences: normalizedExperiences,
+          skills: patch.completeResume.skills || [],
+          summary: patch.completeResume.summary || '',
+          fullName: patch.completeResume.contact?.fullName || '',
+          email: patch.completeResume.contact?.email || '',
+          phone: patch.completeResume.contact?.phone || '',
+          location: patch.completeResume.contact?.location || '',
+          title: patch.completeResume.contact?.title || '',
         };
-        set({ resume: newResume });
-        return;
-      } else {
-        const newResume: Resume = {
-          experiences: normalizeExperiences(patch.experiences) || current.experiences,
-          skills: Array.isArray(patch.skills)
-            ? Array.from(new Set(patch.skills.map((s) => s.trim()).filter(Boolean)))
-            : current.skills,
-          summary: typeof patch.summary === 'string' ? patch.summary.trim() : current.summary,
-          fullName: patch.contact?.fullName?.trim() ?? current.fullName ?? '',
-          email: patch.contact?.email?.trim() ?? current.email ?? '',
-            phone: patch.contact?.phone?.trim() ?? current.phone ?? '',
-          location: patch.contact?.location?.trim() ?? current.location ?? '',
-          title: patch.contact?.title?.trim() ?? current.title ?? '',
-        };
-        set({ resume: newResume });
-        return;
+        console.log('New resume created:', newResume);
+        return { resume: newResume };
       }
-    }
 
-    // Patch merge
-    if (Array.isArray(patch.experiences)) {
-      normalizeExperiences(patch.experiences).forEach((exp) => {
-        get().addOrUpdateExperience(exp);
-      });
-    }
-    if (Array.isArray(patch.skills)) {
-      get().addSkills(patch.skills);
-    }
-    if (typeof patch.summary === 'string' && patch.summary.trim()) {
-      get().setSummary(patch.summary.trim());
-    }
-    if (patch.contact) {
-      get().setContactInfo(patch.contact);
-    }
+      // Handle individual updates
+      if (patch.experiences) {
+        // Properly normalize experiences to match Experience interface
+        currentResume.experiences = patch.experiences.map(exp => ({
+          id: exp.id || makeId(),
+          company: exp.company || '',
+          title: exp.title || '',
+          duration: exp.duration || '',
+          description: Array.isArray(exp.description) 
+            ? exp.description.filter(Boolean) 
+            : exp.description 
+              ? [exp.description] 
+              : []
+        }));
+      }
+
+      if (patch.skills) {
+        currentResume.skills = [...patch.skills];
+      }
+
+      if (patch.summary) {
+        currentResume.summary = patch.summary;
+      }
+
+      // Fix contact information handling
+      if (patch.contact) {
+        console.log('Applying contact patch:', patch.contact);
+        if (patch.contact.fullName !== undefined) currentResume.fullName = patch.contact.fullName;
+        if (patch.contact.email !== undefined) currentResume.email = patch.contact.email;
+        if (patch.contact.phone !== undefined) currentResume.phone = patch.contact.phone;
+        if (patch.contact.location !== undefined) currentResume.location = patch.contact.location;
+        if (patch.contact.title !== undefined) currentResume.title = patch.contact.title;
+        console.log('Resume after contact patch:', currentResume);
+      }
+
+      return { resume: currentResume };
+    });
   },
 }));

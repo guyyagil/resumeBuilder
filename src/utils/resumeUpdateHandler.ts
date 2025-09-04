@@ -7,6 +7,13 @@ export const handleResumeUpdates = async (
   updates: ResumeDataPatch, 
   addChatMessage: (message: string, type: 'ai' | 'user') => void
 ) => {
+  // === COMPREHENSIVE DEBUG LOGGING ===
+  console.log('🔍 === CONTACT DEBUG - START ===');
+  console.log('📦 Raw updates received:', JSON.stringify(updates, null, 2));
+  console.log('📞 Contact in updates:', updates.contact);
+  console.log('📄 Complete resume in updates:', updates.completeResume);
+  console.log('🏢 Current store state before update:', useAppStore.getState().resume);
+  
   const {
     addSkills, 
     addOrUpdateExperience, 
@@ -136,7 +143,10 @@ export const handleResumeUpdates = async (
           addChatMessage('📝 Updated summary!', 'ai');
         }
         if (updates.contact) {
+          console.log('📞 === CONTACT PROCESSING ===');
+          console.log('Contact data being set:', updates.contact);
           setContactInfo(updates.contact);
+          console.log('📄 Resume after setContactInfo:', useAppStore.getState().resume);
           addChatMessage('👤 Updated contact info!', 'ai');
         }
       }
@@ -194,7 +204,7 @@ export const handleResumeUpdates = async (
           // Filter out English descriptions
           descArray = filterEnglishDescriptions(descArray);
           if (descArray.length === 0) {
-            descArray = ['פיתחתי ותחזקתי מערכות תוכנה.'];
+            descArray = [`ביצעתי משימות ${exp.title} בחברת ${exp.company} והשגתי תוצאות מצוינות.`];
           }
               
           addOrUpdateExperience({
@@ -247,9 +257,13 @@ export const handleResumeUpdates = async (
       }
       
       if (updates.contact) {
+        console.log('📞 === CONTACT PROCESSING ===');
+        console.log('Contact data being set:', updates.contact);
         setContactInfo(updates.contact);
+        console.log('📄 Resume after setContactInfo:', useAppStore.getState().resume);
         addChatMessage('👤 Updated contact information!', 'ai');
       }
       break;
   }
+  console.log('🔍 === CONTACT DEBUG - END ===');
 };

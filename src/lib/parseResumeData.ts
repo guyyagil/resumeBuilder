@@ -1,4 +1,5 @@
 // src/lib/parseResumeData.ts
+
 export interface ResumeDataPatch {
   operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign';
   experience?: {
@@ -49,253 +50,103 @@ export interface ResumeDataPatch {
 
 interface ParseResult {
   patch?: ResumeDataPatch;
-  cleanedText: string;
+  messageText: string;
   rawJson?: string;
   error?: string;
-  messageText?: string; // narration without the JSON block
 }
 
-/* helpers */
-function extractFirstBalancedObject(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '{') depth++;
-    else if (ch === '}') {
-      depth--;
-      if (depth === 0) return text.slice(start, i + 1);
-    }
-  }
-  return null;
-}
-
-function splitToLinesPreserveHebrew(input: string): string[] {
-  if (!input) return [];
-  // split by newlines or bullets. Avoid splitting on sentence enders if it creates single-word items.
-  const parts = input
-    .split(/\r?\n|•|●|–|-{2,}/u)
-    .flatMap(p => p.split(/(?<=[.!?׃؛])\s+/u)) // split by sentence enders after splitting by bullets
-    .map(p => p.trim())
-    .filter(p => p && p.length > 1); // filter out empty and single-character strings
-  return parts;
-}
-
-function collectSkillValues(obj: any): string[] {
-  if (!obj || typeof obj !== 'object') return [];
-  const keys = [
-    'skills', 'Skills', 'SKILLS',
-    'CURRENT_SKILLS', 'current_skills', 'currentSkills',
-    'current-skills', 'currentSkillsList', 'CURRENT-SKILLS', 'CURRENTSKILLS'
+function extractJson(text: string): { json: string | null; textBefore: string; textAfter: string } {
+  const patterns = [
+    /\[RESUME_DATA\]([\s\S]*?)\[\/RESUME_DATA\]/,
+    /```json([\s\S]*?)```/,
+    /```([\s\S]*?)```/
   ];
-  const out: string[] = [];
-  for (const k of keys) {
-    const v = obj[k];
-    if (Array.isArray(v)) out.push(...v.filter(Boolean).map(String));
-    else if (typeof v === 'string') {
-      out.push(...v.split(/[\n,;•\/|]+/).map((s: string) => s.trim()).filter(Boolean));
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    // Add a check for match.index
+    if (match && match[1].trim() && match.index !== undefined) {
+      const json = match[1];
+      const textBefore = text.substring(0, match.index).trim();
+      const textAfter = text.substring(match.index + match[0].length).trim();
+      return { json, textBefore, textAfter };
     }
   }
-  return out;
+
+  // Fallback for object without tags
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const potentialJson = text.substring(firstBrace, lastBrace + 1);
+    try {
+      JSON.parse(potentialJson); // Validate it's JSON
+      const textBefore = text.substring(0, firstBrace).trim();
+      const textAfter = text.substring(lastBrace + 1).trim();
+      return { json: potentialJson, textBefore, textAfter };
+    } catch {
+      // Not valid JSON, continue
+    }
+  }
+
+  return { json: null, textBefore: text, textAfter: '' };
 }
 
-/* main parser */
 export function parseResumeData(raw: string): ParseResult {
-  if (!raw) return { cleanedText: '', error: 'EMPTY_INPUT' };
+  if (!raw) return { messageText: '', error: 'EMPTY_INPUT' };
 
-  // normalize line endings and remove BOM
-  const original = raw.replace(/^[\uFEFF]/, '');
-  let work = original;
+  const { json: jsonText, textBefore, textAfter } = extractJson(raw);
+  const messageText = [textBefore, textAfter].filter(Boolean).join('\n').trim();
 
-  // try fenced JSON block first
-  const fence = work.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  let candidate = fence ? fence[1] : null;
-
-  // try [RESUME_DATA] tag
-  if (!candidate) {
-    const tagIdx = work.search(/\[RESUME_DATA\]/i);
-    if (tagIdx !== -1) {
-      const after = work.slice(tagIdx + '[RESUME_DATA]'.length);
-      candidate = extractFirstBalancedObject(after);
-    }
+  if (!jsonText) {
+    return { messageText: raw.trim(), error: 'NO_JSON_FOUND' };
   }
 
-  // fallback: first balanced object anywhere
-  if (!candidate) candidate = extractFirstBalancedObject(work);
-
-  if (!candidate) {
-    return { cleanedText: original.trim(), error: 'NO_JSON_FOUND', messageText: original.trim() };
-  }
-
-  // light clean: smart quotes, trailing commas, stray backticks
-  let jsonText = candidate.trim();
-  let cleanedJson = jsonText
-    .replace(/[“”‘’‛❝❞]/g, '"')
-    .replace(/\u00A0/g, ' ')
-    .replace(/,\s*([}\]])/g, '$1') // remove trailing commas
-    .replace(/```/g, '')
-    .trim();
-
-  // try parse, if fails attempt gentle recovery
   let parsed: any = null;
   try {
+    // Clean trailing commas before parsing
+    const cleanedJson = jsonText.replace(/,\s*([}\]])/g, '$1');
     parsed = JSON.parse(cleanedJson);
   } catch (e) {
-    // recovery attempts: replace single quotes, remove non-json prefixes, try to extract balanced braces again
-    const alt = cleanedJson
-      .replace(/([{\[,]\s*)'([^']*)'(?=\s*[:\],}])/g, '$1"$2"') // 'key' -> "key"
-      .replace(/'([^']*)'(?=\s*[,\]}])/g, '"$1"') // 'value' -> "value"
-      .replace(/,\s*([}\]])/g, '$1')
-      .replace(/[^\x20-\x7E\u0590-\u05FF\r\n\t{}[\]":,.-]/g, ''); // strip weird control characters
-    try {
-      parsed = JSON.parse(alt);
-      cleanedJson = alt;
-    } catch {
-      // final attempt: try to recover with a smaller balanced region
-      const brace = extractFirstBalancedObject(cleanedJson);
-      if (brace) {
-        try {
-          parsed = JSON.parse(brace);
-          cleanedJson = brace;
-        } catch {
-          return { cleanedText: original.trim(), rawJson: cleanedJson, error: 'JSON_PARSE_ERROR', messageText: original.trim() };
-        }
-      } else {
-        return { cleanedText: original.trim(), rawJson: cleanedJson, error: 'JSON_PARSE_ERROR', messageText: original.trim() };
-      }
-    }
+    console.error("JSON parsing failed:", e);
+    return { messageText, error: `JSON_PARSE_ERROR: ${e instanceof Error ? e.message : String(e)}`, rawJson: jsonText };
   }
 
-  const patch: ResumeDataPatch = {};
-
-  // operation
-  if (parsed.operation && ['patch', 'replace', 'reset'].includes(parsed.operation)) {
-    patch.operation = parsed.operation;
-  } else {
-    patch.operation = 'patch';
+  if (!parsed) {
+    return { messageText, error: 'PARSED_EMPTY_JSON', rawJson: jsonText };
   }
 
-  // collect skills from many aliases and from completeResume
-  const skillCandidates = [
-    ...collectSkillValues(parsed),
-    ...(parsed.completeResume ? collectSkillValues(parsed.completeResume) : [])
-  ].map(s => (s || '').trim()).filter(Boolean);
-  if (skillCandidates.length) {
-    patch.skills = Array.from(new Set(skillCandidates));
+  const patch: ResumeDataPatch = { operation: parsed.operation || 'patch' };
+
+  // Summary
+  if (typeof parsed.summary === 'string') {
+    patch.summary = parsed.summary;
   }
 
-  // capture summary from many aliases with better priority
-  const summaryKeys = [
-    'summary', 'Summary', 'SUMMARY',
-    'professional_summary', 'professionalSummary', 'professional-summary',
-    'CURRENT_SUMMARY', 'currentSummary', 'current_summary',
-    'headline', 'profile', 'about', 'description'
-  ];
-  
-  // First try direct top-level summary
-  for (const k of summaryKeys) {
-    if (typeof parsed[k] === 'string' && parsed[k].trim()) {
-      patch.summary = parsed[k].trim();
-      break;
-    }
-  }
-  
-  // Then try completeResume summary if not found
-  if (!patch.summary && parsed.completeResume) {
-    for (const k of summaryKeys) {
-      if (typeof parsed.completeResume[k] === 'string' && parsed.completeResume[k].trim()) {
-        patch.summary = parsed.completeResume[k].trim();
-        break;
-      }
-    }
-  }
-
-  // contact
+  // Contact
   if (parsed.contact && typeof parsed.contact === 'object') {
     patch.contact = {
       fullName: parsed.contact.fullName,
       email: parsed.contact.email,
       phone: parsed.contact.phone,
       location: parsed.contact.location,
-      title: parsed.contact.title
+      title: parsed.contact.title,
     };
-  } else if (parsed.completeResume && parsed.completeResume.contact) {
-    patch.contact = parsed.completeResume.contact;
   }
 
-  // experiences: try multiple keys and normalize descriptions to string[]
-  const candidateExpKeys = ['experiences', 'experience', 'work', 'jobs', 'positions', 'roles'];
-  let exps: any[] | undefined = undefined;
-  for (const k of candidateExpKeys) {
-    const v = parsed[k] ?? (parsed.completeResume && parsed.completeResume[k]);
-    if (v) {
-      exps = Array.isArray(v) ? v.slice() : [v];
-      break;
-    }
-  }
-  // also accept nested: parsed.experience?.experience etc.
-  if (!exps && parsed.experience && typeof parsed.experience === 'object') {
-    const nested = parsed.experience.experiences || parsed.experience.work || parsed.experience;
-    exps = Array.isArray(nested) ? nested : [nested];
+  // Skills
+  if (Array.isArray(parsed.skills)) {
+    patch.skills = parsed.skills;
   }
 
-  if (exps && exps.length) {
-    patch.experiences = exps.map((e: any) => {
-      const descRaw = e.description ?? e.descriptions ?? e.tasks ?? '';
-      let descArr: string[] = [];
-      if (Array.isArray(descRaw)) {
-        descArr = descRaw.map((d: any) => String(d || '').trim()).filter(Boolean);
-      } else if (typeof descRaw === 'string') {
-        descArr = splitToLinesPreserveHebrew(descRaw);
-      } else {
-        descArr = [];
-      }
-      // ensure each description item is trimmed and not too short garbage
-      descArr = descArr.map((d: string) => d.trim()).filter(Boolean);
-
-      return {
-        id: e.id,
-        company: (e.company || e.companyName || e.employer || '').trim(),
-        title: (e.title || e.position || '').trim(),
-        duration: e.duration || e.period || null,
-        description: descArr.length ? descArr : undefined
-      };
-    });
+  // Experiences
+  if (Array.isArray(parsed.experiences)) {
+    patch.experiences = parsed.experiences;
+  }
+  
+  // Complete Resume
+  if (parsed.completeResume) {
+    patch.completeResume = parsed.completeResume;
   }
 
-  // If parsed provides top-level skills array directly, ensure we capture them if not already
-  if ((!patch.skills || patch.skills.length === 0) && Array.isArray(parsed.skills)) {
-    patch.skills = (parsed.skills as any[]).map(s => String(s).trim()).filter(Boolean);
-  }
-
-  // If replace operation with completeResume object provided, prefer it
-  if (parsed.completeResume && typeof parsed.completeResume === 'object') {
-    patch.completeResume = {};
-    if (Array.isArray(parsed.completeResume.experiences)) patch.completeResume.experiences = parsed.completeResume.experiences;
-    if (Array.isArray(parsed.completeResume.skills)) patch.completeResume.skills = parsed.completeResume.skills;
-    if (typeof parsed.completeResume.summary === 'string') patch.completeResume.summary = parsed.completeResume.summary;
-    if (parsed.completeResume.contact && typeof parsed.completeResume.contact === 'object') patch.completeResume.contact = parsed.completeResume.contact;
-    // if main top-level fields missing, expose them too (useful downstream)
-    if (!patch.experiences && patch.completeResume.experiences) patch.experiences = patch.completeResume.experiences;
-    if ((!patch.skills || patch.skills.length === 0) && patch.completeResume.skills) patch.skills = patch.completeResume.skills;
-    if (!patch.summary && patch.completeResume.summary) patch.summary = patch.completeResume.summary;
-    if (!patch.contact && patch.completeResume.contact) patch.contact = patch.completeResume.contact;
-  }
-
-  // messageText: remove the candidate JSON region and surrounding tags/fences
-  const jsonIndex = original.indexOf(candidate);
-  let messageText = original;
-  if (jsonIndex !== -1) {
-    messageText = (original.slice(0, jsonIndex) + original.slice(jsonIndex + candidate.length)).trim();
-  }
-  messageText = messageText
-    .replace(/\[RESUME_DATA\]/gi, '')
-    .replace(/\[\/RESUME_DATA\]/gi, '')
-    .replace(/```(?:json)?/gi, '')
-    .replace(/```/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-
-  return { patch, cleanedText: original.trim(), rawJson: cleanedJson, messageText };
+  return { patch, messageText, rawJson: jsonText };
 }
