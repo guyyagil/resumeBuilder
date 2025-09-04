@@ -7,6 +7,21 @@ import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
 
 const FORCE_LANG: 'he' = 'he';
 
+// Remove common Markdown markers from free text
+const stripSimpleMarkdown = (input: string) =>
+  (input || '')
+    // bold/italic markers
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/__(.*?)__/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    // headings and list stars/dashes at line start
+    .replace(/^[ \t]*#{1,6}[ \t]*/gm, '')
+    .replace(/^[ \t]*[-*][ \t]+/gm, '• ')
+    // collapse multiple spaces
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+
 // ---------------- Public API ----------------
 export const sendMessageToAI = async (
   message: string,
@@ -32,7 +47,7 @@ export const sendMessageToAI = async (
     const primary = parseResumeData(text);
 
     let resumeUpdates: any = {};
-    let conversationMessage: string = (primary.messageText || text).trim();
+    let conversationMessage: string = stripSimpleMarkdown((primary.messageText || text).trim());
 
     // Create a simple addChatMessage function for the handler
     const addChatMessage = (msg: string, type: 'ai' | 'user') => {
@@ -61,16 +76,18 @@ export const sendMessageToAI = async (
         }
         await handleResumeUpdates(recovered, addChatMessage);
         resumeUpdates = recovered;
-        conversationMessage = text
-          .replace(/\[RESUME_DATA\][\s\S]*?\[\/RESUME_DATA\]/gi, '')
-          .replace(JSON.stringify(recovered), '')
-          .replace(/\{[\s\S]*?\}/g, '') // Remove any remaining JSON
-          .replace(/\n\s*\n/g, '\n') // Remove multiple empty lines
-          .trim();
+        conversationMessage = stripSimpleMarkdown(
+          text
+            .replace(/\[RESUME_DATA\][\s\S]*?\[\/RESUME_DATA\]/gi, '')
+            .replace(JSON.stringify(recovered), '')
+            .replace(/\{[\s\S]*?\}/g, '') // Remove any remaining JSON
+            .replace(/\n\s*\n/g, '\n') // Remove multiple empty lines
+            .trim()
+        );
       }
     }
 
-    return { message: conversationMessage, resumeUpdates };
+    return { message: stripSimpleMarkdown(conversationMessage), resumeUpdates };
   } catch (error) {
     console.error('AI error:', error);
     return {

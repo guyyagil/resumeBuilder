@@ -73,7 +73,14 @@ export const handleResumeUpdates = async (
       }
       if (hasHebrew(d) && d.length > 3) results.push(d);
     }
-    return results;
+    // Deduplicate by normalized lowercase text
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const s of results) {
+      const key = s.trim().replace(/\s+/g, ' ').toLowerCase();
+      if (!seen.has(key)) { seen.add(key); deduped.push(s.trim()); }
+    }
+    return deduped;
   };
   
   switch (operation) {
@@ -203,27 +210,27 @@ export const handleResumeUpdates = async (
       
       // Handle experiences array
       if (updates.experiences && Array.isArray(updates.experiences)) {
+        let added = 0;
         updates.experiences.forEach(exp => {
           if (exp.company && exp.title) {
-            let descArray = Array.isArray(exp.description) 
-              ? exp.description 
-              : typeof exp.description === 'string' 
-                ? [exp.description] 
+            let descArray = Array.isArray(exp.description)
+              ? exp.description
+              : typeof exp.description === 'string'
+                ? [exp.description]
                 : [];
-                
-            // Filter out English descriptions
             descArray = filterEnglishDescriptions(descArray);
-                
+            if (descArray.length === 0) descArray = ['פיתחתי ותחזקתי תהליכי עבודה ותשתיות.'];
             addOrUpdateExperience({
               id: exp.id,
-              company: exp.company,
-              title: exp.title,
-              duration: exp.duration || undefined,
+              company: exp.company!,
+              title: exp.title!,
+              duration: exp.duration || '2022 - Present',
               description: descArray
             } as any);
+            added++;
           }
         });
-        addChatMessage(`✅ Added ${updates.experiences.length} experiences!`, 'ai');
+        if (added > 0) addChatMessage(`✅ Added ${added} experiences!`, 'ai');
       }
       
       if (updates.skills && Array.isArray(updates.skills)) {

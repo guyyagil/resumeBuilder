@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { extractResumeFromPlainText } from '../services/geminiService';
+import { extractResumeFromPlainText, sendMessageToAI } from '../services/geminiService';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/build/pdf.worker.mjs';
 
@@ -15,6 +15,7 @@ const WelcomeForm: React.FC = () => {
   const setOriginalResumeText = useAppStore(s => s.setOriginalResumeText);
   const setTargetJobPosting = useAppStore(s => s.setTargetJobPosting);
   const goToChat = useAppStore(s => s.goToChat);
+  const chatMessages = useAppStore(state => state.chatMessages);
 
   const [jobText, setJobText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -53,16 +54,40 @@ const WelcomeForm: React.FC = () => {
     e.preventDefault();
     if (!file) { setError('נא לצרף קובץ PDF'); return; }
     setLoading(true); setError(null);
+
+    // Start static 15s timer for loading
+    setTimeout(() => {
+      setLoading(false);
+      goToChat();
+    }, 15000);
+
     try {
       const pdfText = await extractPdfText(file);
       setOriginalResumeText(pdfText);
       if (jobText.trim()) setTargetJobPosting(jobText.trim());
       const result = await extractResumeFromPlainText(pdfText);
       if (!result.ok) setError('כשל בעיבוד ה-AI: ' + (result.error || ''));
-      else goToChat();
+      
+      // Trigger AI response silently (don't add the "hi" user message, only the AI response)
+      const { userBasicInfo, resume, addChatMessage } = useAppStore.getState();
+      const aiResponse = await sendMessageToAI('שלום, נתחיל לעבוד על קורות החיים שלי', userBasicInfo, resume);
+      
+      // Add only the AI response to chat messages (the greeting)
+      if (typeof aiResponse === 'object' && aiResponse.message) {
+        addChatMessage(aiResponse.message, 'ai');
+        
+        if (aiResponse.resumeUpdates) {
+          const { handleResumeUpdates } = await import('../utils/resumeUpdateHandler');
+          await handleResumeUpdates(aiResponse.resumeUpdates, addChatMessage);
+        }
+      } else if (typeof aiResponse === 'string') {
+        addChatMessage(aiResponse, 'ai');
+      }
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שגיאה לא צפויה בקריאת PDF');
-    } finally { setLoading(false); }
+      setLoading(false);
+    }
   };
 
   return (
