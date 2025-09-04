@@ -65,39 +65,34 @@ export const sendMessageToAI = async (
 export const extractResumeFromPlainText = async (rawText: string) => {
   try {
     const promptParts = [
-      'אתה מומחה בהמרת טקסט גולמי של קורות חיים לפורמט JSON מובנה.',
-      'המשימה שלך היא לנתח את הטקסט המצורף, לזהות את כל החלקים השונים (פרטי קשר, תקציר, ניסיון תעסוקתי, כישורים) ולהחזיר אותם כאובייקט JSON שלם.',
-      'הקפד על הכללים הבאים:',
-      '1. **פעולה (operation)**: תמיד תהיה "replace".',
-      '2. **אובייקט ראשי (completeResume)**: כל המידע ירוכז תחת אובייקט זה.',
-      '3. **פרטי קשר (contact)**: חלץ שם מלא, אימייל, טלפון, ומיקום. אם יש תפקיד כללי בולט (כמו "מהנדס תוכנה" בכותרת), שים אותו בשדה "title".',
-      '4. **ניסיון (experiences)**: עבור כל תפקיד, חלץ חברה, תפקיד, משך זמן (למשל "2020-2022" או "3 שנים"), ותיאור. הפוך את התיאור למערך של משפטים.',
-      '5. **כישורים (skills)**: אסוף את כל הכישורים, גם מטקסטים וגם מרשימות ייעודיות, למערך אחד.',
-      '6. **תקציר (summary)**: אם קיים חלק של תקציר או "אודות", חלץ אותו. אם לא, צור תקציר קצר (2-3 שורות) על סמך הניסיון העדכני ביותר.',
-      '7. **שפה**: כל ערכי הטקסט ב-JSON חייבים להיות בעברית.',
+      'אתה יועץ קריירה ומומחה לכתיבת קורות חיים. משימתך היא להפוך טקסט גולמי של קורות חיים למסמך JSON מובנה, מקצועי ומשופר.',
+      'נתח את הטקסט המצורף ופעל לפי הכללים הבאים בקפדנות:',
+      '1. **העשרת תוכן**: אל תעתיק רק את המידע. שפר אותו. אם תיאור תפקיד חסר או קצר מדי (למשל, מכיל רק את שם החברה והתפקיד), חובה עליך לכתוב תיאור מקצועי של 1-2 משפטים המתארים את מהות התפקיד על סמך שם התפקיד.',
+      '2. **דיוק בפרטים**: השתמש אך ורק במידע האמיתי מהטקסט (שמות, חברות, תאריכים). אם אתה מזהה מידע שנראה כמו placeholder (למשל, "your_email@example.com"), התעלם ממנו והשאר את השדה ריק.',
+      '3. **סיכום מקצועי**: אם חסר תקציר, כתוב אחד בעצמך (2-3 שורות) המסכם את הניסיון והכישורים הבולטים של המועמד.',
+      '4. **מבנה קפדני**: החזר אך ורק אובייקט JSON אחד בתוך תגית [RESUME_DATA]. אל תוסיף שום טקסט הסבר לפני או אחרי התגית.',
       '',
-      '=== פורמט תגובה מחייב ===',
-      'החזר אך ורק בלוק JSON אחד עטוף ב-[RESUME_DATA]...[/RESUME_DATA]. ללא טקסט נוסף לפני או אחרי.',
+      '=== דוגמה למבנה התגובה ===',
       '[RESUME_DATA]',
       '{',
       '  "operation": "replace",',
       '  "completeResume": {',
-      '    "contact": { "fullName": "...", "email": "...", "phone": "...", "location": "...", "title": "..." },',
-      '    "summary": "...",',
+      '    "contact": { "fullName": "שם מהמסמך", "email": "מייל מהמסמך", "phone": "טלפון מהמסמך", "location": "מיקום מהמסמך", "title": "תפקיד נוכחי מהמסמך" },',
+      '    "summary": "תקציר מקצועי משופר או חדש...",',
       '    "experiences": [',
-      '      { "company": "...", "title": "...", "duration": "...", "description": ["..."] }',
+      '      { "company": "שם חברה", "title": "שם תפקיד", "duration": "תקופת העסקה", "description": ["תיאור משופר של התפקיד..."] }',
       '    ],',
-      '    "skills": ["...", "..."]',
+      '    "skills": ["כישורים שנאספו מהטקסט..."]',
       '  }',
       '}',
       '[/RESUME_DATA]',
       '',
-      '=== טקסט קורות החיים לניתוח ===',
+      '=== קורות החיים לניתוח ===',
       rawText.slice(0, 25000),
     ];
     const prompt = promptParts.join('\n');
 
-    console.log('Sending prompt to AI for initial CV extraction...');
+    console.log('Sending enhanced prompt to AI for initial CV extraction...');
     const result = await model.generateContent(prompt);
     const text = (await result.response).text();
     console.log('AI response for CV extraction:', text);
@@ -107,7 +102,6 @@ export const extractResumeFromPlainText = async (rawText: string) => {
 
     if (parsed.patch) {
       console.log('Applying initial parsed patch via handler...');
-      // Use a dummy message handler as this is a background process
       const addChatMessage = (msg: string, type: 'ai' | 'user') => {
         console.log(`[Initial Extraction - ${type.toUpperCase()}]: ${msg}`);
       };

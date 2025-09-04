@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { extractResumeFromPlainText, sendMessageToAI } from '../services/geminiService';
 import * as pdfjsLib from 'pdfjs-dist';
+// Note: The worker import is now handled differently in modern Vite setups.
+// The below line might not be necessary if you have pdfjs-dist as a direct dependency.
 import 'pdfjs-dist/build/pdf.worker.mjs';
 
 (pdfjsLib as any).GlobalWorkerOptions.workerSrc = new URL(
@@ -15,7 +17,7 @@ const WelcomeForm: React.FC = () => {
   const setOriginalResumeText = useAppStore(s => s.setOriginalResumeText);
   const setTargetJobPosting = useAppStore(s => s.setTargetJobPosting);
   const goToChat = useAppStore(s => s.goToChat);
-  const chatMessages = useAppStore(state => state.chatMessages);
+  const addChatMessage = useAppStore(s => s.addChatMessage);
 
   const [jobText, setJobText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -28,13 +30,16 @@ const WelcomeForm: React.FC = () => {
     if (f.size > MAX_SIZE_MB * 1024 * 1024) { setError(`גודל קובץ גדול מ-${MAX_SIZE_MB}MB`); return; }
     setError(null); setFile(f);
   };
+
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) onSelectFile(e.target.files[0]);
   };
+
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files?.[0]) onSelectFile(e.dataTransfer.files[0]);
   }, []);
+
   const prevent = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); };
 
   const extractPdfText = async (f: File): Promise<string> => {
@@ -53,39 +58,41 @@ const WelcomeForm: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) { setError('נא לצרף קובץ PDF'); return; }
-    setLoading(true); setError(null);
-
-    // Start static 15s timer for loading
-    setTimeout(() => {
-      setLoading(false);
-      goToChat();
-    }, 15000);
+    setLoading(true);
+    setError(null);
 
     try {
+      // Step 1: Extract text and job info
       const pdfText = await extractPdfText(file);
       setOriginalResumeText(pdfText);
-      if (jobText.trim()) setTargetJobPosting(jobText.trim());
-      const result = await extractResumeFromPlainText(pdfText);
-      if (!result.ok) setError('כשל בעיבוד ה-AI: ' + (result.error || ''));
-      
-      // Trigger AI response silently (don't add the "hi" user message, only the AI response)
-      const { userBasicInfo, resume, addChatMessage } = useAppStore.getState();
-      const aiResponse = await sendMessageToAI('שלום, נתחיל לעבוד על קורות החיים שלי', userBasicInfo, resume);
-      
-      // Add only the AI response to chat messages (the greeting)
-      if (typeof aiResponse === 'object' && aiResponse.message) {
-        addChatMessage(aiResponse.message, 'ai');
-        
-        if (aiResponse.resumeUpdates) {
-          const { handleResumeUpdates } = await import('../utils/resumeUpdateHandler');
-          await handleResumeUpdates(aiResponse.resumeUpdates, addChatMessage);
-        }
-      } else if (typeof aiResponse === 'string') {
-        addChatMessage(aiResponse, 'ai');
+      if (jobText.trim()) {
+        setTargetJobPosting(jobText.trim());
       }
+
+      // Step 2: Get the fully parsed resume from the first AI call
+      const initialParseResult = await extractResumeFromPlainText(pdfText);
+      if (!initialParseResult.ok || !initialParseResult.patch) {
+        throw new Error(initialParseResult.error || 'Failed to parse resume from PDF');
+      }
+
+      // Step 3: Send the second AI call with the now-populated resume data
+      const updatedState = useAppStore.getState();
+      const aiResponse = await sendMessageToAI(
+        `היי, כשאתה מקבל את ההודעה הראשונה, פנה למשתמש בשמו ("${updatedState.resume.fullName}"), הצג את עצמך כמדריך לשיפור קורות חיים, הסבר בקצרה שתעזור לו להתאים את הקורות חיים למשרת היעד, ותזמין אותו לשתף מידע נוסף או שאלות.`,
+        updatedState.userBasicInfo,
+        updatedState.resume
+      );
       
+      if (aiResponse.message) {
+        addChatMessage(aiResponse.message, 'ai');
+      }
+
+      // Adaptive transition: only after AI response is processed
+      goToChat();
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שגיאה לא צפויה בקריאת PDF');
+    } finally {
       setLoading(false);
     }
   };

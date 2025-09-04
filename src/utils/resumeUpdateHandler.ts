@@ -90,6 +90,19 @@ export const handleResumeUpdates = async (
     return deduped;
   };
   
+  function isPlaceholderContact(contact: any) {
+    if (!contact) return true;
+    // Add more rules as needed
+    return (
+      !contact.email ||
+      contact.email.includes('example.com') ||
+      !contact.phone ||
+      contact.phone === '050-1234567' ||
+      !contact.location ||
+      contact.location === 'תל אביב'
+    );
+  }
+
   switch (operation) {
     case 'reset':
       resetResume();
@@ -145,9 +158,12 @@ export const handleResumeUpdates = async (
         if (updates.contact) {
           console.log('📞 === CONTACT PROCESSING ===');
           console.log('Contact data being set:', updates.contact);
-          setContactInfo(updates.contact);
-          console.log('📄 Resume after setContactInfo:', useAppStore.getState().resume);
-          addChatMessage('👤 Updated contact info!', 'ai');
+          if (!isPlaceholderContact(updates.contact)) {
+            setContactInfo(updates.contact);
+            addChatMessage('👤 Updated contact information!', 'ai');
+          } else {
+            console.log('Skipped placeholder contact info:', updates.contact);
+          }
         }
       }
       break;
@@ -259,9 +275,12 @@ export const handleResumeUpdates = async (
       if (updates.contact) {
         console.log('📞 === CONTACT PROCESSING ===');
         console.log('Contact data being set:', updates.contact);
-        setContactInfo(updates.contact);
-        console.log('📄 Resume after setContactInfo:', useAppStore.getState().resume);
-        addChatMessage('👤 Updated contact information!', 'ai');
+        if (!isPlaceholderContact(updates.contact)) {
+          setContactInfo(updates.contact);
+          addChatMessage('👤 Updated contact information!', 'ai');
+        } else {
+          console.log('Skipped placeholder contact info:', updates.contact);
+        }
       }
       break;
   }
