@@ -94,6 +94,66 @@ interface AppStore {
 const makeId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
+// Helper function to filter English descriptions (keep sentences, drop tech-lists/generic prompts)
+const filterEnglishDescriptions = (descriptions: string[]): string[] => {
+  const hasHebrew = (text: string) => /[\u0590-\u05FF]/.test(text);
+  const WORD_COUNT = (t: string) => (t.trim().split(/\s+/).filter(Boolean).length);
+
+  // token looks like a technology / single token (React, Node.js, AWS)
+  const TECH_TOKEN = /^[A-Za-z0-9+.#-]{2,30}$/;
+
+  const looksLikeTechList = (text: string) => {
+    const tokens = text.split(/[,/|•;]+|\s{2,}/).map(t => t.trim()).filter(Boolean);
+    if (tokens.length < 2) return false;
+    // consider it a tech list only if most tokens are single-token tech-like strings
+    const techCount = tokens.filter(t => TECH_TOKEN.test(t.replace(/\.$/, '')) && t.length <= 30).length;
+    return techCount >= Math.ceil(tokens.length * 0.6);
+  };
+
+  const looksLikeGenericPlaceholder = (text: string) => {
+    const lower = text.toLowerCase().trim();
+    return (
+      lower.includes('add measurable accomplishment') ||
+      lower.includes('add measurable') ||
+      lower.includes('responsibility') ||
+      lower === 'key responsibility' ||
+      lower.includes('accomplishment or responsibility') ||
+      lower.match(/^(add|key|responsibilit(y|ies))/i)
+    );
+  };
+
+  const looksLikeSentence = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    // Hebrew lines are fine
+    if (hasHebrew(trimmed)) return true;
+    // sentences usually end with punctuation or have enough words
+    if (/[.!?]$/.test(trimmed)) return true;
+    if (WORD_COUNT(trimmed) >= 6) return true;
+    // short English sentences that contain a verb-like token (common verbs)
+    if (/\b(develop|led|manage|implemented|build|maintain|design|developed|managed|led|implemented)\b/i.test(trimmed)) return true;
+    return false;
+  };
+
+  const out: string[] = [];
+  for (const raw of descriptions) {
+    const d = (raw || '').toString().trim();
+    if (!d) continue;
+    if (looksLikeGenericPlaceholder(d)) continue;
+    if (looksLikeTechList(d)) {
+      // treat as tech list -> remove from description. Upstream refiner may collect tokens as skills.
+      continue;
+    }
+    if (looksLikeSentence(d)) {
+      out.push(d);
+      continue;
+    }
+    // fallback: if Hebrew short phrase keep, else drop
+    if (hasHebrew(d) && d.length > 3) out.push(d);
+  }
+  return out;
+};
+
 export const useAppStore = create<AppStore>((set, get) => ({
   // Initial state
   currentScreen: 'welcome',
@@ -154,10 +214,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   addOrUpdateExperience: (incoming) =>
     set((state) => {
+      // Filter descriptions before processing
+      const filteredDescriptions = incoming.description 
+        ? filterEnglishDescriptions(Array.isArray(incoming.description) ? incoming.description : [incoming.description])
+        : [];
+
       const exp: Experience = {
         ...incoming,
         id: incoming.id || makeId(),
-        description: Array.from(new Set(incoming.description || [])),
+        description: Array.from(new Set(filteredDescriptions.length > 0 ? filteredDescriptions : ['תיאור התפקיד יתווסף בהמשך.'])),
       };
 
       const idx = state.resume.experiences.findIndex(
@@ -170,13 +235,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
       if (idx !== -1) {
         const prev = state.resume.experiences[idx];
+        const mergedDescriptions = Array.from(
+          new Set([...(prev.description || []), ...(exp.description || [])])
+        );
+        const filteredMerged = filterEnglishDescriptions(mergedDescriptions);
+        
         const merged: Experience = {
           ...prev,
           ...exp,
           id: prev.id || exp.id,
-          description: Array.from(
-            new Set([...(prev.description || []), ...(exp.description || [])])
-          ),
+          description: filteredMerged.length > 0 ? filteredMerged : ['תיאור התפקיד יתווסף בהמשך.'],
         };
         const experiences = [...state.resume.experiences];
         experiences[idx] = merged;
@@ -186,7 +254,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return {
         resume: {
           ...state.resume,
-            experiences: [...state.resume.experiences, exp],
+          experiences: [...state.resume.experiences, exp],
         },
       };
     }),
@@ -212,9 +280,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
     })),
 
   replaceAllExperiences: (experiences) =>
-    set((state) => ({
-      resume: { ...state.resume, experiences },
-    })),
+    set((state) => {
+      const filteredExperiences = experiences.map(exp => ({
+        ...exp,
+        description: exp.description 
+          ? filterEnglishDescriptions(Array.isArray(exp.description) ? exp.description : [exp.description])
+          : []
+      }));
+      
+      return {
+        resume: { ...state.resume, experiences: filteredExperiences },
+      };
+    }),
 
   addSkills: (newSkills) =>
     set((state) => ({
@@ -301,14 +378,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
             : typeof e.description === 'string'
             ? [e.description]
             : [];
+          
+          // Filter English descriptions
+          const filteredDesc = filterEnglishDescriptions(descArr.filter(Boolean).map((d) => d.trim()));
+          
           return {
             id: e.id,
             company: (e.company || 'Unknown').trim(),
             title: (e.title || '').trim(),
             duration: e.duration || undefined,
-            description: Array.from(
-              new Set(descArr.filter(Boolean).map((d) => d.trim()))
-            ),
+            description: filteredDesc.length > 0 ? Array.from(new Set(filteredDesc)) : ['תיאור התפקיד יתווסף בהמשך.'],
           };
         });
     };

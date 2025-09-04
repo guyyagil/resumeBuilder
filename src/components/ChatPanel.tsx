@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
-import type { AIResponse } from '../types/resume';
+import type { AIResponse } from '../types';
 import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
 
 interface ChatPanelProps {

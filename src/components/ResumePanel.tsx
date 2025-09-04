@@ -1,7 +1,7 @@
 // src/components/ResumePanel.tsx
 import React from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { generateProfessionalSummary, combineSkills } from '../utils/resumeHelpers';
+import { generateProfessionalSummary, combineSkills, getDisplayExperiences } from '../utils/resumeHelpers';
 import { printResume } from '../utils/printHelpers';
 
 interface ResumePanelProps {
@@ -13,6 +13,9 @@ export const ResumePanel: React.FC<ResumePanelProps> = ({ userBasicInfo }) => {
   
   const allSkills = combineSkills(userBasicInfo?.keySkills, resume.skills);
   const professionalSummary = generateProfessionalSummary(userBasicInfo, resume.summary);
+  
+  // Filter out English descriptions for display
+  const displayExperiences = getDisplayExperiences(resume.experiences);
 
   return (
     <div id="resume-pane" className="rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col h-[calc(100vh-2rem)]">
@@ -63,25 +66,27 @@ export const ResumePanel: React.FC<ResumePanelProps> = ({ userBasicInfo }) => {
             ניסיון
           </h3>
           <div className="space-y-4">
-            {resume.experiences.map((exp: any) => (
+            {displayExperiences.map((exp: any) => (
               <div key={exp.id || exp.company} className="mb-4">
                 <h3 className="font-semibold text-gray-900">{exp.title}</h3>
                 <p className="text-sm text-gray-600 mb-2">{exp.company} • {exp.duration}</p>
                 <div className="text-sm text-gray-700 space-y-1">
-                  {exp.description.map((desc: string, index: number) => {
-                    const cleanDesc = desc.replace(/^[•\-\s]+/, '');
-                    return (
-                      <div key={index} className="flex items-start gap-2">
-                        <span className="text-gray-400 mt-1 text-xs">•</span>
-                        <span className="flex-1">{cleanDesc}</span>
-                      </div>
-                    );
-                  })}
+                  {exp.description
+                    .filter((desc: string) => desc.trim().split(/\s+/).length > 2) // Only show descriptions with more than 2 words
+                    .map((desc: string, index: number) => {
+                      const cleanDesc = desc.replace(/^[•\-\s]+/, '');
+                      return (
+                        <div key={index} className="flex items-start gap-2">
+                          <span className="text-gray-400 mt-1 text-xs">•</span>
+                          <span className="flex-1">{cleanDesc}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             ))}
             
-            {resume.experiences.length === 0 && (
+            {displayExperiences.length === 0 && (
               <div className="text-gray-500 text-sm italic text-center py-4">
                 <p>ספר לי על הניסיון המקצועי שלך כדי למלא חלק זה</p>
               </div>
@@ -96,7 +101,16 @@ export const ResumePanel: React.FC<ResumePanelProps> = ({ userBasicInfo }) => {
           </h2>
           <div className="text-gray-700">
             {allSkills.length > 0 ? (
-              <p className="text-sm leading-relaxed">{allSkills.join(' • ')}</p>
+              <div className="flex flex-wrap gap-2">
+                {allSkills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-3 py-1.5 rounded-md"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
             ) : (
               <p className="text-gray-500 text-sm italic text-center py-4 w-full">
                 שתף את הכישורים שלך בצ'אט כדי למלא חלק זה

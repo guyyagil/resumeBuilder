@@ -1,5 +1,5 @@
 // src/utils/resumeHelpers.ts
-import type { ExperienceInput } from '../types/resume';
+import type { ExperienceInput } from '../types';
 
 export const normalizeExperiences = (items: ExperienceInput[] = []) =>
   items
@@ -11,7 +11,7 @@ export const normalizeExperiences = (items: ExperienceInput[] = []) =>
       duration: e.duration || '2022 - Present',
       description: e.description && e.description.length > 0
         ? e.description
-        : ['Add measurable accomplishment or responsibility']
+        : ['יש להוסיף תיאור תפקיד.']
     }));
 
 export const generateProfessionalSummary = (userBasicInfo: any, resumeSummary?: string) => {
@@ -29,4 +29,41 @@ export const combineSkills = (userSkills?: string, resumeSkills: string[] = []) 
     ...(userSkills?.split(',').map(s => s.trim()).filter(s => s) || []),
     ...resumeSkills
   ])];
+};
+
+// Helper function to filter English descriptions for display
+export const filterEnglishDescriptionsForDisplay = (descriptions: string[]): string[] => {
+  const hasHebrew = (text: string) => /[\u0590-\u05FF]/.test(text);
+  const isGenericEnglish = (text: string) => {
+    const lower = text.toLowerCase().trim();
+    return (
+      lower.includes('add measurable accomplishment') ||
+      lower.includes('add measurable') ||
+      lower.includes('responsibility') ||
+      lower === 'key responsibility' ||
+      lower.includes('accomplishment or responsibility') ||
+      lower.includes('add responsibility') ||
+      // Match any short English-only text that looks like a placeholder
+      (lower.match(/^[a-z\s,.'-]+$/i) && !hasHebrew(text) && text.length < 60)
+    );
+  };
+  
+  return descriptions.filter(desc => {
+    const trimmed = desc.trim();
+    if (!trimmed) return false;
+    if (isGenericEnglish(trimmed)) {
+      console.log('Hiding English description from display:', trimmed);
+      return false;
+    }
+    // Keep Hebrew content or substantial English content
+    return hasHebrew(trimmed) || (trimmed.length > 60 && !isGenericEnglish(trimmed));
+  });
+};
+
+// Helper to get filtered experiences for display
+export const getDisplayExperiences = (experiences: any[]): any[] => {
+  return experiences.map(exp => ({
+    ...exp,
+    description: filterEnglishDescriptionsForDisplay(exp.description || [])
+  }));
 };
