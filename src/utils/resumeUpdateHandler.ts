@@ -8,10 +8,8 @@ export const handleResumeUpdates = async (
   addChatMessage: (message: string, type: 'ai' | 'user') => void
 ) => {
   // === COMPREHENSIVE DEBUG LOGGING ===
-  console.log('🔍 === CONTACT DEBUG - START ===');
+  console.log('🔍 === EXPERIENCE DEBUG - START ===');
   console.log('📦 Raw updates received:', JSON.stringify(updates, null, 2));
-  console.log('📞 Contact in updates:', updates.contact);
-  console.log('📄 Complete resume in updates:', updates.completeResume);
   console.log('🏢 Current store state before update:', useAppStore.getState().resume);
   
   const {
@@ -42,19 +40,19 @@ export const handleResumeUpdates = async (
 
     const looksLikeTechList = (text: string) => {
       const tokens = text.split(/[,/|•;]+|\s{2,}/).map(t => t.trim()).filter(Boolean);
-      if (tokens.length < 2) return false;
+      if (tokens.length < 3) return false;
       const techCount = tokens.filter(t => TECH_TOKEN.test(t.replace(/\.$/, '')) && t.length <= 30).length;
-      return techCount >= Math.ceil(tokens.length * 0.6);
+      return techCount >= Math.ceil(tokens.length * 0.7);
     };
 
     const looksLikeGenericPlaceholder = (text: string) => {
       const lower = text.toLowerCase().trim();
       return (
         lower.includes('add measurable accomplishment') ||
-        lower.includes('add measurable') ||
-        lower.includes('responsibility') ||
-        lower === 'key responsibility' ||
-        lower.includes('accomplishment or responsibility')
+        lower.includes('key responsibility') ||
+        lower.includes('accomplishment or responsibility') ||
+        lower === 'responsibility' ||
+        lower === 'accomplishment'
       );
     };
 
@@ -63,36 +61,45 @@ export const handleResumeUpdates = async (
       if (!trimmed) return false;
       if (hasHebrew(trimmed)) return true;
       if (/[.!?]$/.test(trimmed)) return true;
-      if (WORD_COUNT(trimmed) >= 6) return true;
-      if (/\b(develop|developed|build|built|manage|managed|lead|led|implement|implemented|design|designed|maintain|maintained|support|supported)\b/i.test(trimmed)) return true;
+      if (WORD_COUNT(trimmed) >= 4) return true;
+      if (/\b(develop|developed|build|built|manage|managed|lead|led|implement|implemented|design|designed|maintain|maintained|support|supported|responsible|worked|created|achieved)\b/i.test(trimmed)) return true;
       return false;
     };
 
+    console.log('🔍 Filtering descriptions:', descriptions);
     const results: string[] = [];
     for (const raw of descriptions) {
       const d = (raw || '').toString().trim();
       if (!d) continue;
-      if (looksLikeGenericPlaceholder(d)) continue;
-      if (looksLikeTechList(d)) continue; // drop pure tech lists from descriptions
+      
+      if (looksLikeGenericPlaceholder(d)) {
+        console.log(`Skipping placeholder: ${d}`);
+        continue;
+      }
+      if (looksLikeTechList(d)) {
+        console.log(`Skipping tech list: ${d}`);
+        continue;
+      }
       if (looksLikeSentence(d)) {
+        console.log(`Keeping sentence: ${d}`);
         results.push(d);
         continue;
       }
-      if (hasHebrew(d) && d.length > 3) results.push(d);
+      if (hasHebrew(d) && d.length > 3) {
+        console.log(`Keeping Hebrew text: ${d}`);
+        results.push(d);
+      }
     }
-    // Deduplicate by normalized lowercase text
-    const seen = new Set<string>();
-    const deduped: string[] = [];
-    for (const s of results) {
-      const key = s.trim().replace(/\s+/g, ' ').toLowerCase();
-      if (!seen.has(key)) { seen.add(key); deduped.push(s.trim()); }
-    }
+    
+    // Simple deduplication by exact match only
+    const deduped = [...new Set(results.map(s => s.trim()))];
+    
+    console.log('🔍 Final filtered descriptions:', deduped);
     return deduped;
   };
   
   function isPlaceholderContact(contact: any) {
     if (!contact) return true;
-    // Add more rules as needed
     return (
       !contact.email ||
       contact.email.includes('example.com') ||
@@ -205,84 +212,139 @@ export const handleResumeUpdates = async (
     case 'add':
     case 'patch':
     default:
-      // Handle single experience
+      console.log('🔍 Processing patch/add/update operation');
+      
+      // Handle single experience - simplified, trust AI
       if (updates.experience) {
+        console.log('🔍 Processing single experience:', updates.experience);
         const exp = updates.experience;
-        const hasValidCompany = exp.company && exp.company !== 'Company Name' && !exp.company.includes('Needed');
-        const hasValidTitle = exp.title && exp.title !== 'Job Title' && !exp.title.includes('Needed');
+        
+        // Basic validation only
+        const hasValidCompany = exp.company && exp.company.trim() && exp.company !== 'Company Name';
+        const hasValidTitle = exp.title && exp.title.trim() && exp.title !== 'Job Title';
+          
+        console.log(`🔍 Experience validation: company=${hasValidCompany}, title=${hasValidTitle}`);
+        
         if (hasValidCompany && hasValidTitle) {
           let descArray = Array.isArray(exp.description) 
             ? exp.description 
             : typeof exp.description === 'string' 
               ? [exp.description] 
-              : ['Key responsibility'];
+              : [];
               
-          // Filter out English descriptions
+          // Only filter out obvious placeholders and tech lists
           descArray = filterEnglishDescriptions(descArray);
+          
+          // If no descriptions remain, add a simple default
           if (descArray.length === 0) {
-            descArray = [`ביצעתי משימות ${exp.title} בחברת ${exp.company} והשגתי תוצאות מצוינות.`];
+            descArray = [`עבדתי כ${exp.title} בחברת ${exp.company}.`];
+            console.log('🔍 Added minimal default description');
           }
-              
-          addOrUpdateExperience({
-            id: exp.id,
+          
+          // Handle duration
+          let duration = exp.duration;
+          if (!duration || duration.trim() === '' || duration === 'לא צוין') {
+            duration = undefined;
+          } else if (duration.trim()) {
+            duration = duration.trim();
+          }
+          
+          const experienceToAdd = {
+            id: exp.id || `${exp.company}-${exp.title}`,
             company: exp.company!,
             title: exp.title!,
-            duration: exp.duration || '2022 - Present',
+            duration: duration,
             description: descArray
-          } as any);
-          addChatMessage(`✅ Added/updated experience at ${exp.company}!`, 'ai');
+          };
+          
+          console.log('🔍 Adding experience:', experienceToAdd);
+          addOrUpdateExperience(experienceToAdd as any);
+          addChatMessage(`✅ הוספתי/עדכנתי ניסיון בחברת ${exp.company}!`, 'ai');
+        } else {
+          console.log('🔍 Experience validation failed - basic requirements not met');
         }
       }
       
-      // Handle experiences array
+      // Handle experiences array - simplified
       if (updates.experiences && Array.isArray(updates.experiences)) {
+        console.log('🔍 Processing experiences array:', updates.experiences);
         let added = 0;
-        updates.experiences.forEach(exp => {
-          if (exp.company && exp.title) {
+        updates.experiences.forEach((exp, index) => {
+          console.log(`🔍 Processing experience ${index}:`, exp);
+          
+          const hasValidCompany = exp.company && exp.company.trim() && exp.company !== 'Company Name';
+          const hasValidTitle = exp.title && exp.title.trim() && exp.title !== 'Job Title';
+            
+          if (hasValidCompany && hasValidTitle) {
             let descArray = Array.isArray(exp.description)
               ? exp.description
               : typeof exp.description === 'string'
                 ? [exp.description]
                 : [];
+                
             descArray = filterEnglishDescriptions(descArray);
-            if (descArray.length === 0) descArray = ['פיתחתי ותחזקתי תהליכי עבודה ותשתיות.'];
-            addOrUpdateExperience({
-              id: exp.id,
+            
+            if (descArray.length === 0) {
+              descArray = [`עבדתי כ${exp.title} בחברת ${exp.company}.`];
+            }
+            
+            // Handle duration
+            let duration = exp.duration;
+            if (!duration || duration.trim() === '' || duration === 'לא צוין') {
+              duration = undefined;
+            } else if (duration.trim()) {
+              duration = duration.trim();
+            }
+            
+            const experienceToAdd = {
+              id: exp.id || `${exp.company}-${exp.title}`,
               company: exp.company!,
               title: exp.title!,
-              duration: exp.duration || '2022 - Present',
+              duration: duration,
               description: descArray
-            } as any);
+            };
+            
+            console.log(`🔍 Adding experience ${index}:`, experienceToAdd);
+            addOrUpdateExperience(experienceToAdd as any);
             added++;
           }
         });
-        if (added > 0) addChatMessage(`✅ Added ${added} experiences!`, 'ai');
+        if (added > 0) {
+          addChatMessage(`✅ הוספתי ${added} ניסיונות עבודה!`, 'ai');
+          console.log(`🔍 Successfully added ${added} experiences`);
+        }
       }
       
+      // Handle skills - trust AI completely
       if (updates.skills && Array.isArray(updates.skills)) {
-        addSkills(updates.skills);
-        addChatMessage(`✅ Added ${updates.skills.length} new skills!`, 'ai');
+        const validSkills = updates.skills.filter(skill => skill && skill.trim());
+        if (validSkills.length > 0) {
+          addSkills(validSkills);
+          addChatMessage(`✅ הוספתי ${validSkills.length} כישורים!`, 'ai');
+        }
       }
       
-      // Fix summary handling - ensure it's properly set
+      // Handle summary
       if (updates.summary && typeof updates.summary === 'string' && updates.summary.trim()) {
         const cleanSummary = updates.summary.trim();
         setSummary(cleanSummary);
         console.log('Setting summary:', cleanSummary);
-        addChatMessage('📝 Updated professional summary!', 'ai');
+        addChatMessage('📝 עדכנתי תקציר מקצועי!', 'ai');
       }
       
+      // Handle contact
       if (updates.contact) {
         console.log('📞 === CONTACT PROCESSING ===');
         console.log('Contact data being set:', updates.contact);
         if (!isPlaceholderContact(updates.contact)) {
           setContactInfo(updates.contact);
-          addChatMessage('👤 Updated contact information!', 'ai');
+          addChatMessage('👤 עדכנתי פרטי קשר!', 'ai');
         } else {
           console.log('Skipped placeholder contact info:', updates.contact);
         }
       }
       break;
   }
-  console.log('🔍 === CONTACT DEBUG - END ===');
+  console.log('🔍 === EXPERIENCE DEBUG - END ===');
+  console.log('🏢 Final store state after update:', useAppStore.getState().resume);
 };

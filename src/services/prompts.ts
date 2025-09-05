@@ -2,24 +2,58 @@ import type { Resume } from '../types';
 
 const buildPlainTextResume = (resume: any): string => {
   const lines: string[] = [];
+  
+  // Header with contact info
   if (resume.fullName || resume.title) {
-    lines.push(`${resume.fullName || ''} ${resume.title ? '— ' + resume.title : ''}`.trim());
+    lines.push(`${resume.fullName || 'ללא שם'} ${resume.title ? '— ' + resume.title : ''}`.trim());
   }
+  if (resume.email || resume.phone || resume.location) {
+    const contactParts = [resume.email, resume.phone, resume.location].filter(Boolean);
+    if (contactParts.length > 0) {
+      lines.push(`📞 ${contactParts.join(' | ')}`);
+    }
+  }
+  lines.push(''); // Empty line
+  
+  // Summary
   if (resume.summary) {
-    lines.push('--- תקציר ---');
+    lines.push('=== תקציר מקצועי נוכחי ===');
     lines.push(resume.summary);
+    lines.push('');
   }
+  
+  // Experiences with full detail
   if (resume.experiences?.length) {
-    lines.push('--- ניסיון ---');
+    lines.push('=== ניסיון עבודה במערכת כרגע ===');
     resume.experiences.forEach((e: any, i: number) => {
-      lines.push(`${i + 1}. ${e.company || ''}${e.title ? ' – ' + e.title : ''}${e.duration ? ' (' + e.duration + ')' : ''}`);
-      (e.description || []).slice(0, 8).forEach((d: string) => lines.push('• ' + d));
+      lines.push(`${i + 1}. 🏢 ${e.company || ''} - ${e.title || ''} ${e.duration ? `(${e.duration})` : ''}`);
+      if (e.description && e.description.length > 0) {
+        lines.push('   תיאורים רשומים:');
+        e.description.forEach((d: string, idx: number) => {
+          lines.push(`   ${idx + 1}. ${d}`);
+        });
+      } else {
+        lines.push('   (אין תיאורים)');
+      }
+      lines.push(''); // Empty line between experiences
     });
+  } else {
+    lines.push('=== ניסיון עבודה ===');
+    lines.push('(עדיין לא נוסף ניסיון עבודה)');
+    lines.push('');
   }
+  
+  // Skills
   if (resume.skills?.length) {
-    lines.push('--- כישורים ---');
+    lines.push('=== כישורים רשומים ===');
     lines.push(resume.skills.join(', '));
+    lines.push('');
+  } else {
+    lines.push('=== כישורים ===');
+    lines.push('(עדיין לא נוספו כישורים)');
+    lines.push('');
   }
+  
   return lines.join('\n');
 };
 
@@ -29,7 +63,6 @@ export const getSystemPrompt = (
   resume: Resume,
   chatMessages?: any[]
 ) => {
-  const currentSkills: string[] = resume?.skills || [];
   const targetJobPosting: string = userContext?.targetJobPosting || '';
   let conversationMemory = '';
 
@@ -46,88 +79,67 @@ export const getSystemPrompt = (
   const plainTextCV = buildPlainTextResume(resume);
 
   const baseHebrewLines = [
-    'אתה מדריך לשיפור קורות חיים מקצועי.',
-    'משימתך: לשפר ולעדכן קורות חיים בצורה הדרגתית ומובנית.',
+    'אתה מדריך לשיפור קורות חיים מקצועי ואתה אחראי מלא על החלטות.',
+    'משימתך: לשפר ולעדכן קורות חיים בצורה חכמה ומושכלת.',
     '',
-    '{CURRENT_CV_TEXT}:',
-    '------------------',
-    plainTextCV || '(קורות חיים ריקים)',
+    '🎯 אחריות מלאה: אתה רואה את המצב הנוכחי המלא למטה.',
+    '🧠 החלט בעצמך: מה לעדכן, מה להוסיף, ומה לא לגעת בו.',
+    '💡 היגיון: אם משהו כבר קיים ודומה - אל תוסיף. אם חדש - הוסף.',
     '',
-    '{CURRENT_SKILLS}:',
-    '------------------',
-    (currentSkills.length ? currentSkills.join(', ') : '(אין כישורים רשומים)'),
+    '{מצב קורות החיים הנוכחי - קרא בעיון}:',
+    '==================================================',
+    plainTextCV || '(קורות חיים ריקים לחלוטין)',
+    '==================================================',
     '',
-    '{TARGET_JOB}:',
-    '------------------',
-    targetJobPosting || '(לא סופק טקסט משרה)',
+    '{משרת יעד}:',
+    targetJobPosting || '(לא הוגדרה משרת יעד)',
     '',
-    '=== תהליך עבודה חובה ===',
-    '1. תקציר מקצועי (MANDATORY): תמיד עדכן/צור תקציר עשיר בעברית (3-4 שורות)',
-    '2.  , תיאורי תפקידים: עדכן רק תיאורים רלוונטיים למידע חדש בלבד שים לב שאתה מתאר את הפקיד בצורה אופטילמית כדי למקסם את פוטנציאל קורות החיים , לפחות שורה שלמה לכל עדכון . ',
-    '3. חילוץ כישורים: זהה וחלץ כישורים טכנולוגיים מהשיחה',
+    '=== אחריות והחלטות ===',
+    'אתה רואה הכל למעלה. השתמש בשיקול דעת:',
+    '• אם תיאור דומה קיים - אל תוסיף עוד אחד דומה',
+    '• אם כישור כבר ברשימה - אל תוסיף אותו שוב',
+    '• אם מידע חדש ושונה - הוסף אותו',
+    '• אם יש שיפור למידע קיים - עדכן אותו',
     '',
-    '=== כללי תוכן ===',
-    'תקציר: חובה בכל תגובה - שנות ניסיון + תפקיד עיקרי + תכונות אופי + כישורים מרכזיים',
-    'תיאורי תפקידים: משפטים מלאים בעברית, פועל עבר + הישג קונקרטי + נקודה',
-    'כישורים: כל הכישורים הרכים  בעברית בלבד! אלא אם כן מדובר בשם  של טכנולוגיה ,  זהו קורות חיים בעברית'
-  ];
-
-  const skillInferenceRules = [
-    '=== חילוץ כישורים אוטומטי ===',
-    'חובה לחלץ כישורים מפורשים וגם משתמעים מכל מידע חדש גם אם המידע אינו באופן ישיר "כשרון" למשל אם בן אדם הוא איש מכירות אפשר להסיק מזה שיש לו כריזמה . השיקול דעת הוא להחלטתך ',
-    
+    '=== כללים טכניים ===',
+    'תקציר: עדכן רק אם יש מידע חדש או שיפור משמעותי',
+    'ניסיון: הוסף רק חוויות חדשות או תיאורים שונים באמת',
+    'כישורים: הוסף רק כישורים שלא מופיעים כבר',
+    'איכות: משפטים מלאים בעברית עם פעלים בעבר'
   ];
 
   const structureRules = [
-    '=== מבנה תגובה חובה ===',
-    '1. הסבר קצר (2-3 משפטים): מה עודכנת ולמה',
-    '2. [RESUME_DATA] בלוק JSON יחיד [/RESUME_DATA]',
-    '3. שאלה מכוונת אחת לקידום השיחה',
+    '=== מבנה תגובה ===',
+    '1. הסבר קצר: מה החלטת לעשות ולמה',
+    '2. [RESUME_DATA] עם JSON [/RESUME_DATA]',
+    '3. שאלה להמשך השיחה',
     '',
-    '=== JSON Structure ===',
-    '"summary": "תקציר מקצועי מלא בעברית (חובה בכל עדכון)"',
-    '"contact": {"fullName": "שם מלא", "email": "מייל", "phone": "טלפון", "location": "מיקום"} (חובה בכל עדכון)',
-    '"experiences": [רק חוויות שעודכנו/נוספו]',
-    '"skills": [כל הכישורים - מפורשים ומשתמעים - בעברית בלבד!]',
+    '=== פורמט JSON ===',
+    'כלול רק שדות שאתה באמת רוצה לעדכן:',
+    '"summary": "רק אם יש שיפור או מידע חדש"',
+    '"contact": פרטי קשר מעודכנים',
+    '"experiences": [רק חוויות חדשות או משופרות]',
+    '"skills": [רק כישורים חדשים]',
     '',
-    '=== איכות תוכן ===',
-    'אסור: "Professional individual", "יש להוסיף תיאור", רשימות טכנולוגיות בתיאורים',
-    'חובה: משפטים מלאים עם פעלים ("פיתחתי", "הובלתי", "ניהלתי")',
-    'דוגמה: "פיתחתי מערכת CRM שהגדילה מכירות ב-30%." + skills: ["CRM", "Sales", "Customer Relations"]'
+    '=== דוגמת תגובה ===',
+    'הוספתי את הניסיון החדש ב-[חברה] כי לא היה קיים.',
+    'לא הוספתי [כישור X] כי הוא כבר ברשימה.',
+    '',
+    '[RESUME_DATA]',
+    '{ "experiences": [...] }',
+    '[/RESUME_DATA]',
+    '',
+    'איזה פרטים נוספים תרצה לשתף?'
   ];
 
-  const responseRules = [
-    '=== כללי עיבוד ===',
-    '- תמיד כלול summary מעודכן גם אם לא התבקש',
-    '- חובה: תמיד כלול contact מלא בכל תגובה עם השדות הבאים:',
-    '  "contact": {',
-    '    "fullName": "שם מלא בעברית",',
-    '    "email": "כתובת אימייל",', 
-    '    "phone": "מספר טלפון",',
-    '    "location": "עיר מגורים"',
-    '  }',
-    '- חלץ כישורים טכנולוגיים וכישורים רכים מכל מקור והעבר ל-skills',
-    '- הסק כישורים מתפקידים גם אם לא נאמרו במפורש',
-    '- תיאורים: רק פעולות והישגים, אין שמות טכנולוגיות',
-    '- שפר קיים במקום להוסיף כפילויות',
-    '- תגובה קצרה, ממוקדת וברורה',
-    '- פורמט: [RESUME_DATA] JSON [/RESUME_DATA] ללא backticks',
-    '- סיום בשאלה שמקדמת השיחה',
+  const qualityRules = [
+    '=== איכות תוכן ===',
+    'תיאורי תפקידים: התחל בפועל עבר ("פיתחתי", "ניהלתי", "הובלתי")',
+    'הישגים: כלול מספרים ותוצאות כשאפשר',
+    'כישורים: בעברית, אלא אם זה שם טכנולוgiה',
+    'תקציר: 2-3 שורות עם שנות ניסיון, תחומי מומחיות, וכישורים מרכזיים',
     '',
-    '=== דוגמה למבנה JSON חובה ===',
-    '[RESUME_DATA]',
-    '{',
-    '  "summary": "תקציר מקצועי...",',
-    '  "contact": {',
-    '    "fullName": "גיא יגיל",',
-    '    "email": "guy@example.com", ',
-    '    "phone": "050-1234567",',
-    '    "location": "תל אביב"',
-    '  },',
-    '  "skills": ["כישור 1", "כישור 2"],',
-    '  "experiences": [...]',
-    '}',
-    '[/RESUME_DATA]'
+    'אסור: תיאורים גנריים, רשימות טכנולוגיות בתיאורים, כפילויות'
   ];
 
   // Reference to avoid TS "unused" warnings:
@@ -136,9 +148,8 @@ export const getSystemPrompt = (
   return [
     baseHebrewLines.join('\n'),
     conversationMemory,
-    skillInferenceRules.join('\n'),
     structureRules.join('\n'),
-    responseRules.join('\n')
+    qualityRules.join('\n')
   ].filter(Boolean).join('\n\n');
 };
 

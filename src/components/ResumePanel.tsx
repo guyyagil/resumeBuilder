@@ -66,25 +66,32 @@ export const ResumePanel: React.FC<ResumePanelProps> = ({ userBasicInfo }) => {
             ניסיון
           </h3>
           <div className="space-y-4">
-            {displayExperiences.map((exp: any) => (
-              <div key={exp.id || exp.company} className="mb-4">
-                <h3 className="font-semibold text-gray-900">{exp.title}</h3>
-                <p className="text-sm text-gray-600 mb-2">{exp.company} • {exp.duration}</p>
-                <div className="text-sm text-gray-700 space-y-1">
-                  {exp.description
-                    .filter((desc: string) => desc.trim().split(/\s+/).length > 2) // Only show descriptions with more than 2 words
-                    .map((desc: string, index: number) => {
-                      const cleanDesc = desc.replace(/^[•\-\s]+/, '');
-                      return (
-                        <div key={index} className="flex items-start gap-2">
-                          <span className="text-gray-400 mt-1 text-xs">•</span>
-                          <span className="flex-1">{cleanDesc}</span>
-                        </div>
-                      );
-                    })}
+            {displayExperiences.map((exp: any) => {
+              // Better duration handling
+              const displayDuration = exp.duration && exp.duration.trim() 
+                ? exp.duration.trim() 
+                : 'תקופת עבודה לא צוינה';
+                
+              return (
+                <div key={exp.id || exp.company} className="mb-4">
+                  <h3 className="font-semibold text-gray-900">{exp.title}</h3>
+                  <p className="text-sm text-gray-600 mb-2">{exp.company} • {displayDuration}</p>
+                  <div className="text-sm text-gray-700 space-y-1">
+                    {exp.description
+                      .filter((desc: string) => desc.trim().split(/\s+/).length > 2) // Only show descriptions with more than 2 words
+                      .map((desc: string, index: number) => {
+                        const cleanDesc = desc.replace(/^[•\-\s]+/, '');
+                        return (
+                          <div key={index} className="flex items-start gap-2">
+                            <span className="text-gray-400 mt-1 text-xs">•</span>
+                            <span className="flex-1">{cleanDesc}</span>
+                          </div>
+                        );
+                      })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {displayExperiences.length === 0 && (
               <div className="text-gray-500 text-sm italic text-center py-4">
