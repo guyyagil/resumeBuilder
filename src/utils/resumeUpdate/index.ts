@@ -83,9 +83,8 @@ export const handleResumeUpdates = async (
       break;
 
     case 'rewrite':
-      await handleRewrite(updates, useAppStore.getState().resume, storeActions, addChatMessage, {
-        filterEnglishDescriptions,
-      });
+      await handleRewrite(updates, useAppStore.getState().resume, storeActions, addChatMessage
+      );
       break;
 
     case 'patch':
