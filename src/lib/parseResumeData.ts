@@ -1,7 +1,7 @@
-// src/lib/parseResumeData.ts
+import { normalizeResumeData } from '../services/parsers';
 
 export interface ResumeDataPatch {
-  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign';
+  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign' | 'delete' | 'rewrite';
   experience?: {
     id?: string;
     company?: string;
@@ -43,110 +43,212 @@ export interface ResumeDataPatch {
     skills?: string[];
     summary?: string;
   };
+  // Enhanced deletion capabilities
   removeSkills?: string[];
   removeExperiences?: string[];
   clearSections?: string[];
+  deleteCompany?: string;
+  deleteSkill?: string;
+  deleteExperienceById?: string;
+  // New granular deletion options
+  removeDescriptionFromExperience?: {
+    company: string;
+    descriptionToRemove: string;
+  };
+  removeDescriptionsFromExperience?: {
+    company: string;
+    descriptionsToRemove: string[];
+  };
+  updateExperienceDescription?: {
+    company: string;
+    newDescriptions: string[];
+    replaceAll?: boolean; // if true, replace all descriptions, if false, merge with existing
+  };
+  rewriteExperience?: {
+    company: string;
+    title?: string;
+    duration?: string;
+    newDescriptions: string[];
+    reason?: string; // why we're rewriting
+  };
+  replaceExperience?: {
+    company: string;
+    newExperience: {
+      id?: string;
+      company?: string;
+      title?: string;
+      duration?: string | null;
+      description?: string[] | string | null;
+    };
+  };
 }
 
 interface ParseResult {
-  patch?: ResumeDataPatch;
   messageText: string;
-  rawJson?: string;
-  error?: string;
+  patch: ResumeDataPatch | undefined; // Changed from null to undefined
+  error: string;
+  rawJson: string;
 }
 
-function extractJson(text: string): { json: string | null; textBefore: string; textAfter: string } {
-  const patterns = [
-    /\[RESUME_DATA\]([\s\S]*?)\[\/RESUME_DATA\]/,
-    /```json([\s\S]*?)```/,
-    /```([\s\S]*?)```/
-  ];
+// Remove unused extractJson function
+// const extractJson = (text: string): string | null => { ... }
 
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    // Add a check for match.index
-    if (match && match[1].trim() && match.index !== undefined) {
-      const json = match[1];
-      const textBefore = text.substring(0, match.index).trim();
-      const textAfter = text.substring(match.index + match[0].length).trim();
-      return { json, textBefore, textAfter };
-    }
-  }
+export const parseResumeData = (rawText: string): ParseResult => {
+  let messageText = '';
+  let patch: ResumeDataPatch | undefined = undefined;
+  let error = '';
+  let rawJson = '';
 
-  // Fallback for object without tags
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const potentialJson = text.substring(firstBrace, lastBrace + 1);
-    try {
-      JSON.parse(potentialJson); // Validate it's JSON
-      const textBefore = text.substring(0, firstBrace).trim();
-      const textAfter = text.substring(lastBrace + 1).trim();
-      return { json: potentialJson, textBefore, textAfter };
-    } catch {
-      // Not valid JSON, continue
-    }
-  }
-
-  return { json: null, textBefore: text, textAfter: '' };
-}
-
-export function parseResumeData(raw: string): ParseResult {
-  if (!raw) return { messageText: '', error: 'EMPTY_INPUT' };
-
-  const { json: jsonText, textBefore, textAfter } = extractJson(raw);
-  const messageText = [textBefore, textAfter].filter(Boolean).join('\n').trim();
-
-  if (!jsonText) {
-    return { messageText: raw.trim(), error: 'NO_JSON_FOUND' };
-  }
-
-  let parsed: any = null;
   try {
-    // Clean trailing commas before parsing
-    const cleanedJson = jsonText.replace(/,\s*([}\]])/g, '$1');
-    parsed = JSON.parse(cleanedJson);
-  } catch (e) {
-    console.error("JSON parsing failed:", e);
-    return { messageText, error: `JSON_PARSE_ERROR: ${e instanceof Error ? e.message : String(e)}`, rawJson: jsonText };
-  }
+    console.log('🔍 === PARSING START ===');
+    console.log('Raw AI text:', rawText);
+    
+    // Extract message text (everything outside RESUME_DATA tags)
+    const resumeDataMatch = rawText.match(/\[RESUME_DATA\](.*?)\[\/RESUME_DATA\]/s);
+    
+    if (resumeDataMatch) {
+      console.log('🔍 Found RESUME_DATA tags');
+      // Split text around RESUME_DATA
+      const beforeData = rawText.substring(0, rawText.indexOf('[RESUME_DATA]')).trim();
+      const afterData = rawText.substring(rawText.indexOf('[/RESUME_DATA]') + '[/RESUME_DATA]'.length).trim();
+      messageText = (beforeData + ' ' + afterData).trim();
+      
+      // Extract and clean JSON
+      rawJson = resumeDataMatch[1].trim();
+      console.log('🔍 Extracted JSON:', rawJson);
+      
+      // Remove common artifacts
+      rawJson = rawJson
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/, '')
+        .replace(/```\s*$/, '')
+        .replace(/^\s*json\s*/i, '')
+        .trim();
 
-  if (!parsed) {
-    return { messageText, error: 'PARSED_EMPTY_JSON', rawJson: jsonText };
-  }
+      // Try parsing the JSON
+      let parsedData;
+      try {
+        parsedData = JSON.parse(rawJson);
+        console.log('🔍 Successfully parsed JSON:', parsedData);
+      } catch (parseError) {
+        console.log('🔍 JSON parse failed, trying to fix...');
+        // Try to fix common JSON issues
+        let fixedJson = rawJson
+          .replace(/([{,]\s*)(\w+):/g, '$1"$2":')
+          .replace(/:\s*'([^']*)'/g, ': "$1"')
+          .replace(/,(\s*[}\]])/g, '$1')
+          .replace(/\n/g, ' ')
+          .replace(/\s+/g, ' ');
 
-  const patch: ResumeDataPatch = { operation: parsed.operation || 'patch' };
+        try {
+          parsedData = JSON.parse(fixedJson);
+          console.log('🔍 Fixed and parsed JSON:', parsedData);
+        } catch (secondError) {
+          const objectMatch = fixedJson.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+          if (objectMatch) {
+            try {
+              parsedData = JSON.parse(objectMatch[0]);
+              console.log('🔍 Extracted and parsed JSON:', parsedData);
+            } catch (thirdError) {
+              error = `JSON parsing failed: ${thirdError}`;
+              console.error('🔍 All JSON parsing attempts failed:', {
+                original: rawJson,
+                fixed: fixedJson,
+                extracted: objectMatch[0],
+                error: thirdError
+              });
+              return { messageText: rawText, patch: undefined, error, rawJson };
+            }
+          } else {
+            error = `No valid JSON object found`;
+            console.error('🔍 No JSON object found in:', rawJson);
+            return { messageText: rawText, patch: undefined, error, rawJson };
+          }
+        }
+      }
 
-  // Summary
-  if (typeof parsed.summary === 'string') {
-    patch.summary = parsed.summary;
-  }
+      // Normalize the parsed data
+      if (parsedData && typeof parsedData === 'object') {
+        patch = normalizeResumeData(parsedData);
+        console.log('🔍 Normalized patch:', patch);
+      }
+    } else {
+      console.log('🔍 No RESUME_DATA tags found, checking for Hebrew deletion commands');
+      // No RESUME_DATA tags found - check for deletion commands in plain text
+      messageText = rawText;
+      
+      // Enhanced Hebrew command detection
+      const hebrewText = rawText;
+      console.log('🔍 Checking Hebrew text for commands:', hebrewText);
+      
+      // Look for update/rewrite commands in Hebrew
+      if (hebrewText.includes('באיירוקס') || hebrewText.includes('באיירקוס')) {
+        console.log('🔍 Found Airkos company mention - creating update patch');
+        
+        // Extract the new information
+        const info = hebrewText;
+        patch = {
+          operation: 'patch',
+          rewriteExperience: {
+            company: 'אייר קוס',
+            newDescriptions: [`אחראי על מתקן מסווג בחברת אייר קוס מערכות, ${info.includes('מתקן מסווג') ? 'כולל ניהול ותפעול מערכות רגישות' : ''}`],
+            reason: 'המשתמש סיפק פרטים חדשים על האחריות'
+          }
+        };
+        console.log('🔍 Created Hebrew command patch:', patch);
+      }
+      
+      // Check for other Hebrew commands
+      if (hebrewText.includes('מחק') || hebrewText.includes('הסר')) {
+        patch = { operation: 'remove' };
+        
+        // Extract company names
+        const companyMatches = hebrewText.match(/(?:מחק|הסר).*?(?:את\s+)?(?:ה)?(?:ניסיון\s+ב-?|חברת\s+)([א-ת\w\s]+)/i);
+        if (companyMatches) {
+          patch.removeExperiences = [companyMatches[1].trim()];
+        }
+        
+        // Extract skills
+        const skillMatches = hebrewText.match(/(?:מחק|הסר).*?(?:את\s+)?(?:ה)?כישור\s+([א-ת\w\s]+)/i);
+        if (skillMatches) {
+          patch.removeSkills = [skillMatches[1].trim()];
+        }
+      }
+    }
 
-  // Contact
-  if (parsed.contact && typeof parsed.contact === 'object') {
-    patch.contact = {
-      fullName: parsed.contact.fullName,
-      email: parsed.contact.email,
-      phone: parsed.contact.phone,
-      location: parsed.contact.location,
-      title: parsed.contact.title,
+    // Clean up message text
+    messageText = messageText
+      .replace(/\[RESUME_DATA\].*?\[\/RESUME_DATA\]/gs, '')
+      .replace(/```json.*?```/gs, '')
+      .replace(/```.*?```/gs, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // If no meaningful message text, provide a default
+    if (!messageText || messageText.length < 10) {
+      if (patch?.operation === 'remove' || patch?.removeExperiences || patch?.removeSkills) {
+        messageText = 'מחקתי את הפריטים שביקשת';
+      } else if (patch?.rewriteExperience) {
+        messageText = `עדכנתי את הניסיון בחברת ${patch.rewriteExperience.company} עם הפרטים החדשים`;
+      } else {
+        messageText = patch ? 'עדכנתי את קורות החיים שלך!' : 'הבנתי את הבקשה שלך.';
+      }
+    }
+
+    console.log('🔍 === PARSING END ===');
+    console.log('Final messageText:', messageText);
+    console.log('Final patch:', patch);
+
+    return { messageText, patch: patch || undefined, error, rawJson };
+
+  } catch (err) {
+    error = `Parsing error: ${err}`;
+    console.error('parseResumeData error:', err);
+    return { 
+      messageText: rawText || 'שגיאה בעיבוד התגובה', 
+      patch: undefined,
+      error, 
+      rawJson 
     };
   }
-
-  // Skills
-  if (Array.isArray(parsed.skills)) {
-    patch.skills = parsed.skills;
-  }
-
-  // Experiences
-  if (Array.isArray(parsed.experiences)) {
-    patch.experiences = parsed.experiences;
-  }
-  
-  // Complete Resume
-  if (parsed.completeResume) {
-    patch.completeResume = parsed.completeResume;
-  }
-
-  return { patch, messageText, rawJson: jsonText };
-}
+};

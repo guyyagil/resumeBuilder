@@ -184,6 +184,27 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
     patch.contact = (raw as any).completeResume.contact;
   }
 
+  // Pass through granular update/delete operations
+  if (raw.rewriteExperience) {
+    patch.rewriteExperience = raw.rewriteExperience;
+    // If the main operation is just a patch, upgrade it to rewrite for clarity
+    if (patch.operation === 'patch') {
+      patch.operation = 'rewrite';
+    }
+  }
+  if (raw.updateExperienceDescription) {
+    patch.updateExperienceDescription = raw.updateExperienceDescription;
+  }
+  if (raw.removeDescriptionFromExperience) {
+    patch.removeDescriptionFromExperience = raw.removeDescriptionFromExperience;
+  }
+  if (raw.removeDescriptionsFromExperience) {
+    patch.removeDescriptionsFromExperience = raw.removeDescriptionsFromExperience;
+  }
+  if (raw.replaceExperience) {
+    patch.replaceExperience = raw.replaceExperience;
+  }
+
   return patch;
 };
 

@@ -33,29 +33,52 @@ export const sendMessageToAI = async (
 
     const result = await model.generateContent(fullPrompt);
     const text = (await result.response).text();
-    console.log('Raw AI Response:\n---\n', text, '\n---');
+    console.log('🤖 Raw AI Response:\n---\n', text, '\n---');
 
     const { patch, messageText, error, rawJson } = parseResumeData(text);
 
     if (error) {
-      console.warn(`Parsing Warning: ${error}`, { rawJson });
+      console.warn(`⚠️ Parsing Warning: ${error}`, { rawJson });
+      // Still continue with the message even if JSON parsing failed
     }
 
-    const conversationMessage = stripSimpleMarkdown(messageText);
+    // Ensure we have a meaningful conversation message
+    let conversationMessage = stripSimpleMarkdown(messageText);
+    
+    // If message is too short or generic, enhance it
+    if (!conversationMessage || conversationMessage.length < 15) {
+      if (patch?.operation === 'remove' || patch?.removeExperiences || patch?.removeSkills) {
+        conversationMessage = 'מחקתי את הפריטים שביקשת. האם זה נראה טוב עכשיו?';
+      } else if (patch?.operation === 'clear') {
+        conversationMessage = 'ניקיתי את החלק שביקשת. רוצה להתחיל לבנות אותו מחדש?';
+      } else if (patch?.experience) {
+        conversationMessage = `הוספתי את הניסיון בחברת ${patch.experience.company}. איך היה התפקיד הזה?`;
+      } else if (patch?.skills?.length) {
+        conversationMessage = `הוספתי ${patch.skills.length} כישורים חדשים לקורות החיים שלך!`;
+      } else if (patch?.summary) {
+        conversationMessage = 'עדכנתי את התקציר המקצועי שלך. נראה טוב?';
+      } else {
+        conversationMessage = 'מה עוד תרצה לספר לי על הקריירה שלך?';
+      }
+    }
 
+    // Apply resume updates if we have a patch
     if (patch) {
-      console.log('Applying resume updates via handler:', patch);
-      // We can create a dummy addChatMessage as it's not used for user-facing messages here
-      const internalAddChatMessage = (msg: string, type: 'ai' | 'user') => console.log(`[Internal ${type}]: ${msg}`);
+      console.log('📝 Applying resume updates via handler:', patch);
+      const internalAddChatMessage = (msg: string, type: 'ai' | 'user') => 
+        console.log(`[Internal ${type.toUpperCase()}]: ${msg}`);
       await handleResumeUpdates(patch, internalAddChatMessage);
     }
 
-    return { message: conversationMessage, resumeUpdates: patch || {} };
+    return { 
+      message: conversationMessage, 
+      resumeUpdates: patch || {} 
+    };
 
   } catch (error) {
-    console.error('AI service error:', error);
+    console.error('🚨 AI service error:', error);
     return {
-      message: 'שגיאה בתקשורת עם ה-AI. נסה שוב.',
+      message: 'מצטער, הייתה לי בעיה טכנית. בוא ננסה שוב?',
       resumeUpdates: {}
     };
   }
