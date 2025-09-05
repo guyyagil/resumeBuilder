@@ -1,7 +1,6 @@
 import { geminiModel as model } from './aiClient';
 import { parseResumeData } from '../lib/parseResumeData';
 import { getSystemPrompt } from './prompts';
-import { refineResumePatch } from './parsers';
 import type { Resume } from '../types';
 import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
 

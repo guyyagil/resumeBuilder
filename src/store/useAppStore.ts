@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 import { z } from 'zod';
 
-// Simplified onboarding schema
+/* ===========================
+   Types (as provided)
+   =========================== */
+
 const welcomeFormSchema = z.object({
   targetJobPosting: z.string().optional(),
 });
@@ -30,7 +33,7 @@ interface Resume {
   email?: string;
   phone?: string;
   location?: string;
-  title?: string; // headline / current role
+  title?: string;
 }
 
 interface ResumeDataPatch {
@@ -78,7 +81,7 @@ interface ResumeDataPatch {
   };
   removeSkills?: string[];
   removeExperiences?: string[];
-  clearSections?: string[];
+  clearSections?: string[]; // e.g., ["experiences","skills","summary","contact"]
 }
 
 interface AppStore {
@@ -119,68 +122,116 @@ interface AppStore {
   ) => void;
 }
 
+/* ===========================
+   Utilities (small & focused)
+   =========================== */
+
 const makeId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-// Helper function to filter English descriptions (keep sentences, drop tech-lists/generic prompts)
+const norm = (s?: string) => (s || '').toLowerCase().trim().replace(/\s+/g, ' ');
+
+const sameByCompanyTitle = (a: Partial<Experience>, b: Partial<Experience>) =>
+  !!a && !!b && norm(a.company) === norm(b.company) && norm(a.title) === norm(b.title);
+
+const normalizeDescriptions = (d?: string[] | string | null): string[] => {
+  if (Array.isArray(d)) return d.map(x => (x || '').toString().trim()).filter(Boolean);
+  if (typeof d === 'string') return d.trim() ? [d.trim()] : [];
+  return [];
+};
+
+// keep sentences, drop tech-list/boilerplate (compact)
 const filterEnglishDescriptions = (descriptions: string[]): string[] => {
-  const hasHebrew = (text: string) => /[\u0590-\u05FF]/.test(text);
-  const WORD_COUNT = (t: string) => (t.trim().split(/\s+/).filter(Boolean).length);
-
-  // token looks like a technology / single token (React, Node.js, AWS)
-  const TECH_TOKEN = /^[A-Za-z0-9+.#-]{2,30}$/;
-
-  const looksLikeTechList = (text: string) => {
-    const tokens = text.split(/[,/|•;]+|\s{2,}/).map(t => t.trim()).filter(Boolean);
+  const hasHeb = (t: string) => /[\u0590-\u05FF]/.test(t);
+  const words = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
+  const TECH = /^[A-Za-z0-9+.#-]{2,30}$/;
+  const looksList = (t: string) => {
+    const tokens = t.split(/[,/|•;]+|\s{2,}/).map(x => x.trim()).filter(Boolean);
     if (tokens.length < 2) return false;
-    // consider it a tech list only if most tokens are single-token tech-like strings
-    const techCount = tokens.filter(t => TECH_TOKEN.test(t.replace(/\.$/, '')) && t.length <= 30).length;
+    const techCount = tokens.filter(x => TECH.test(x.replace(/\.$/, '')) && x.length <= 30).length;
     return techCount >= Math.ceil(tokens.length * 0.6);
   };
-
-  const looksLikeGenericPlaceholder = (text: string) => {
-    const lower = text.toLowerCase().trim();
-    return (
-      lower.includes('add measurable accomplishment') ||
-      lower.includes('add measurable') ||
-      lower.includes('responsibility') ||
-      lower === 'key responsibility' ||
-      lower.includes('accomplishment or responsibility') ||
-      lower.match(/^(add|key|responsibilit(y|ies))/i)
-    );
+  const looksPlaceholder = (t: string) => {
+    const l = t.toLowerCase().trim();
+    return l.includes('add measurable') || l.includes('responsibility') || l === 'key responsibility';
   };
-
-  const looksLikeSentence = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return false;
-    // Hebrew lines are fine
-    if (hasHebrew(trimmed)) return true;
-    // sentences usually end with punctuation or have enough words
-    if (/[.!?]$/.test(trimmed)) return true;
-    if (WORD_COUNT(trimmed) >= 6) return true;
-    // short English sentences that contain a verb-like token (common verbs)
-    if (/\b(develop|led|manage|implemented|build|maintain|design|developed|managed|led|implemented)\b/i.test(trimmed)) return true;
-    return false;
-  };
-
+  const looksSentence = (t: string) =>
+    !!t &&
+    (hasHeb(t) || /[.!?]$/.test(t) || words(t) >= 6 || /\b(develop|led|manage|implemented|build|maintain|design)\b/i.test(t));
   const out: string[] = [];
   for (const raw of descriptions) {
     const d = (raw || '').toString().trim();
-    if (!d) continue;
-    if (looksLikeGenericPlaceholder(d)) continue;
-    if (looksLikeTechList(d)) {
-      // treat as tech list -> remove from description. Upstream refiner may collect tokens as skills.
-      continue;
-    }
-    if (looksLikeSentence(d)) {
-      out.push(d);
-      continue;
-    }
-    // fallback: if Hebrew short phrase keep, else drop
-    if (hasHebrew(d) && d.length > 3) out.push(d);
+    if (!d || looksPlaceholder(d) || looksList(d)) continue;
+    if (looksSentence(d) || (hasHeb(d) && d.length > 3)) out.push(d);
   }
   return out;
 };
+
+const normalizeDuration = (raw?: string | null): string | undefined => {
+  if (raw == null) return undefined;
+  let s = String(raw).trim();
+  if (!s) return undefined;
+  if (/^(לא\s*צוין|לא\s*צויין|n\/a|none|unknown|not specified)$/i.test(s)) return undefined;
+  s = s.replace(/[\u2012\u2013\u2014\u2015–—−]/g, '-').replace(/\s*-\s*/g, ' - ').replace(/\s{2,}/g, ' ').trim();
+  if (/\b(עד היום|הווה|Present|present|now|current)\b/i.test(s)) {
+    s = s.replace(/\b(עד היום|הווה|Present|present|now|current)\b/i, m => m.trim());
+  }
+  return s || undefined;
+};
+
+const dedupeSkills = (arr: string[]) =>
+  Array.from(new Set(arr.map(s => (s || '').trim()).filter(Boolean)));
+
+type RawExperience = {
+  id?: string;
+  company?: string;
+  title?: string;
+  duration?: string | null;
+  description?: string[] | string | null;
+};
+
+const sanitizeExperience = (x: RawExperience): Experience => ({
+  id: x.id || makeId(),
+  company: (x.company || '').trim(),
+  title: (x.title || '').trim(),
+  duration: normalizeDuration(x.duration ?? undefined) || '',
+  description: filterEnglishDescriptions(normalizeDescriptions(x.description)),
+});
+
+const upsertExperience = (list: Experience[], incoming: Experience): Experience[] => {
+  const i = list.findIndex(e => (incoming.id && e.id === incoming.id) || sameByCompanyTitle(e, incoming));
+  if (i === -1) return [...list, incoming];
+  const prev = list[i];
+  const next: Experience = {
+    ...prev,
+    ...incoming,
+    // merge descriptions without dupes (case-insensitive)
+    description: (() => {
+      const seen = new Set(prev.description.map(d => d.toLowerCase().trim()));
+      const out = [...prev.description];
+      for (const d of incoming.description) {
+        const k = d.toLowerCase().trim();
+        if (!seen.has(k)) {
+          seen.add(k);
+          out.push(d);
+        }
+      }
+      return out;
+    })(),
+    // Fix: Allow explicit duration updates, including empty strings
+    duration: incoming.hasOwnProperty('duration') ? incoming.duration || '' : prev.duration,
+  };
+  const copy = [...list];
+  copy[i] = next;
+  return copy;
+};
+
+const removeExperienceByIdOrCompany = (list: Experience[], idOrCompany: string): Experience[] =>
+  list.filter(e => !((e.id && e.id === idOrCompany) || norm(e.company) === norm(idOrCompany)));
+
+/* ===========================
+   Store
+   =========================== */
 
 export const useAppStore = create<AppStore>((set) => ({
   // Initial state
@@ -200,185 +251,36 @@ export const useAppStore = create<AppStore>((set) => ({
   targetJobPosting: undefined,
   originalResumeText: undefined,
 
-  // Actions
+  /* ---------- UI state ---------- */
   setUserBasicInfo: (data) => set({ userBasicInfo: data }),
-
+  goToChat: () => set({ currentScreen: 'chat' }),
+  addChatMessage: (content, type) =>
+    set((s) => ({ chatMessages: [...s.chatMessages, { id: makeId(), type, content, timestamp: new Date() }] })),
   setTargetJobPosting: (text) =>
-    set((state) => ({
+    set((s) => ({
       targetJobPosting: text,
-      userBasicInfo: {
-        ...(state.userBasicInfo || {}),
-        targetJobPosting: text,
-      } as WelcomeFormData,
+      userBasicInfo: { ...(s.userBasicInfo || {}), targetJobPosting: text },
     })),
-
   setOriginalResumeText: (text) => set({ originalResumeText: text }),
 
-  goToChat: () => set({ currentScreen: 'chat' }),
+  /* ---------- Resume basics ---------- */
+  updateResume: (updates) => set((s) => ({ resume: { ...s.resume, ...updates } })),
 
-  addChatMessage: (content, type) =>
-    set((state) => ({
-      chatMessages: [
-        ...state.chatMessages,
-        { id: makeId(), type, content, timestamp: new Date() },
-      ],
-    })),
-
-  setContactInfo: (c) => {
-    console.log('=== setContactInfo called ===');
-    console.log('Contact data received:', c);
-    
-    set((state) => {
-      const updatedResume = { ...state.resume, ...c };
-      console.log('Resume before update:', state.resume);
-      console.log('Resume after update:', updatedResume);
-      
-      return {
-        resume: updatedResume,
-        userBasicInfo: {
-          ...(state.userBasicInfo || {}),
-          ...(c.fullName ? { fullName: c.fullName } : {}),
-          ...(c.title ? { currentRole: c.title } : {}),
-          ...(c.email ? { email: c.email } : {}),
-          ...(c.phone ? { phone: c.phone } : {}),
-          ...(c.location ? { location: c.location } : {}),
-        },
-      };
-    });
-  },
-
-  updateResume: (updates) =>
-    set((state) => ({ resume: { ...state.resume, ...updates } })),
-
-  addOrUpdateExperience: (incoming) =>
-    set((state) => {
-      // Filter descriptions before processing
-      const filteredDescriptions = incoming.description 
-        ? filterEnglishDescriptions(Array.isArray(incoming.description) ? incoming.description : [incoming.description])
-        : [];
-
-      const exp: Experience = {
-        ...incoming,
-        id: incoming.id || makeId(),
-        description: Array.from(new Set(filteredDescriptions.length > 0 ? filteredDescriptions : [`ביצעתי משימות ${incoming.title ? `בתפקיד ${incoming.title}` : 'מקצועיות'} בחברת ${incoming.company}.`])),
-      };
-
-      const idx = state.resume.experiences.findIndex(
-        (e) =>
-          (exp.id && e.id && e.id === exp.id) ||
-          (e.company &&
-            exp.company &&
-            e.company.trim().toLowerCase() === exp.company.trim().toLowerCase())
-      );
-
-      if (idx !== -1) {
-        const prev = state.resume.experiences[idx];
-        const mergedDescriptions = Array.from(
-          new Set([...(prev.description || []), ...(exp.description || [])])
-        );
-        const filteredMerged = filterEnglishDescriptions(mergedDescriptions);
-        
-        const merged: Experience = {
-          ...prev,
-          ...exp,
-          id: prev.id || exp.id,
-          description: filteredMerged.length > 0 ? filteredMerged : [`ביצעתי משימות מקצועיות בתפקיד ${prev.title || exp.title} בחברת ${prev.company || exp.company}.`],
-        };
-        const experiences = [...state.resume.experiences];
-        experiences[idx] = merged;
-        return { resume: { ...state.resume, experiences } };
-      }
-
-      return {
-        resume: {
-          ...state.resume,
-          experiences: [...state.resume.experiences, exp],
-        },
-      };
-    }),
-
-  removeExperience: (idOrCompany) =>
-    set((state) => ({
-      resume: {
-        ...state.resume,
-        experiences: state.resume.experiences.filter(
-          (e) =>
-            !(
-              (e.id && e.id === idOrCompany) ||
-              e.company.trim().toLowerCase() ===
-                idOrCompany.trim().toLowerCase()
-            )
-        ),
+  setContactInfo: (c) =>
+    set((s) => ({
+      resume: { ...s.resume, ...c },
+      userBasicInfo: {
+        ...(s.userBasicInfo || {}),
+        ...(c.fullName ? { fullName: c.fullName } : {}),
+        ...(c.title ? { currentRole: c.title } : {}),
+        ...(c.email ? { email: c.email } : {}),
+        ...(c.phone ? { phone: c.phone } : {}),
+        ...(c.location ? { location: c.location } : {}),
       },
     })),
 
-  clearAllExperiences: () =>
-    set((state) => ({
-      resume: { ...state.resume, experiences: [] },
-    })),
-
-  replaceAllExperiences: (experiences) =>
-    set((state) => {
-      const filteredExperiences = experiences.map(exp => ({
-        ...exp,
-        description: exp.description 
-          ? filterEnglishDescriptions(Array.isArray(exp.description) ? exp.description : [exp.description])
-          : []
-      }));
-      
-      return {
-        resume: { ...state.resume, experiences: filteredExperiences },
-      };
-    }),
-
-  addSkills: (newSkills) =>
-    set((state) => ({
-      resume: {
-        ...state.resume,
-        skills: Array.from(
-          new Set([
-            ...state.resume.skills,
-            ...newSkills.map((s) => s.trim()).filter(Boolean),
-          ])
-        ),
-      },
-    })),
-
-  removeSkills: (skillsToRemove) =>
-    set((state) => {
-      const toRemove = skillsToRemove.map((s) => s.toLowerCase().trim());
-      return {
-        resume: {
-          ...state.resume,
-          skills: state.resume.skills.filter(
-            (s) => !toRemove.includes(s.toLowerCase().trim())
-          ),
-        },
-      };
-    }),
-
-  replaceSkills: (newSkills) =>
-    set((state) => ({
-      resume: {
-        ...state.resume,
-        skills: newSkills.map((s) => s.trim()).filter(Boolean),
-      },
-    })),
-
-  clearAllSkills: () =>
-    set((state) => ({
-      resume: { ...state.resume, skills: [] },
-    })),
-
-  setSummary: (summary) =>
-    set((state) => ({
-      resume: { ...state.resume, summary },
-    })),
-
-  clearSummary: () =>
-    set((state) => ({
-      resume: { ...state.resume, summary: '' },
-    })),
+  setSummary: (summary) => set((s) => ({ resume: { ...s.resume, summary } })),
+  clearSummary: () => set((s) => ({ resume: { ...s.resume, summary: '' } })),
 
   resetResume: () =>
     set(() => ({
@@ -394,37 +296,66 @@ export const useAppStore = create<AppStore>((set) => ({
       },
     })),
 
-  replaceEntireResume: (newResume) =>
-    set(() => ({
-      resume: newResume,
+  replaceEntireResume: (newResume) => set(() => ({ resume: newResume })),
+
+  /* ---------- Experiences ---------- */
+  addOrUpdateExperience: (experience) =>
+    set((s) => {
+      console.log('🔄 Merging experience update:', {
+        incoming: experience,
+        existing: s.resume.experiences.find(e => 
+          (experience.id && e.id === experience.id) || 
+          sameByCompanyTitle(e, experience)
+        )
+      });
+      
+      const result = upsertExperience(s.resume.experiences, sanitizeExperience(experience));
+      
+      console.log('🔄 Final merged experience:', 
+        result.find(e => 
+          (experience.id && e.id === experience.id) || 
+          sameByCompanyTitle(e, experience)
+        )
+      );
+      
+      return {
+        resume: { ...s.resume, experiences: result }
+      };
+    }),
+
+  removeExperience: (idOrCompany) =>
+    set((s) => ({ resume: { ...s.resume, experiences: removeExperienceByIdOrCompany(s.resume.experiences, idOrCompany) } })),
+
+  clearAllExperiences: () => set((s) => ({ resume: { ...s.resume, experiences: [] } })),
+
+  replaceAllExperiences: (experiences) =>
+    set((s) => ({
+      resume: { ...s.resume, experiences: experiences.map(sanitizeExperience) },
     })),
 
-  applyResumeDataPatch: (patch) => {
-    console.log('=== applyResumeDataPatch called ===');
-    console.log('Patch received:', patch);
-    
-    set((state) => {
-      const currentResume = { ...state.resume };
-      
+  /* ---------- Skills ---------- */
+  addSkills: (newSkills) =>
+    set((s) => ({ resume: { ...s.resume, skills: dedupeSkills([...s.resume.skills, ...newSkills]) } })),
+
+  removeSkills: (skillsToRemove) =>
+    set((s) => {
+      const toRemove = new Set(skillsToRemove.map((x) => x.toLowerCase().trim()));
+      return { resume: { ...s.resume, skills: s.resume.skills.filter((k) => !toRemove.has(k.toLowerCase().trim())) } };
+    }),
+
+  replaceSkills: (newSkills) => set((s) => ({ resume: { ...s.resume, skills: dedupeSkills(newSkills) } })),
+  clearAllSkills: () => set((s) => ({ resume: { ...s.resume, skills: [] } })),
+
+  /* ---------- Patch application (new model) ---------- */
+  applyResumeDataPatch: (patch) =>
+    set((s) => {
+      let next: Resume = { ...s.resume };
+
+      // 1) Operation: replace (complete resume)
       if (patch.operation === 'replace' && patch.completeResume) {
-        console.log('Applying complete resume replacement');
-        
-        // Properly normalize experiences to match Experience interface
-        const normalizedExperiences: Experience[] = (patch.completeResume.experiences || []).map(exp => ({
-          id: exp.id || makeId(),
-          company: exp.company || '',
-          title: exp.title || '',
-          duration: exp.duration || '',
-          description: Array.isArray(exp.description) 
-            ? exp.description.filter(Boolean) 
-            : exp.description 
-              ? [exp.description] 
-              : []
-        }));
-        
-        const newResume: Resume = {
-          experiences: normalizedExperiences,
-          skills: patch.completeResume.skills || [],
+        next = {
+          experiences: (patch.completeResume.experiences || []).map(sanitizeExperience),
+          skills: dedupeSkills(patch.completeResume.skills || []),
           summary: patch.completeResume.summary || '',
           fullName: patch.completeResume.contact?.fullName || '',
           email: patch.completeResume.contact?.email || '',
@@ -432,46 +363,93 @@ export const useAppStore = create<AppStore>((set) => ({
           location: patch.completeResume.contact?.location || '',
           title: patch.completeResume.contact?.title || '',
         };
-        console.log('New resume created:', newResume);
-        return { resume: newResume };
+        return { resume: next };
       }
 
-      // Handle individual updates
-      if (patch.experiences) {
-        // Properly normalize experiences to match Experience interface
-        currentResume.experiences = patch.experiences.map(exp => ({
-          id: exp.id || makeId(),
-          company: exp.company || '',
-          title: exp.title || '',
-          duration: exp.duration || '',
-          description: Array.isArray(exp.description) 
-            ? exp.description.filter(Boolean) 
-            : exp.description 
-              ? [exp.description] 
-              : []
-        }));
+      // 2) Operation: reset
+      if (patch.operation === 'reset') {
+        return {
+          resume: {
+            experiences: [],
+            skills: [],
+            summary: '',
+            fullName: '',
+            email: '',
+            phone: '',
+            location: '',
+            title: '',
+          },
+        };
       }
 
-      if (patch.skills) {
-        currentResume.skills = [...patch.skills];
+      // 3) Experience (single)
+      if (patch.experience) {
+        const sanitized = sanitizeExperience(patch.experience);
+        if (patch.operation === 'remove') {
+          next.experiences = removeExperienceByIdOrCompany(next.experiences, sanitized.id || sanitized.company);
+        } else if (patch.operation === 'update' || patch.operation === 'add' || !patch.operation || patch.operation === 'patch') {
+          next.experiences = upsertExperience(next.experiences, sanitized);
+        }
       }
 
-      if (patch.summary) {
-        currentResume.summary = patch.summary;
+      // 4) Experiences (bulk)
+      if (Array.isArray(patch.experiences)) {
+        const incoming = patch.experiences.map(sanitizeExperience);
+        if (patch.operation === 'remove') {
+          for (const e of incoming) next.experiences = removeExperienceByIdOrCompany(next.experiences, e.id || e.company);
+        } else if (patch.operation === 'update' || patch.operation === 'add' || !patch.operation || patch.operation === 'patch') {
+          for (const e of incoming) next.experiences = upsertExperience(next.experiences, e);
+        } else if (patch.operation === 'clear') {
+          next.experiences = [];
+        }
       }
 
-      // Fix contact information handling
+      // 5) Skills
+      if (Array.isArray(patch.skills)) {
+        if (patch.operation === 'replace' || patch.operation === 'redesign') {
+          next.skills = dedupeSkills(patch.skills);
+        } else if (patch.operation === 'remove') {
+          const toRemove = new Set(patch.skills.map((k) => k.toLowerCase().trim()));
+          next.skills = next.skills.filter((k) => !toRemove.has(k.toLowerCase().trim()));
+        } else {
+          next.skills = dedupeSkills([...next.skills, ...patch.skills]);
+        }
+      }
+      if (Array.isArray(patch.removeSkills) && patch.removeSkills.length) {
+        const toRemove = new Set(patch.removeSkills.map((k) => k.toLowerCase().trim()));
+        next.skills = next.skills.filter((k) => !toRemove.has(k.toLowerCase().trim()));
+      }
+
+      // 6) Summary
+      if (typeof patch.summary === 'string') next.summary = patch.summary;
+
+      // 7) Contact
       if (patch.contact) {
-        console.log('Applying contact patch:', patch.contact);
-        if (patch.contact.fullName !== undefined) currentResume.fullName = patch.contact.fullName;
-        if (patch.contact.email !== undefined) currentResume.email = patch.contact.email;
-        if (patch.contact.phone !== undefined) currentResume.phone = patch.contact.phone;
-        if (patch.contact.location !== undefined) currentResume.location = patch.contact.location;
-        if (patch.contact.title !== undefined) currentResume.title = patch.contact.title;
-        console.log('Resume after contact patch:', currentResume);
+        next = { ...next, ...patch.contact };
       }
 
-      return { resume: currentResume };
-    });
-  },
+      // 8) Remove experiences by name/id
+      if (Array.isArray(patch.removeExperiences) && patch.removeExperiences.length) {
+        for (const key of patch.removeExperiences) {
+          next.experiences = removeExperienceByIdOrCompany(next.experiences, key);
+        }
+      }
+
+      // 9) Clear specific sections
+      if (Array.isArray(patch.clearSections) && patch.clearSections.length) {
+        const setClear = new Set(patch.clearSections.map((x) => x.toLowerCase().trim()));
+        if (setClear.has('experiences')) next.experiences = [];
+        if (setClear.has('skills')) next.skills = [];
+        if (setClear.has('summary')) next.summary = '';
+        if (setClear.has('contact')) {
+          next.fullName = '';
+          next.email = '';
+          next.phone = '';
+          next.location = '';
+          next.title = '';
+        }
+      }
+
+      return { resume: next };
+    }),
 }));

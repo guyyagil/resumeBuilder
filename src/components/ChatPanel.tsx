@@ -46,11 +46,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
         fullName: resume.fullName || userBasicInfo?.fullName,
       };
 
+      console.log('🔍 Sending context to AI:', {
+        userContext,
+        resumeData: resume,
+        chatMessages: chatMessages.slice(-5) // last 5 messages for context
+      });
+
       const aiResponse = await sendMessageToAI(
         userMessage,
         userContext,
         resume,
-        chatMessages
+        chatMessages.slice(-5) // Only send recent chat history to avoid token limits
       ) as AIResponse;
       
       if (typeof aiResponse === 'object' && aiResponse.message) {
@@ -79,7 +85,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
   };
 
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-white/80 backdrop-blur-sm shadow-lg flex flex-col h-[calc(100vh-2rem)]">
+    <div
+      className="rounded-2xl border border-indigo-100 bg-white/80 backdrop-blur-sm shadow-lg flex flex-col h-[calc(100vh-2rem)]"
+      style={{ fontFamily: 'Arial, sans-serif' }} // שינוי הפונט לאריאל
+    >
       <div className="p-4 border-b border-indigo-100 flex-shrink-0">
         <h2 className="font-bold text-lg bg-gradient-to-l from-indigo-600 to-cyan-500 bg-clip-text text-transparent">
           שיחה עם ה-AI
@@ -105,7 +114,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
                 : 'bg-white text-gray-900 border border-gray-200 shadow-sm'      // לבן = AI
             }`}
           >
-            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            <p className="text-base whitespace-pre-wrap leading-relaxed">{message.content}</p>
           </div>
         ))}
         {isLoading && (

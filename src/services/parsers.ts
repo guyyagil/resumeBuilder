@@ -55,6 +55,35 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
       : 'patch'
   };
 
+  // Helper: build a duration string from various possible fields (duration, startDate/endDate, period, start/end)
+  const buildDuration = (obj: any): string | undefined => {
+    if (!obj) return undefined;
+    // Prefer explicit duration if present and non-empty
+    if (obj.duration && String(obj.duration).trim()) return String(obj.duration).trim();
+    // Add 'years' as a common alias for duration
+    if (obj.years && String(obj.years).trim()) return String(obj.years).trim();
+    // Add 'date' as another common alias for duration
+    if (obj.date && String(obj.date).trim()) return String(obj.date).trim();
+
+    // Common start/end aliases from different parsers/AI outputs (including snake_case variants)
+    const start = (obj.startDate || obj.start || obj.from || obj.start_time || obj.startYear || obj.start_year || obj.start_date) ?? undefined;
+    const end = (obj.endDate || obj.end || obj.to || obj.end_time || obj.endYear || obj.end_year || obj.end_date) ?? undefined;
+
+    const s = start !== undefined && start !== null ? String(start).trim() : '';
+    const e = end !== undefined && end !== null ? String(end).trim() : '';
+    if (!s && !e) {
+      // fallback to period field
+      if (obj.period && String(obj.period).trim()) return String(obj.period).trim();
+      return undefined;
+    }
+
+    // Normalize common 'present' tokens (leave to store normalizeDuration later if needed)
+    if (s && e) return `${s} - ${e}`;
+    if (s && !e) return `${s} - Present`;
+    if (!s && e) return `${e}`;
+    return undefined;
+  };
+
   // Handle completeResume first (for initial CV extraction)
   if (raw.operation === 'replace' && raw.completeResume) {
     patch.completeResume = raw.completeResume;
@@ -82,7 +111,7 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
           id: firstExp.id,
           company: (firstExp.company || '').trim(),
           title: (firstExp.title || '').trim(),
-          duration: firstExp.duration || undefined,
+          duration: buildDuration(firstExp) || undefined,
           description: desc
         };
       }
@@ -136,7 +165,7 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
           id: (expSource as any).id,
           company: ((expSource as any).company || (expSource as any).companyName || (expSource as any).employer || '').trim(),
           title: ((expSource as any).title || (expSource as any).position || '').trim(),
-          duration: (expSource as any).duration || (expSource as any).period || undefined,
+          duration: buildDuration(expSource) || undefined,
           description: Array.isArray(desc) ? desc : []
         };
       }
@@ -148,7 +177,8 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
   const skillKeys = [
     'skills', 'Skills', 'SKILLS',
     'CURRENT_SKILLS', 'current_skills', 'currentSkills',
-    'CURRENT-SKILLS', 'CURRENTSKILLS'
+    'CURRENT-SKILLS', 'CURRENTSKILLS',
+    'updateSkills', 'addSkills', 'newSkills' // Add these AI-generated field names
   ];
   for (const k of skillKeys) {
     const val = (raw as any)[k];
@@ -228,7 +258,13 @@ export const refineResumePatch = async (
     [/\bעצמאי/i, 'עבודה עצמאית'],
     [/\bפתרון בעיות\b/i, 'פתרון בעיות'],
     [/\bעבודה תחת לחץ\b/i, 'עבודה בתנאי לחץ'],
-    [/\bניהול זמן\b/i, 'ניהול זמן']
+    [/\bניהול זמן\b/i, 'ניהול זמן'],
+    [/\bמכירות\b/i, 'מכירות'],
+    [/\bשירות לקוחות\b/i, 'שירות לקוחות'],
+    [/\bעמידה ביעדים\b/i, 'עמידה ביעדים'],
+    [/\bאבטחה\b/i, 'אבטחה'],
+    [/\bהדרכה\b/i, 'הדרכה'],
+    [/\bשימור לקוחות\b/i, 'שימור לקוחות']
   ];
 
   const existing = new Set((patch.skills || []).map(s => (s || '').trim()).filter(Boolean));
@@ -318,6 +354,36 @@ export const refineResumePatch = async (
     } catch (err) {
       console.warn('AI soft-skill inference failed:', err);
     }
+  }
+
+  // Enhanced skill extraction from experience content
+  const extractMoreSkills = (text: string) => {
+    // Technical skills
+    const techPatterns = [
+      /\b(JavaScript|TypeScript|Python|Java|C\+\+|C#|PHP|Ruby|Node\.js|React|Angular|Vue)\b/gi,
+      /\b(AWS|Azure|Docker|Kubernetes|Git|SQL|MongoDB|PostgreSQL)\b/gi
+    ];
+    
+    techPatterns.forEach(pattern => {
+      const matches = text.match(pattern);
+      if (matches) {
+        matches.forEach(match => existing.add(match.trim()));
+      }
+    });
+  };
+  
+  // Apply enhanced extraction to all descriptions
+  const allDescriptions = [
+    ...(Array.isArray(experiencesArr)
+      ? experiencesArr.flatMap((e: any) => (Array.isArray(e.description) ? e.description : []))
+      : []),
+    ...(patch.experience && Array.isArray((patch.experience as any).description)
+      ? (patch.experience as any).description
+      : [])
+  ];
+  
+  if (allDescriptions.length > 0) {
+    extractMoreSkills(allDescriptions.join(' '));
   }
 
   // Assign merged skills back to patch (preserve order by converting Set to array)

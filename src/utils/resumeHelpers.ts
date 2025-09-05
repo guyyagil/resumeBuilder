@@ -8,7 +8,8 @@ export const normalizeExperiences = (items: ExperienceInput[] = []) =>
       id: e.id || (typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).slice(2)),
       company: e.company!,
       title: e.title!,
-      duration: e.duration || '2022 - Present',
+      // don't force a default duration here — keep undefined so store/patch logic can normalize consistently
+      duration: e.duration || undefined,
       description: e.description && e.description.length > 0
         ? e.description
         : ['יש להוסיף תיאור תפקיד.']

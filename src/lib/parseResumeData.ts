@@ -68,6 +68,7 @@ export interface ResumeDataPatch {
     company: string;
     title?: string;
     duration?: string;
+    newDuration?: string; // <-- Add this line
     newDescriptions: string[];
     reason?: string; // why we're rewriting
   };
@@ -130,6 +131,74 @@ export const parseResumeData = (rawText: string): ParseResult => {
       try {
         parsedData = JSON.parse(rawJson);
         console.log('🔍 Successfully parsed JSON:', parsedData);
+
+        // Handle repeated top-level rewriteExperience entries in the raw JSON text.
+        // JSON.parse will only keep the last duplicate key; extract all occurrences from rawJson
+        // and convert them into a proper experiences array so downstream normalization/appliers can handle them.
+        const countRewrite = (rawJson.match(/"rewriteExperience"\s*:/g) || []).length;
+        if (countRewrite > 1) {
+          const extractObjectsForKey = (text: string, key: string): any[] => {
+            const results: any[] = [];
+            let idx = 0;
+            const keyPattern = `"${key}"`;
+            while (true) {
+              const kPos = text.indexOf(keyPattern, idx);
+              if (kPos === -1) break;
+              // find first '{' after the key
+              const braceStart = text.indexOf('{', kPos);
+              if (braceStart === -1) break;
+              let depth = 0;
+              let i = braceStart;
+              for (; i < text.length; i++) {
+                const ch = text[i];
+                if (ch === '{') depth++;
+                else if (ch === '}') {
+                  depth--;
+                  if (depth === 0) {
+                    const objStr = text.slice(braceStart, i + 1);
+                    try {
+                      const parsedObj = JSON.parse(objStr);
+                      results.push(parsedObj);
+                    } catch {
+                      // ignore parse errors for this occurrence
+                    }
+                    idx = i + 1;
+                    break;
+                  }
+                }
+              }
+              if (i >= text.length) break;
+            }
+            return results;
+          };
+
+          const extracted = extractObjectsForKey(rawJson, 'rewriteExperience');
+          if (extracted && extracted.length > 0) {
+            parsedData.experiences = parsedData.experiences || [];
+            for (const item of extracted) {
+              // Map common fields to normalized experience shape
+              const company = (item.company || item.companyName || item.employer || '').toString().trim();
+              const title = (item.title || item.position || '').toString().trim();
+              const duration = (item.dates || item.duration || item.startDate || item.period || '').toString().trim() || undefined;
+              const description = Array.isArray(item.newDescriptions)
+                ? item.newDescriptions.map((s: any) => (s || '').toString().trim()).filter(Boolean)
+                : Array.isArray(item.description)
+                  ? item.description.map((s: any) => (s || '').toString().trim()).filter(Boolean)
+                  : (typeof item.newDescriptions === 'string' ? [item.newDescriptions.trim()] : (typeof item.description === 'string' ? [item.description.trim()] : []));
+
+              if (company || title || description.length || duration) {
+                parsedData.experiences.push({
+                  company: company || undefined,
+                  title: title || undefined,
+                  duration: duration || undefined,
+                  description: description.length ? description : undefined
+                });
+              }
+            }
+            console.log('🔍 Extracted multiple rewriteExperience objects -> merged into parsedData.experiences:', parsedData.experiences);
+          }
+        }
+        // end repeated-rewriteExperience handling
       } catch (parseError) {
         console.log('🔍 JSON parse failed, trying to fix...');
         // Try to fix common JSON issues
