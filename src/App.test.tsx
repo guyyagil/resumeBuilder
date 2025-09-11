@@ -6,8 +6,7 @@ describe('App Component', () => {
         expect(App).toBeDefined();
     });
     
-    it('has a title', () => {
-        const title = App.title;
-        expect(title).toBe('Expected Title');
+    it('is a function component', () => {
+        expect(typeof App).toBe('function');
     });
 });

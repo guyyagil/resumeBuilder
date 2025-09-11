@@ -43,29 +43,28 @@ export const handleRewrite = async (
   addChatMessage: (m: string, t: 'ai' | 'user') => void
 ) => {
   if (updates.rewriteExperience) {
-    const { company, title, duration, newDuration, newDescriptions, reason } = updates.rewriteExperience;
+    const { company, title, duration, newDuration, newDescriptions, reason, newCompany } = updates.rewriteExperience;
     const exp = findExp(currentResume, company);
 
     if (exp) {
       const finalDuration = newDuration ?? duration ?? exp.duration;
       
-      // Add explicit logging to debug
-      console.log('🔄 Rewrite update details:', {
-        company,
-        currentDuration: exp.duration,
-        newDuration,
-        finalDuration,
-        title: title || exp.title
-      });
-      
       storeActions.addOrUpdateExperience({
         ...exp,
         ...(title && { title }),
+        ...(newCompany && { company: newCompany }), // Add this line to handle company name changes
         duration: finalDuration,
         description: Array.isArray(newDescriptions) ? newDescriptions : exp.description,
       });
       
-      addChatMessage(`🔄 כתבתי מחדש את הניסיון בחברת ${exp.company}${reason ? ` (${reason})` : ''}`, 'ai');
+      const changes = [];
+      if (newCompany && newCompany !== exp.company) changes.push(`שם החברה ל-${newCompany}`);
+      if (title && title !== exp.title) changes.push(`תפקיד ל-${title}`);
+      if (finalDuration !== exp.duration) changes.push('תאריכים');
+      if (Array.isArray(newDescriptions)) changes.push('תיאורים');
+      
+      const changeText = changes.length > 0 ? ` - עדכנתי: ${changes.join(', ')}` : '';
+      addChatMessage(`🔄 כתבתי מחדש את הניסיון בחברת ${newCompany || exp.company}${changeText}${reason ? ` (${reason})` : ''}`, 'ai');
     } else {
       addChatMessage(`⚠️ לא מצאתי ניסיון קיים ל-${company} עבור כתיבה מחדש.`, 'ai');
     }

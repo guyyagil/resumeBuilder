@@ -3,18 +3,13 @@ import WelcomeForm from './components/WelcomeForm'
 import { useAppStore } from './store/useAppStore'
 
 function App() {
-  const { currentScreen, userBasicInfo, setUserBasicInfo, goToChat } = useAppStore();
-
-  const handleWelcomeComplete = (data: any) => {
-    setUserBasicInfo(data);
-    goToChat();
-  };
+  const { currentScreen } = useAppStore();
 
   if (currentScreen === 'welcome') {
-    return <WelcomeForm onComplete={handleWelcomeComplete} />;
+    return <WelcomeForm />;
   }
 
-  return <Layout userBasicInfo={userBasicInfo} />;
+  return <Layout userBasicInfo={null} />;
 }
 
 export default App

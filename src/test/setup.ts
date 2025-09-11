@@ -1,3 +1,3 @@
 import { expect } from 'vitest';
 
-global.expect = expect;
+(globalThis as any).expect = expect;

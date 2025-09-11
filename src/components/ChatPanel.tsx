@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
-import type { AIResponse } from '../types';
+// import type { AIResponse } from '../types'; // Removed unused import
 import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
 
 interface ChatPanelProps {
@@ -49,22 +49,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
       console.log('🔍 Sending context to AI:', {
         userContext,
         resumeData: resume,
-        chatMessages: chatMessages.slice(-5) // last 5 messages for context
+        chatMessages: chatMessages // Send ALL messages for context
       });
 
       const aiResponse = await sendMessageToAI(
         userMessage,
         userContext,
         resume,
-        chatMessages.slice(-5) // Only send recent chat history to avoid token limits
-      ) as AIResponse;
+        chatMessages // Send ALL chat history, not just slice(-5)
+      ) as any; // AIResponse type removed
       
       if (typeof aiResponse === 'object' && aiResponse.message) {
-        addChatMessage(aiResponse.message, 'ai');
-        
+        // Handle resume updates FIRST, then send the message
         if (aiResponse.resumeUpdates) {
           await handleResumeUpdates(aiResponse.resumeUpdates, addChatMessage);
         }
+        
+        addChatMessage(aiResponse.message, 'ai');
       } else {
         const message = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
         addChatMessage(message, 'ai');

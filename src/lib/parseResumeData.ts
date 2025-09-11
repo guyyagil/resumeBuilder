@@ -1,7 +1,7 @@
 import { normalizeResumeData } from '../services/parsers';
 
 export interface ResumeDataPatch {
-  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign' | 'delete' | 'rewrite';
+  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign' | 'delete' | 'rewrite' | 'reorganize';
   experience?: {
     id?: string;
     company?: string;
@@ -68,8 +68,9 @@ export interface ResumeDataPatch {
     company: string;
     title?: string;
     duration?: string;
-    newDuration?: string; // <-- Add this line
+    newDuration?: string;
     newDescriptions: string[];
+    newCompany?: string; // Add this line
     reason?: string; // why we're rewriting
   };
   replaceExperience?: {
@@ -84,34 +85,30 @@ export interface ResumeDataPatch {
   };
 }
 
-interface ParseResult {
-  messageText: string;
-  patch: ResumeDataPatch | undefined; // Changed from null to undefined
-  error: string;
-  rawJson: string;
-}
+
 
 // Remove unused extractJson function
 // const extractJson = (text: string): string | null => { ... }
 
-export const parseResumeData = (rawText: string): ParseResult => {
+export const parseResumeData = (aiResponse: string) => {
   let messageText = '';
-  let patch: ResumeDataPatch | undefined = undefined;
+  let patch: any = undefined; // Will be converted to ResumeDataPatch later
   let error = '';
   let rawJson = '';
+  let parsedData: any = null;
 
   try {
     console.log('🔍 === PARSING START ===');
-    console.log('Raw AI text:', rawText);
+    console.log('Raw AI text:', aiResponse);
     
     // Extract message text (everything outside RESUME_DATA tags)
-    const resumeDataMatch = rawText.match(/\[RESUME_DATA\](.*?)\[\/RESUME_DATA\]/s);
+    const resumeDataMatch = aiResponse.match(/\[RESUME_DATA\](.*?)\[\/RESUME_DATA\]/s);
     
     if (resumeDataMatch) {
       console.log('🔍 Found RESUME_DATA tags');
       // Split text around RESUME_DATA
-      const beforeData = rawText.substring(0, rawText.indexOf('[RESUME_DATA]')).trim();
-      const afterData = rawText.substring(rawText.indexOf('[/RESUME_DATA]') + '[/RESUME_DATA]'.length).trim();
+      const beforeData = aiResponse.substring(0, aiResponse.indexOf('[RESUME_DATA]')).trim();
+      const afterData = aiResponse.substring(aiResponse.indexOf('[/RESUME_DATA]') + '[/RESUME_DATA]'.length).trim();
       messageText = (beforeData + ' ' + afterData).trim();
       
       // Extract and clean JSON
@@ -226,12 +223,12 @@ export const parseResumeData = (rawText: string): ParseResult => {
                 extracted: objectMatch[0],
                 error: thirdError
               });
-              return { messageText: rawText, patch: undefined, error, rawJson };
+              return { messageText: aiResponse, patch: undefined, error, rawJson };
             }
           } else {
             error = `No valid JSON object found`;
             console.error('🔍 No JSON object found in:', rawJson);
-            return { messageText: rawText, patch: undefined, error, rawJson };
+            return { messageText: aiResponse, patch: undefined, error, rawJson };
           }
         }
       }
@@ -244,10 +241,13 @@ export const parseResumeData = (rawText: string): ParseResult => {
     } else {
       console.log('🔍 No RESUME_DATA tags found, checking for Hebrew deletion commands');
       // No RESUME_DATA tags found - check for deletion commands in plain text
-      messageText = rawText;
+      messageText = aiResponse
+        .replace(/\[\/RESUME_DATA\]$/g, '') // Remove trailing [/RESUME_DATA] tag
+        .replace(/\[RESUME_DATA\]$/g, '') // Remove trailing [RESUME_DATA] tag
+        .trim();
       
       // Enhanced Hebrew command detection
-      const hebrewText = rawText;
+      const hebrewText = aiResponse;
       console.log('🔍 Checking Hebrew text for commands:', hebrewText);
       
       // Look for update/rewrite commands in Hebrew
@@ -290,6 +290,8 @@ export const parseResumeData = (rawText: string): ParseResult => {
       .replace(/\[RESUME_DATA\].*?\[\/RESUME_DATA\]/gs, '')
       .replace(/```json.*?```/gs, '')
       .replace(/```.*?```/gs, '')
+      .replace(/\[\/RESUME_DATA\]$/g, '') // Remove trailing [/RESUME_DATA] tag
+      .replace(/\[RESUME_DATA\]$/g, '') // Remove trailing [RESUME_DATA] tag
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -308,13 +310,52 @@ export const parseResumeData = (rawText: string): ParseResult => {
     console.log('Final messageText:', messageText);
     console.log('Final patch:', patch);
 
+    if (parsedData) {
+      const normalized = normalizeResumeData(parsedData);
+      
+      // Convert NormalizedResumePatch to ResumeDataPatch
+      const storeCompatiblePatch: ResumeDataPatch = {
+        operation: ['delete', 'rewrite'].includes(normalized.operation) ? 'patch' : normalized.operation as any,
+        experience: normalized.experience,
+        experiences: normalized.experiences,
+        skills: normalized.skills,
+        summary: normalized.summary,
+        contact: normalized.contact,
+        completeResume: normalized.completeResume,
+        removeSkills: normalized.removeSkills,
+        removeExperiences: normalized.removeExperiences,
+        clearSections: normalized.clearSections,
+        // Convert rewriteExperience to match ResumeDataPatch format
+        ...(normalized.rewriteExperience && {
+          rewriteExperience: {
+            company: normalized.rewriteExperience.company,
+            title: normalized.rewriteExperience.newData?.title,
+            duration: normalized.rewriteExperience.newData?.duration,
+            newDescriptions: normalized.rewriteExperience.newDescriptions || [],
+            reason: normalized.rewriteExperience.reason
+          }
+        }),
+        updateExperienceDescription: normalized.updateExperienceDescription,
+        removeDescriptionFromExperience: normalized.removeDescriptionFromExperience,
+        removeDescriptionsFromExperience: normalized.removeDescriptionsFromExperience,
+        replaceExperience: normalized.replaceExperience
+      };
+      
+      return {
+        patch: storeCompatiblePatch,
+        messageText: messageText,
+        error: null,
+        rawJson: JSON.stringify(parsedData, null, 2)
+      };
+    }
+
     return { messageText, patch: patch || undefined, error, rawJson };
 
   } catch (err) {
     error = `Parsing error: ${err}`;
     console.error('parseResumeData error:', err);
     return { 
-      messageText: rawText || 'שגיאה בעיבוד התגובה', 
+      messageText: aiResponse || 'שגיאה בעיבוד התגובה', 
       patch: undefined,
       error, 
       rawJson 

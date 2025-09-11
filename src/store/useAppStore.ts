@@ -37,7 +37,7 @@ interface Resume {
 }
 
 interface ResumeDataPatch {
-  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign';
+  operation?: 'patch' | 'replace' | 'reset' | 'add' | 'update' | 'remove' | 'clear' | 'redesign' | 'reorganize' | 'delete' | 'rewrite';
   experience?: {
     id?: string;
     company?: string;
@@ -82,6 +82,53 @@ interface ResumeDataPatch {
   removeSkills?: string[];
   removeExperiences?: string[];
   clearSections?: string[]; // e.g., ["experiences","skills","summary","contact"]
+
+  // New granular operations
+  editExperienceField?: {
+    company: string;
+    field: 'company' | 'title' | 'duration';
+    newValue: string;
+  };
+  editDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+    newText: string;
+  };
+  removeDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+  };
+  addDescriptionLine?: {
+    company: string;
+    text: string;
+    position?: number; // optional position, defaults to end
+  };
+  editContactField?: {
+    field: 'fullName' | 'email' | 'phone' | 'location' | 'title';
+    value: string;
+  };
+  editSkill?: {
+    oldSkill: string;
+    newSkill: string;
+  };
+  editSummary?: {
+    type: 'replace' | 'append' | 'prepend';
+    text: string;
+  };
+  appendToSummary?: string;
+  replaceSkills?: string[];
+  reorganize?: {
+    experiences?: Experience[];
+    skills?: string[];
+    summary?: string;
+    contact?: Partial<Pick<Resume, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>;
+  };
+  replaceComplete?: Resume;
+  clearSection?: 'experiences' | 'skills' | 'summary' | 'contact';
+  updateExperienceDescription?: {
+    company: string;
+    newDescriptions: string[];
+  };
 }
 
 interface AppStore {
@@ -120,6 +167,23 @@ interface AppStore {
   setContactInfo: (
     c: Partial<Pick<Resume, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>
   ) => void;
+
+  // New granular methods
+  editExperienceField: (company: string, field: 'company' | 'title' | 'duration', newValue: string) => void;
+  editDescriptionLine: (company: string, lineIndex: number, newText: string) => void;
+  removeDescriptionLine: (company: string, lineIndex: number) => void;
+  addDescriptionLine: (company: string, text: string, position?: number) => void;
+  editContactField: (field: 'fullName' | 'email' | 'phone' | 'location' | 'title', value: string) => void;
+  editSkill: (oldSkill: string, newSkill: string) => void;
+  editSummary: (type: 'replace' | 'append' | 'prepend', text: string) => void;
+  reorganizeResume: (data: {
+    experiences?: Experience[];
+    skills?: string[];
+    summary?: string;
+    contact?: Partial<Pick<Resume, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>;
+  }) => void;
+  clearSection: (section: 'experiences' | 'skills' | 'summary' | 'contact') => void;
+  cleanDuplicateDescriptions: () => void;
 }
 
 /* ===========================
@@ -351,6 +415,116 @@ export const useAppStore = create<AppStore>((set) => ({
     set((s) => {
       let next: Resume = { ...s.resume };
 
+      // Handle granular operations first
+      if (patch.editExperienceField) {
+        const { company, field, newValue } = patch.editExperienceField;
+        next.experiences = next.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? { ...exp, [field]: field === 'duration' ? normalizeDuration(newValue) || '' : newValue.trim() }
+            : exp
+        );
+      }
+
+      if (patch.editDescriptionLine) {
+        const { company, lineIndex, newText } = patch.editDescriptionLine;
+        next.experiences = next.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? {
+                ...exp,
+                description: exp.description.map((desc, idx) => 
+                  idx === lineIndex ? newText.trim() : desc
+                )
+              }
+            : exp
+        );
+      }
+
+      if (patch.removeDescriptionLine) {
+        const { company, lineIndex } = patch.removeDescriptionLine;
+        next.experiences = next.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? {
+                ...exp,
+                description: exp.description.filter((_, idx) => idx !== lineIndex)
+              }
+            : exp
+        );
+      }
+
+      if (patch.addDescriptionLine) {
+        const { company, text, position } = patch.addDescriptionLine;
+        next.experiences = next.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? {
+                ...exp,
+                description: position !== undefined
+                  ? [
+                      ...exp.description.slice(0, position),
+                      text.trim(),
+                      ...exp.description.slice(position)
+                    ]
+                  : [...exp.description, text.trim()]
+              }
+            : exp
+        );
+      }
+
+      if (patch.editContactField) {
+        const { field, value } = patch.editContactField;
+        next[field] = value.trim();
+      }
+
+      if (patch.editSkill) {
+        const { oldSkill, newSkill } = patch.editSkill;
+        next.skills = next.skills.map(skill => 
+          skill.toLowerCase().trim() === oldSkill.toLowerCase().trim()
+            ? newSkill.trim()
+            : skill
+        );
+      }
+
+      if (patch.editSummary) {
+        const { type, text } = patch.editSummary;
+        next.summary = type === 'replace' 
+          ? text.trim()
+          : type === 'append'
+          ? (next.summary + ' ' + text).trim()
+          : (text + ' ' + next.summary).trim();
+      }
+
+      if (patch.appendToSummary) {
+        next.summary = (next.summary + ' ' + patch.appendToSummary).trim();
+      }
+
+      if (patch.replaceSkills) {
+        next.skills = dedupeSkills(patch.replaceSkills);
+      }
+
+      if (patch.reorganize) {
+        const { experiences, skills, summary, contact } = patch.reorganize;
+        if (experiences) next.experiences = experiences.map(sanitizeExperience);
+        if (skills) next.skills = dedupeSkills(skills);
+        if (summary !== undefined) next.summary = summary;
+        if (contact) next = { ...next, ...contact };
+      }
+
+      if (patch.replaceComplete) {
+        next = patch.replaceComplete;
+      }
+
+      if (patch.clearSection) {
+        if (patch.clearSection === 'experiences') next.experiences = [];
+        if (patch.clearSection === 'skills') next.skills = [];
+        if (patch.clearSection === 'summary') next.summary = '';
+        if (patch.clearSection === 'contact') {
+          next.fullName = '';
+          next.email = '';
+          next.phone = '';
+          next.location = '';
+          next.title = '';
+        }
+      }
+
       // 1) Operation: replace (complete resume)
       if (patch.operation === 'replace' && patch.completeResume) {
         next = {
@@ -428,6 +602,16 @@ export const useAppStore = create<AppStore>((set) => ({
         next = { ...next, ...patch.contact };
       }
 
+      // 7.5) Update experience description
+      if (patch.updateExperienceDescription) {
+        const { company, newDescriptions } = patch.updateExperienceDescription;
+        next.experiences = next.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? { ...exp, description: newDescriptions }
+            : exp
+        );
+      }
+
       // 8) Remove experiences by name/id
       if (Array.isArray(patch.removeExperiences) && patch.removeExperiences.length) {
         for (const key of patch.removeExperiences) {
@@ -452,4 +636,148 @@ export const useAppStore = create<AppStore>((set) => ({
 
       return { resume: next };
     }),
+  /* ---------- New granular operations ---------- */
+  editExperienceField: (company, field, newValue) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        experiences: s.resume.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? { ...exp, [field]: field === 'duration' ? normalizeDuration(newValue) || '' : newValue.trim() }
+            : exp
+        )
+      }
+    })),
+
+  editDescriptionLine: (company, lineIndex, newText) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        experiences: s.resume.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? {
+                ...exp,
+                description: exp.description.map((desc, idx) => 
+                  idx === lineIndex ? newText.trim() : desc
+                )
+              }
+            : exp
+        )
+      }
+    })),
+
+  removeDescriptionLine: (company, lineIndex) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        experiences: s.resume.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? {
+                ...exp,
+                description: exp.description.filter((_, idx) => idx !== lineIndex)
+              }
+            : exp
+        )
+      }
+    })),
+
+  addDescriptionLine: (company, text, position) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        experiences: s.resume.experiences.map(exp => 
+          norm(exp.company) === norm(company)
+            ? {
+                ...exp,
+                description: (() => {
+                  const trimmedText = text.trim();
+                  const currentDesc = exp.description || [];
+                  
+                  // Check if this text already exists to prevent duplicates
+                  if (currentDesc.some(desc => desc.trim() === trimmedText)) {
+                    return currentDesc; // Don't add duplicate
+                  }
+                  
+                  return position !== undefined
+                    ? [
+                        ...currentDesc.slice(0, position),
+                        trimmedText,
+                        ...currentDesc.slice(position)
+                      ]
+                    : [...currentDesc, trimmedText];
+                })()
+              }
+            : exp
+        )
+      }
+    })),
+
+  editContactField: (field, value) =>
+    set((s) => ({
+      resume: { ...s.resume, [field]: value.trim() }
+    })),
+
+  editSkill: (oldSkill, newSkill) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        skills: s.resume.skills.map(skill => 
+          skill.toLowerCase().trim() === oldSkill.toLowerCase().trim()
+            ? newSkill.trim()
+            : skill
+        )
+      }
+    })),
+
+  editSummary: (type, text) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        summary: type === 'replace' 
+          ? text.trim()
+          : type === 'append'
+          ? (s.resume.summary + ' ' + text).trim()
+          : (text + ' ' + s.resume.summary).trim()
+      }
+    })),
+
+  reorganizeResume: (data) =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        ...(data.experiences && { experiences: data.experiences.map(sanitizeExperience) }),
+        ...(data.skills && { skills: dedupeSkills(data.skills) }),
+        ...(data.summary !== undefined && { summary: data.summary }),
+        ...(data.contact && data.contact)
+      }
+    })),
+
+  clearSection: (section) =>
+    set((s) => {
+      const updates: Partial<Resume> = {};
+      if (section === 'experiences') updates.experiences = [];
+      if (section === 'skills') updates.skills = [];
+      if (section === 'summary') updates.summary = '';
+      if (section === 'contact') {
+        updates.fullName = '';
+        updates.email = '';
+        updates.phone = '';
+        updates.location = '';
+        updates.title = '';
+      }
+      return { resume: { ...s.resume, ...updates } };
+    }),
+
+  // Utility function to clean duplicates from all experiences
+  cleanDuplicateDescriptions: () =>
+    set((s) => ({
+      resume: {
+        ...s.resume,
+        experiences: s.resume.experiences.map(exp => ({
+          ...exp,
+          description: Array.from(new Set(exp.description.map(desc => desc.trim()))).filter(Boolean)
+        }))
+      }
+    })),
+
 }));

@@ -1,3 +1,26 @@
+export interface ContactInfo {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  title?: string;
+}
+
+export interface Experience {
+  id?: string;
+  company?: string;
+  title?: string;
+  duration?: string;
+  description?: string[];
+}
+
+export interface CompleteResume {
+  contact?: ContactInfo;
+  experiences?: Experience[];
+  skills?: string[];
+  summary?: string;
+}
+
 export type Operation =
   | 'patch'
   | 'replace'
@@ -7,6 +30,7 @@ export type Operation =
   | 'remove'
   | 'clear'
   | 'redesign'
+  | 'reorganize'
   | 'delete'
   | 'rewrite';
 
@@ -48,106 +72,237 @@ export interface ReplaceExperience {
 // Raw AI output shape (may contain many aliases) - extend with new granular fields
 export interface RawAIResumeData {
   operation?: Operation;
-  experience?: any;
-  experiences?: any[];
+  experience?: Experience;
+  experiences?: Experience[];
   skills?: string[];
   summary?: string;
-  contact?: any;
-  completeResume?: any;
+  contact?: ContactInfo;
+  completeResume?: CompleteResume;
   removeSkills?: string[];
   removeExperiences?: string[];
   clearSections?: string[];
+  rewriteExperience?: {
+    company: string;
+    newDescriptions?: string[];
+    newData?: Partial<Experience>;
+    reason?: string;
+  };
+  updateExperienceDescription?: {
+    company: string;
+    newDescriptions: string[];
+  };
+  removeDescriptionFromExperience?: {
+    company: string;
+    descriptionToRemove: string;
+  };
+  removeDescriptionsFromExperience?: {
+    company: string;
+    descriptionsToRemove: string[];
+  };
+  replaceExperience?: {
+    company: string;
+    newExperience: Experience;
+  };
 
-  // New granular fields that parsers produce/expect
-  rewriteExperience?: RewriteExperience;
-  updateExperienceDescription?: UpdateExperienceDescription;
-  removeDescriptionFromExperience?: RemoveDescriptionFromExperience;
-  removeDescriptionsFromExperience?: RemoveDescriptionsFromExperience;
-  replaceExperience?: ReplaceExperience;
-  // ...other possible raw fields...
+  // New granular operations
+  editExperienceField?: {
+    company: string;
+    field: 'company' | 'title' | 'duration';
+    newValue: string;
+  };
+  editDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+    newText: string;
+  };
+  removeDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+  };
+  addDescriptionLine?: {
+    company: string;
+    text: string;
+    position?: number;
+  };
+  editContactField?: {
+    field: 'fullName' | 'email' | 'phone' | 'location' | 'title';
+    value: string;
+  };
+  editSkill?: {
+    oldSkill: string;
+    newSkill: string;
+  };
+  editSummary?: {
+    type: 'replace' | 'append' | 'prepend';
+    text: string;
+  };
+  appendToSummary?: string;
+  replaceSkills?: string[];
+  reorganize?: {
+    experiences?: Experience[];
+    skills?: string[];
+    summary?: string;
+    contact?: Partial<ContactInfo>;
+  };
+  replaceComplete?: CompleteResume;
+  clearSection?: 'experiences' | 'skills' | 'summary' | 'contact';
 }
 
-// Normalized patch used internally
 export interface NormalizedResumePatch {
   operation: Operation;
-  experience?: {
-    id?: string;
-    company?: string;
-    title?: string;
-    duration?: string | null;
-    description?: string[] | string | null;
-  };
-  experiences?: Array<{
-    id?: string;
-    company?: string;
-    title?: string;
-    duration?: string | null;
-    description?: string[] | string | null;
-  }>;
+  experience?: Experience;
+  experiences?: Experience[];
   skills?: string[];
+  summary?: string;
+  contact?: ContactInfo;
+  completeResume?: CompleteResume;
   removeSkills?: string[];
   removeExperiences?: string[];
   clearSections?: string[];
-  summary?: string;
-  contact?: {
-    fullName?: string;
-    email?: string;
-    phone?: string;
-    location?: string;
-    title?: string;
+  rewriteExperience?: {
+    company: string;
+    newDescriptions?: string[];
+    newData?: Partial<Experience>;
+    reason?: string;
   };
-  completeResume?: any;
+  updateExperienceDescription?: {
+    company: string;
+    newDescriptions: string[];
+  };
+  removeDescriptionFromExperience?: {
+    company: string;
+    descriptionToRemove: string;
+  };
+  removeDescriptionsFromExperience?: {
+    company: string;
+    descriptionsToRemove: string[];
+  };
+  replaceExperience?: {
+    company: string;
+    newExperience: Experience;
+  };
 
-  // New granular actions
-  rewriteExperience?: RewriteExperience;
-  updateExperienceDescription?: UpdateExperienceDescription;
-  removeDescriptionFromExperience?: RemoveDescriptionFromExperience;
-  removeDescriptionsFromExperience?: RemoveDescriptionsFromExperience;
-  replaceExperience?: ReplaceExperience;
-  // ...existing normalized fields...
+  // New granular operations
+  editExperienceField?: {
+    company: string;
+    field: 'company' | 'title' | 'duration';
+    newValue: string;
+  };
+  editDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+    newText: string;
+  };
+  removeDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+  };
+  addDescriptionLine?: {
+    company: string;
+    text: string;
+    position?: number;
+  };
+  editContactField?: {
+    field: 'fullName' | 'email' | 'phone' | 'location' | 'title';
+    value: string;
+  };
+  editSkill?: {
+    oldSkill: string;
+    newSkill: string;
+  };
+  editSummary?: {
+    type: 'replace' | 'append' | 'prepend';
+    text: string;
+  };
+  appendToSummary?: string;
+  replaceSkills?: string[];
+  reorganize?: {
+    experiences?: Experience[];
+    skills?: string[];
+    summary?: string;
+    contact?: Partial<ContactInfo>;
+  };
+  replaceComplete?: CompleteResume;
+  clearSection?: 'experiences' | 'skills' | 'summary' | 'contact';
 }
 
-// src/types/resume.ts
-export type ResumeOperation = 'reset' | 'redesign' | 'clear' | 'remove' | 'replace' | 'update' | 'add';
-
-export interface ExperienceInput {
-  id?: string;
-  company?: string;
-  title?: string;
-  duration?: string;
-  description?: string[];
-}
-
-export interface ResumeExperience {
-  id?: string;
-  company: string;
-  title: string;
-  duration: string;
-  description: string[];
-}
-
-export interface CompleteResume {
-  experiences?: ResumeExperience[];
+// For backward compatibility with store
+export interface ResumeDataPatch {
+  operation?: Operation;
+  experience?: Experience;
+  experiences?: Experience[];
   skills?: string[];
   summary?: string;
-}
-
-export interface ResumeUpdates {
-  operation?: ResumeOperation;
+  contact?: ContactInfo;
   completeResume?: CompleteResume;
-  clearSections?: ('experiences' | 'skills' | 'summary')[];
-  removeExperiences?: string[];
   removeSkills?: string[];
-  experiences?: ExperienceInput[];
-  skills?: string[];
-  summary?: string;
-  experience?: ExperienceInput;
+  removeExperiences?: string[];
+  clearSections?: string[];
+
+  // New granular operations
+  editExperienceField?: {
+    company: string;
+    field: 'company' | 'title' | 'duration';
+    newValue: string;
+  };
+  editDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+    newText: string;
+  };
+  removeDescriptionLine?: {
+    company: string;
+    lineIndex: number;
+  };
+  addDescriptionLine?: {
+    company: string;
+    text: string;
+    position?: number;
+  };
+  editContactField?: {
+    field: 'fullName' | 'email' | 'phone' | 'location' | 'title';
+    value: string;
+  };
+  editSkill?: {
+    oldSkill: string;
+    newSkill: string;
+  };
+  editSummary?: {
+    type: 'replace' | 'append' | 'prepend';
+    text: string;
+  };
+  appendToSummary?: string;
+  replaceSkills?: string[];
+  reorganize?: {
+    experiences?: Experience[];
+    skills?: string[];
+    summary?: string;
+    contact?: Partial<ContactInfo>;
+  };
+  replaceComplete?: CompleteResume;
+  clearSection?: 'experiences' | 'skills' | 'summary' | 'contact';
+
+  // Legacy operations for backward compatibility
+  rewriteExperience?: {
+    company: string;
+    newDescriptions?: string[];
+    newData?: Partial<Experience>;
+    reason?: string;
+  };
+  updateExperienceDescription?: {
+    company: string;
+    newDescriptions: string[];
+  };
+  removeDescriptionFromExperience?: {
+    company: string;
+    descriptionToRemove: string;
+  };
+  removeDescriptionsFromExperience?: {
+    company: string;
+    descriptionsToRemove: string[];
+  };
+  replaceExperience?: {
+    company: string;
+    newExperience: Experience;
+  };
 }
-
-export type AIResponse = string | {
-  message: string;
-  resumeUpdates?: ResumeUpdates;
-};
-
-export type Experience = { company: string; title?: string; duration?: string; description?: string[] };
-export type Resume = { experiences?: Experience[]; skills?: string[]; summary?: string; fullName?: string; title?: string };

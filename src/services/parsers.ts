@@ -50,9 +50,7 @@ export const recoverMalformedResumeJson = (raw: string): any | null => {
 
 export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch => {
   const patch: NormalizedResumePatch = {
-    operation: raw.operation === 'replace' || raw.operation === 'reset'
-      ? raw.operation
-      : 'patch'
+    operation: raw.operation || 'patch'
   };
 
   // Helper: build a duration string from various possible fields (duration, startDate/endDate, period, start/end)
@@ -84,10 +82,82 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
     return undefined;
   };
 
+  // Handle all granular operations
+  if (raw.editExperienceField) {
+    patch.editExperienceField = raw.editExperienceField;
+  }
+  if (raw.editDescriptionLine) {
+    patch.editDescriptionLine = raw.editDescriptionLine;
+  }
+  if (raw.removeDescriptionLine) {
+    patch.removeDescriptionLine = raw.removeDescriptionLine;
+  }
+  if (raw.addDescriptionLine) {
+    patch.addDescriptionLine = {
+      company: raw.addDescriptionLine.company,
+      text: (raw.addDescriptionLine as any).text || (raw.addDescriptionLine as any).newText || (raw.addDescriptionLine as any).newLine,
+      position: raw.addDescriptionLine.position
+    };
+  }
+  if (raw.editContactField) {
+    patch.editContactField = raw.editContactField;
+  }
+  if (raw.editSkill) {
+    patch.editSkill = raw.editSkill;
+  }
+  if (raw.editSummary) {
+    // Handle both string and object formats for editSummary
+    if (typeof raw.editSummary === 'string') {
+      patch.editSummary = {
+        type: 'replace',
+        text: raw.editSummary
+      };
+    } else {
+      patch.editSummary = raw.editSummary;
+    }
+  }
+
+  // Handle legacy operations
+  if (raw.updateExperienceDescription) {
+    patch.updateExperienceDescription = {
+      company: raw.updateExperienceDescription.company,
+      newDescriptions: (raw.updateExperienceDescription as any).description || raw.updateExperienceDescription.newDescriptions || []
+    };
+  }
+  if (raw.rewriteExperience) {
+    patch.rewriteExperience = raw.rewriteExperience;
+  }
+  if (raw.removeDescriptionFromExperience) {
+    patch.removeDescriptionFromExperience = raw.removeDescriptionFromExperience;
+  }
+  if (raw.removeDescriptionsFromExperience) {
+    patch.removeDescriptionsFromExperience = raw.removeDescriptionsFromExperience;
+  }
+  if (raw.replaceExperience) {
+    patch.replaceExperience = raw.replaceExperience;
+  }
+  if (raw.appendToSummary) {
+    patch.appendToSummary = raw.appendToSummary;
+  }
+  if (raw.replaceSkills) {
+    patch.replaceSkills = raw.replaceSkills;
+  }
+  if (raw.reorganize) {
+    patch.reorganize = raw.reorganize;
+    patch.operation = 'reorganize';
+  }
+  if (raw.replaceComplete) {
+    patch.replaceComplete = raw.replaceComplete;
+    patch.operation = 'replace';
+  }
+  if (raw.clearSection) {
+    patch.clearSection = raw.clearSection;
+  }
+
   // Handle completeResume first (for initial CV extraction)
   if (raw.operation === 'replace' && raw.completeResume) {
     patch.completeResume = raw.completeResume;
-    
+
     // Also expose top-level fields for easier access
     if (raw.completeResume.contact) {
       patch.contact = raw.completeResume.contact;
@@ -98,13 +168,14 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
       if (firstExp && typeof firstExp === 'object') {
         let desc: string[] = [];
         if (Array.isArray(firstExp.description)) {
-          desc = firstExp.description.map((s: string) => s.trim()).filter(Boolean);
+          desc = firstExp.description.map((s: any) => String(s).trim()).filter(Boolean);
         } else if (typeof firstExp.description === 'string') {
-          const sentences = firstExp.description
+          const descriptionStr = firstExp.description as string;
+          const sentences = descriptionStr
             .split(/(?<=[.!?])\s+/)
             .map((s: string) => s.trim())
             .filter(Boolean);
-          desc = sentences.length > 0 ? sentences : [firstExp.description.trim()];
+          desc = sentences.length > 0 ? sentences : [descriptionStr.trim()];
         }
 
         patch.experience = {
@@ -117,7 +188,7 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
       }
     }
     if (Array.isArray(raw.completeResume.skills)) {
-      patch.skills = Array.from(new Set(raw.completeResume.skills.map((s: string) => (s || '').trim()).filter(Boolean)));
+      patch.skills = Array.from(new Set(raw.completeResume.skills.map((s: any) => String(s || '').trim()).filter(Boolean)));
     }
     if (typeof raw.completeResume.summary === 'string') {
       patch.summary = raw.completeResume.summary.trim();
@@ -150,7 +221,7 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
     if (expSource && typeof expSource === 'object') {
       let desc: string[] = [];
       if (Array.isArray((expSource as any).description)) {
-        desc = (expSource as any).description.map((s: string) => s.trim()).filter(Boolean);
+        desc = (expSource as any).description.map((s: any) => String(s).trim()).filter(Boolean);
       } else if (typeof (expSource as any).description === 'string') {
         const sentences = (expSource as any).description
           .split(/(?<=[.!?])\s+/)
@@ -363,7 +434,7 @@ export const refineResumePatch = async (
       /\b(JavaScript|TypeScript|Python|Java|C\+\+|C#|PHP|Ruby|Node\.js|React|Angular|Vue)\b/gi,
       /\b(AWS|Azure|Docker|Kubernetes|Git|SQL|MongoDB|PostgreSQL)\b/gi
     ];
-    
+
     techPatterns.forEach(pattern => {
       const matches = text.match(pattern);
       if (matches) {
@@ -371,7 +442,7 @@ export const refineResumePatch = async (
       }
     });
   };
-  
+
   // Apply enhanced extraction to all descriptions
   const allDescriptions = [
     ...(Array.isArray(experiencesArr)
@@ -381,7 +452,7 @@ export const refineResumePatch = async (
       ? (patch.experience as any).description
       : [])
   ];
-  
+
   if (allDescriptions.length > 0) {
     extractMoreSkills(allDescriptions.join(' '));
   }

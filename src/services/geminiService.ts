@@ -1,8 +1,9 @@
 import { geminiModel as model } from './aiClient';
 import { parseResumeData } from '../lib/parseResumeData';
 import { getSystemPrompt } from './prompts';
-import type { Resume } from '../types';
+// import type { Resume } from '../types'; // Using store Resume type instead
 import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
+import type { NormalizedResumePatch } from '../types';
 
 // Remove common Markdown markers from free text
 const stripSimpleMarkdown = (input: string) =>
@@ -15,6 +16,8 @@ const stripSimpleMarkdown = (input: string) =>
     // headings and list stars/dashes at line start
     .replace(/^[ \t]*#{1,6}[ \t]*/gm, '')
     .replace(/^[ \t]*[-*][ \t]+/gm, '• ')
+    // remove surrounding quotes
+    .replace(/^["'](.*)["']$/s, '$1')
     // collapse multiple spaces
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
@@ -23,12 +26,12 @@ const stripSimpleMarkdown = (input: string) =>
 export const sendMessageToAI = async (
   message: string,
   userContext?: any,
-  resumeData?: Resume,
+  resumeData?: any, // Resume type from store
   chatMessages?: any[]
 ) => {
   try {
     const systemPrompt = getSystemPrompt('he', userContext, resumeData || {}, chatMessages);
-    const fullPrompt = `${systemPrompt}\n\nהודעת משתמש: "${message}"`;
+    const fullPrompt = `${systemPrompt}\n\nהודעת משתמש: ${message}`;
 
     const result = await model.generateContent(fullPrompt);
     const text = (await result.response).text();
@@ -43,7 +46,7 @@ export const sendMessageToAI = async (
 
     // Ensure we have a meaningful conversation message
     let conversationMessage = stripSimpleMarkdown(messageText);
-    
+
     // If message is too short or generic, enhance it
     if (!conversationMessage || conversationMessage.length < 15) {
       if (patch?.operation === 'remove' || patch?.removeExperiences || patch?.removeSkills) {
@@ -64,14 +67,19 @@ export const sendMessageToAI = async (
     // Apply resume updates if we have a patch
     if (patch) {
       console.log('📝 Applying resume updates via handler:', patch);
-      const internalAddChatMessage = (msg: string, type: 'ai' | 'user') => 
+      const internalAddChatMessage = (msg: string, type: 'ai' | 'user') =>
         console.log(`[Internal ${type.toUpperCase()}]: ${msg}`);
-      await handleResumeUpdates(patch, internalAddChatMessage);
+      // Convert ResumeDataPatch to NormalizedResumePatch for handleResumeUpdates
+      const normalizedPatch: NormalizedResumePatch = {
+        ...patch,
+        operation: patch.operation || 'patch'
+      };
+      await handleResumeUpdates(normalizedPatch, internalAddChatMessage);
     }
 
-    return { 
-      message: conversationMessage, 
-      resumeUpdates: patch || {} 
+    return {
+      message: conversationMessage,
+      resumeUpdates: patch || {}
     };
 
   } catch (error) {
@@ -118,7 +126,7 @@ export const extractResumeFromPlainText = async (rawText: string) => {
     const result = await model.generateContent(prompt);
     const text = (await result.response).text();
     console.log('AI response for CV extraction:', text);
-    
+
     const parsed = parseResumeData(text);
     console.log('Parsed initial resume data:', parsed);
 
@@ -127,8 +135,13 @@ export const extractResumeFromPlainText = async (rawText: string) => {
       const addChatMessage = (msg: string, type: 'ai' | 'user') => {
         console.log(`[Initial Extraction - ${type.toUpperCase()}]: ${msg}`);
       };
-      
-      await handleResumeUpdates(parsed.patch, addChatMessage);
+
+      // Convert ResumeDataPatch to NormalizedResumePatch for handleResumeUpdates
+      const normalizedPatch: NormalizedResumePatch = {
+        ...parsed.patch,
+        operation: parsed.patch.operation || 'patch'
+      };
+      await handleResumeUpdates(normalizedPatch, addChatMessage);
       console.log('Successfully applied initial resume patch');
       return { ok: true, raw: text, patch: parsed.patch };
     }

@@ -25,7 +25,24 @@ export const applyResumePatch = (patch: NormalizedResumePatch) => {
 
   if (patch.operation === 'replace') {
     if (patch.completeResume) {
-      replaceEntireResume(patch.completeResume);
+      // Convert CompleteResume to Resume format
+      const resumeData = {
+        experiences: patch.completeResume.experiences?.map(exp => ({
+          id: exp.id,
+          company: exp.company || '',
+          title: exp.title || '',
+          duration: exp.duration,
+          description: exp.description || []
+        })) || [],
+        skills: patch.completeResume.skills || [],
+        summary: patch.completeResume.summary || '',
+        fullName: patch.completeResume.contact?.fullName,
+        email: patch.completeResume.contact?.email,
+        phone: patch.completeResume.contact?.phone,
+        location: patch.completeResume.contact?.location,
+        title: patch.completeResume.contact?.title
+      };
+      replaceEntireResume(resumeData);
       return;
     } else {
       // no completeResume provided — treat as reset/replace fallback
