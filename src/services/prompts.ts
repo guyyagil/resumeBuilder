@@ -66,7 +66,7 @@ const buildPlainTextResume = (resume: Partial<ResumeLike>): string => {
 
 // ---- System prompt builder with autonomy ----
 export const getSystemPrompt = (
-  language: string = 'he',
+  // language: string = 'he',
   userContext: any = {},
   currentResume: Partial<ResumeLike> = {},
   chatHistory: Array<{ type: 'user' | 'ai'; content: string }> = []

@@ -1,14 +1,14 @@
-// src/components/ResumePanel.tsx
+// src/components/ResumePanel/ResumePanel1.tsx - Classic Style
 import React from 'react';
-import { useAppStore } from '../store/useAppStore';
-import { generateProfessionalSummary, combineSkills, getDisplayExperiences } from '../utils/resumeHelpers';
-import { printResume } from '../utils/printHelpers';
+import { useAppStore } from '../../store/useAppStore';
+import { generateProfessionalSummary, combineSkills, getDisplayExperiences } from '../../utils/resumeHelpers';
+import { printResume } from '../../utils/printHelpers';
 
-interface ResumePanelProps {
+interface ResumePanel1Props {
   userBasicInfo: any;
 }
 
-export const ResumePanel: React.FC<ResumePanelProps> = ({ userBasicInfo }) => {
+export const ResumePanel1: React.FC<ResumePanel1Props> = ({ userBasicInfo }) => {
   const { resume } = useAppStore();
   
   const allSkills = combineSkills(userBasicInfo?.keySkills, resume.skills);
@@ -18,10 +18,37 @@ export const ResumePanel: React.FC<ResumePanelProps> = ({ userBasicInfo }) => {
   const displayExperiences = getDisplayExperiences(resume.experiences);
 
   return (
-    <div id="resume-pane" className="rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col h-[calc(100vh-2rem)]">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-4 flex-shrink-0">
-        <h1 className="text-lg font-bold text-gray-900">קורות חיים</h1>
+    <div id="resume-pane" className="h-full flex flex-col resume1-print bg-white">
+      <style>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+          .resume1-print {
+            width: 760px !important;
+            margin: 0 auto !important;
+            box-sizing: border-box !important;
+            background: #fff !important;
+            border: 2px solid #3b82f6 !important;
+            border-radius: 1rem !important;
+            padding: 1rem !important;
+            height: auto !important;
+            min-height: 0 !important;
+            display: block !important;
+            overflow: visible !important;
+          }
+          .resume1-print .mb-6,
+          .resume1-print .mb-4 {
+            margin-bottom: 0.75rem !important;
+          }
+          .resume1-print .p-6 {
+            padding: 1rem !important;
+          }
+        }
+      `}</style>
+      {/* Print Button */}
+      <div className="p-4 border-b border-gray-200 flex justify-end flex-shrink-0">
         <button
           onClick={() => printResume(resume)}
           className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-xs font-medium text-white shadow hover:from-indigo-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"

@@ -118,7 +118,7 @@ interface ResumeDataPatch {
   appendToSummary?: string;
   replaceSkills?: string[];
   reorganize?: {
-    experiences?: Experience[];
+    experiences?: Experience[] | string[];
     skills?: string[];
     summary?: string;
     contact?: Partial<Pick<Resume, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>;
@@ -136,6 +136,7 @@ interface AppStore {
   userBasicInfo: WelcomeFormData | null;
   chatMessages: ChatMessage[];
   resume: Resume;
+  resumeHistory: Resume[];
   targetJobPosting?: string;
   originalResumeText?: string;
 
@@ -144,6 +145,10 @@ interface AppStore {
   addChatMessage: (content: string, type: 'user' | 'ai') => void;
   setTargetJobPosting: (text: string) => void;
   setOriginalResumeText: (text: string) => void;
+
+  // Undo functionality
+  undo: () => void;
+  saveToHistory: () => void;
 
   updateResume: (updates: Partial<Resume>) => void;
 
@@ -177,7 +182,7 @@ interface AppStore {
   editSkill: (oldSkill: string, newSkill: string) => void;
   editSummary: (type: 'replace' | 'append' | 'prepend', text: string) => void;
   reorganizeResume: (data: {
-    experiences?: Experience[];
+    experiences?: Experience[] | string[];
     skills?: string[];
     summary?: string;
     contact?: Partial<Pick<Resume, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>;
@@ -312,6 +317,7 @@ export const useAppStore = create<AppStore>((set) => ({
     location: '',
     title: '',
   },
+  resumeHistory: [],
   targetJobPosting: undefined,
   originalResumeText: undefined,
 
@@ -327,11 +333,37 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
   setOriginalResumeText: (text) => set({ originalResumeText: text }),
 
+  /* ---------- Undo functionality ---------- */
+  saveToHistory: () =>
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+    })),
+
+  undo: () =>
+    set((s) => {
+      if (s.resumeHistory.length === 0) return s;
+      
+      const newHistory = [...s.resumeHistory];
+      const previousResume = newHistory.pop();
+      
+      return {
+        resumeHistory: newHistory,
+        resume: previousResume!,
+      };
+    }),
+
+
+
   /* ---------- Resume basics ---------- */
-  updateResume: (updates) => set((s) => ({ resume: { ...s.resume, ...updates } })),
+  updateResume: (updates) => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, ...updates }
+    })),
 
   setContactInfo: (c) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: { ...s.resume, ...c },
       userBasicInfo: {
         ...(s.userBasicInfo || {}),
@@ -343,11 +375,21 @@ export const useAppStore = create<AppStore>((set) => ({
       },
     })),
 
-  setSummary: (summary) => set((s) => ({ resume: { ...s.resume, summary } })),
-  clearSummary: () => set((s) => ({ resume: { ...s.resume, summary: '' } })),
+  setSummary: (summary) => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, summary }
+    })),
+  
+  clearSummary: () => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, summary: '' }
+    })),
 
   resetResume: () =>
-    set(() => ({
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         experiences: [],
         skills: [],
@@ -360,7 +402,11 @@ export const useAppStore = create<AppStore>((set) => ({
       },
     })),
 
-  replaceEntireResume: (newResume) => set(() => ({ resume: newResume })),
+  replaceEntireResume: (newResume) => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: newResume
+    })),
 
   /* ---------- Experiences ---------- */
   addOrUpdateExperience: (experience) =>
@@ -383,36 +429,62 @@ export const useAppStore = create<AppStore>((set) => ({
       );
       
       return {
+        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
         resume: { ...s.resume, experiences: result }
       };
     }),
 
   removeExperience: (idOrCompany) =>
-    set((s) => ({ resume: { ...s.resume, experiences: removeExperienceByIdOrCompany(s.resume.experiences, idOrCompany) } })),
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, experiences: removeExperienceByIdOrCompany(s.resume.experiences, idOrCompany) }
+    })),
 
-  clearAllExperiences: () => set((s) => ({ resume: { ...s.resume, experiences: [] } })),
+  clearAllExperiences: () => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, experiences: [] }
+    })),
 
   replaceAllExperiences: (experiences) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: { ...s.resume, experiences: experiences.map(sanitizeExperience) },
     })),
 
   /* ---------- Skills ---------- */
   addSkills: (newSkills) =>
-    set((s) => ({ resume: { ...s.resume, skills: dedupeSkills([...s.resume.skills, ...newSkills]) } })),
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, skills: dedupeSkills([...s.resume.skills, ...newSkills]) }
+    })),
 
   removeSkills: (skillsToRemove) =>
     set((s) => {
       const toRemove = new Set(skillsToRemove.map((x) => x.toLowerCase().trim()));
-      return { resume: { ...s.resume, skills: s.resume.skills.filter((k) => !toRemove.has(k.toLowerCase().trim())) } };
+      return {
+        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+        resume: { ...s.resume, skills: s.resume.skills.filter((k) => !toRemove.has(k.toLowerCase().trim())) }
+      };
     }),
 
-  replaceSkills: (newSkills) => set((s) => ({ resume: { ...s.resume, skills: dedupeSkills(newSkills) } })),
-  clearAllSkills: () => set((s) => ({ resume: { ...s.resume, skills: [] } })),
+  replaceSkills: (newSkills) => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, skills: dedupeSkills(newSkills) }
+    })),
+  
+  clearAllSkills: () => 
+    set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+      resume: { ...s.resume, skills: [] }
+    })),
 
   /* ---------- Patch application (new model) ---------- */
   applyResumeDataPatch: (patch) =>
     set((s) => {
+      // Save current state to history before applying patch
+      const newHistory = [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))];
       let next: Resume = { ...s.resume };
 
       // Handle granular operations first
@@ -537,12 +609,13 @@ export const useAppStore = create<AppStore>((set) => ({
           location: patch.completeResume.contact?.location || '',
           title: patch.completeResume.contact?.title || '',
         };
-        return { resume: next };
+        return { resumeHistory: newHistory, resume: next };
       }
 
       // 2) Operation: reset
       if (patch.operation === 'reset') {
         return {
+          resumeHistory: newHistory,
           resume: {
             experiences: [],
             skills: [],
@@ -634,11 +707,12 @@ export const useAppStore = create<AppStore>((set) => ({
         }
       }
 
-      return { resume: next };
+      return { resumeHistory: newHistory, resume: next };
     }),
   /* ---------- New granular operations ---------- */
   editExperienceField: (company, field, newValue) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         experiences: s.resume.experiences.map(exp => 
@@ -651,6 +725,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   editDescriptionLine: (company, lineIndex, newText) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         experiences: s.resume.experiences.map(exp => 
@@ -668,6 +743,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   removeDescriptionLine: (company, lineIndex) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         experiences: s.resume.experiences.map(exp => 
@@ -683,6 +759,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   addDescriptionLine: (company, text, position) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         experiences: s.resume.experiences.map(exp => 
@@ -714,11 +791,13 @@ export const useAppStore = create<AppStore>((set) => ({
 
   editContactField: (field, value) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: { ...s.resume, [field]: value.trim() }
     })),
 
   editSkill: (oldSkill, newSkill) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         skills: s.resume.skills.map(skill => 
@@ -731,6 +810,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   editSummary: (type, text) =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         summary: type === 'replace' 
@@ -742,15 +822,56 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
 
   reorganizeResume: (data) =>
-    set((s) => ({
-      resume: {
-        ...s.resume,
-        ...(data.experiences && { experiences: data.experiences.map(sanitizeExperience) }),
-        ...(data.skills && { skills: dedupeSkills(data.skills) }),
-        ...(data.summary !== undefined && { summary: data.summary }),
-        ...(data.contact && data.contact)
+    set((s) => {
+      let experiencesToSet = s.resume.experiences;
+      
+      // Handle both string arrays (company names) and Experience arrays
+      if (data.experiences) {
+        if (Array.isArray(data.experiences) && data.experiences.length > 0) {
+          const isStringArray = typeof data.experiences[0] === 'string';
+          
+          if (isStringArray) {
+            // Reorder existing experiences based on company names
+            const currentExperiences = s.resume.experiences;
+            const newOrder = data.experiences as string[];
+            const reorderedExperiences = [];
+            
+            for (const companyName of newOrder) {
+              const experience = currentExperiences.find((exp: Experience) => 
+                exp.company === companyName || 
+                exp.company.includes(companyName) ||
+                companyName.includes(exp.company)
+              );
+              if (experience) {
+                reorderedExperiences.push(experience);
+              }
+            }
+            
+            // Add any experiences not found in the new order at the end
+            const addedCompanies = reorderedExperiences.map((exp: Experience) => exp.company);
+            const remainingExperiences = currentExperiences.filter((exp: Experience) => 
+              !addedCompanies.includes(exp.company)
+            );
+            
+            experiencesToSet = [...reorderedExperiences, ...remainingExperiences];
+          } else {
+            // Handle as Experience objects
+            experiencesToSet = (data.experiences as Experience[]).map(sanitizeExperience);
+          }
+        }
       }
-    })),
+      
+      return {
+        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+        resume: {
+          ...s.resume,
+          experiences: experiencesToSet,
+          ...(data.skills && { skills: dedupeSkills(data.skills) }),
+          ...(data.summary !== undefined && { summary: data.summary }),
+          ...(data.contact && data.contact)
+        }
+      };
+    }),
 
   clearSection: (section) =>
     set((s) => {
@@ -765,12 +886,16 @@ export const useAppStore = create<AppStore>((set) => ({
         updates.location = '';
         updates.title = '';
       }
-      return { resume: { ...s.resume, ...updates } };
+      return { 
+        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+        resume: { ...s.resume, ...updates } 
+      };
     }),
 
   // Utility function to clean duplicates from all experiences
   cleanDuplicateDescriptions: () =>
     set((s) => ({
+      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
       resume: {
         ...s.resume,
         experiences: s.resume.experiences.map(exp => ({

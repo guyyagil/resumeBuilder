@@ -30,7 +30,7 @@ export const sendMessageToAI = async (
   chatMessages?: any[]
 ) => {
   try {
-    const systemPrompt = getSystemPrompt('he', userContext, resumeData || {}, chatMessages);
+    const systemPrompt = getSystemPrompt(userContext, resumeData || {}, chatMessages);
     const fullPrompt = `${systemPrompt}\n\nהודעת משתמש: ${message}`;
 
     const result = await model.generateContent(fullPrompt);

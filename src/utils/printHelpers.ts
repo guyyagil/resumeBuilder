@@ -1,98 +1,125 @@
-// src/utils/printHelpers.ts
-export const printResume = (resume: any) => {
-  const source = document.getElementById('resume-pane');
-  if (!source) {
-    alert('Resume content not found');
-    return;
-  }
+// src/utils/printHelpers.ts - Exact Preview Replication for Print
+// Simple, robust print helper: duplicates a chosen panel into a full-page popup and opens the print dialog.
 
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  if (!printWindow) {
-    alert('Please allow popups for printing');
-    return;
-  }
+type PanelInput = string | HTMLElement;
 
-  // Get all existing stylesheets and inline styles
-  const allStyles = Array.from(document.head.querySelectorAll('style, link[rel="stylesheet"]'))
-    .map(element => {
-      if (element.tagName === 'STYLE') {
-        return `<style>${element.innerHTML}</style>`;
-      } else if (element.tagName === 'LINK') {
-        return element.outerHTML;
+const resolveElement = (panel: PanelInput): HTMLElement | null => {
+  if (typeof panel === 'string') return document.querySelector(panel) as HTMLElement | null;
+  return panel instanceof HTMLElement ? panel : null;
+};
+
+const collectAllStyles = (): string => {
+  // Copy inline <style> tags and <link rel="stylesheet"> tags as-is.
+  const nodes = Array.from(document.head.querySelectorAll('style, link[rel="stylesheet"]'));
+  const styles = nodes
+    .map((el) => {
+      if (el.tagName === 'STYLE') {
+        return `<style>${(el as HTMLStyleElement).innerHTML}</style>`;
+      }
+      if (el.tagName === 'LINK') {
+        const link = el as HTMLLinkElement;
+        // Preserve attrs to keep media/integrity/crossorigin if present
+        const attrs = Array.from(link.attributes)
+          .map(a => `${a.name}="${a.value}"`)
+          .join(' ');
+        return `<link ${attrs}>`;
       }
       return '';
     })
     .join('\n');
 
-  // Enhanced print-specific styles
-  const printStyles = `
+  // A few minimal print adjustments to preserve colors and avoid hidden overflow
+  const printTuning = `
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap');
-      
+      @page { size: auto; margin: 15mm; }
+      html, body {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       * {
-        margin: 0;
-        padding: 0;
+        -webkit-print-color-adjust: inherit !important;
+        print-color-adjust: inherit !important;
         box-sizing: border-box;
       }
-      
-      html, body {
-        background: white !important;
-        color: #111827 !important;
-        font-family: 'Heebo', Arial, sans-serif !important;
-        direction: rtl !important;
-        line-height: 1.5;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+      @media print {
+        body { margin: 0 !important; }
       }
-      
-      @page {
-        size: A4;
-        margin: 15mm;
-      }
-      
-      /* Add more print styles here... */
     </style>
   `;
 
-  // Clone and prepare content for printing
-  const resumeContent = source.cloneNode(true) as HTMLElement;
-  const header = resumeContent.querySelector('.flex.items-center.justify-between');
-  if (header) header.remove();
-  
-  const scrollableContent = resumeContent.querySelector('.flex-1.overflow-y-auto');
-  const finalContent = scrollableContent ? scrollableContent.innerHTML : resumeContent.innerHTML;
+  return styles + '\n' + printTuning;
+};
 
-  // Write complete document
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="he" dir="rtl">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>קורות חיים - ${resume.fullName || 'Resume'}</title>
-      ${allStyles}
-      ${printStyles}
-    </head>
-    <body>
-      <div class="print-container">
-        ${finalContent}
-      </div>
-      <script>
-        window.addEventListener('load', function() {
-          setTimeout(function() {
-            window.print();
-            window.addEventListener('afterprint', function() {
-              window.close();
-            });
-            setTimeout(function() {
-              try { window.close(); } catch(e) {}
-            }, 10000);
-          }, 300);
+const buildDocumentHTML = (contentHTML: string, title?: string): string => {
+  const dir = document.documentElement.getAttribute('dir') || 'auto';
+  const lang = document.documentElement.getAttribute('lang') || 'he';
+  const baseHref = document.baseURI || window.location.href;
+
+  // Wrap in flex container to preserve two-column layout for print
+  return `<!DOCTYPE html>
+<html lang="${lang}" dir="${dir}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="${baseHref}">
+  <title>${title || document.title || 'Print'}</title>
+  ${collectAllStyles()}
+</head>
+<body>
+  <div id="print-root" class="flex min-h-full">${contentHTML}</div>
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        try { window.print(); } catch (e) {}
+        window.addEventListener('afterprint', function() {
+          try { window.close(); } catch(e) {}
         });
-      </script>
-    </body>
-    </html>
-  `);
-  
+        setTimeout(function(){ try { window.close(); } catch(e) {} }, 15000);
+      }, 300);
+    });
+  </script>
+</body>
+</html>`;
+};
+
+/**
+ * Print a chosen panel (HTMLElement or CSS selector).
+ * Duplicates the panel into a full-page popup and opens the browser print dialog.
+ */
+export const printPanel = (panel: PanelInput, title?: string) => {
+  const source = resolveElement(panel);
+  if (!source) {
+    alert('Selected panel was not found.');
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to use the print feature.');
+    return;
+  }
+
+  // Deep clone to avoid mutating the original DOM
+  const clone = source.cloneNode(true) as HTMLElement;
+
+  // Optional: hide elements marked for exclusion
+  // Elements can opt-out with [data-no-print] on themselves or ancestors
+  clone.querySelectorAll('[data-no-print], [data-no-print] *').forEach((el) => {
+    (el as HTMLElement).style.display = 'none';
+  });
+
+  const html = buildDocumentHTML(clone.outerHTML, title);
+
+  printWindow.document.open();
+  printWindow.document.write(html);
   printWindow.document.close();
+};
+
+/**
+ * Backwards-compatible convenience wrapper for resumes.
+ * Attempts to print the default resume pane (#resume-pane) and uses resume.fullName for the title if provided.
+ */
+export const printResume = (resume?: { fullName?: string } | null, panelSelector: string = '#resume-pane') => {
+  const title = resume?.fullName ? `קורות חיים - ${resume.fullName}` : undefined;
+  printPanel(panelSelector, title);
 };

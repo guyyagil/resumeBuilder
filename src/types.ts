@@ -139,7 +139,7 @@ export interface RawAIResumeData {
   appendToSummary?: string;
   replaceSkills?: string[];
   reorganize?: {
-    experiences?: Experience[];
+    experiences?: Experience[] | string[];
     skills?: string[];
     summary?: string;
     contact?: Partial<ContactInfo>;
@@ -217,7 +217,7 @@ export interface NormalizedResumePatch {
   appendToSummary?: string;
   replaceSkills?: string[];
   reorganize?: {
-    experiences?: Experience[];
+    experiences?: Experience[] | string[];
     skills?: string[];
     summary?: string;
     contact?: Partial<ContactInfo>;
@@ -274,7 +274,7 @@ export interface ResumeDataPatch {
   appendToSummary?: string;
   replaceSkills?: string[];
   reorganize?: {
-    experiences?: Experience[];
+    experiences?: Experience[] | string[];
     skills?: string[];
     summary?: string;
     contact?: Partial<ContactInfo>;

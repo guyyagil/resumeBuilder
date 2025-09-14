@@ -5,6 +5,69 @@ import { sendMessageToAI } from '../services/geminiService';
 // import type { AIResponse } from '../types'; // Removed unused import
 import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
 
+// Clean AI message from technical tags
+const cleanAIMessage = (message: string): string => {
+  if (!message) return '';
+  
+  return message
+    // Remove RESUMEDATA tags and their content
+    .replace(/\[RESUMEDATA\].*?\[\/RESUMEDATA\]/gs, '')
+    .replace(/\[RESUME_DATA\].*?\[\/RESUME_DATA\]/gs, '')
+    // Remove JSON code blocks
+    .replace(/```json.*?```/gs, '')
+    .replace(/```.*?```/gs, '')
+    // Remove any remaining tags
+    .replace(/\[\/RESUMEDATA\]/g, '')
+    .replace(/\[RESUMEDATA\]/g, '')
+    .replace(/\[\/RESUME_DATA\]/g, '')
+    .replace(/\[RESUME_DATA\]/g, '')
+    // Clean up whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// Undo Button Component
+const UndoButton: React.FC = () => {
+  const { undo, resumeHistory } = useAppStore();
+  const canUndo = resumeHistory.length > 0;
+
+  const handleUndo = () => {
+    if (canUndo) {
+      undo();
+    }
+  };
+
+  return (
+    <button
+      onClick={handleUndo}
+      disabled={!canUndo}
+      className={`
+        flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all
+        ${canUndo 
+          ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 hover:border-orange-300' 
+          : 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+        }
+      `}
+      title={canUndo ? 'בטל שינוי אחרון' : 'אין שינויים לביטול'}
+    >
+      <svg 
+        className="w-4 h-4" 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          strokeWidth={2} 
+          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" 
+        />
+      </svg>
+      בטל
+    </button>
+  );
+};
+
 interface ChatPanelProps {
   userBasicInfo: any;
 }
@@ -65,10 +128,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
           await handleResumeUpdates(aiResponse.resumeUpdates, addChatMessage);
         }
         
-        addChatMessage(aiResponse.message, 'ai');
+        // Clean the message to ensure no RESUMEDATA tags appear in chat
+        const cleanMessage = cleanAIMessage(aiResponse.message);
+        addChatMessage(cleanMessage, 'ai');
       } else {
         const message = typeof aiResponse === 'string' ? aiResponse : aiResponse.message;
-        addChatMessage(message, 'ai');
+        const cleanMessage = cleanAIMessage(message);
+        addChatMessage(cleanMessage, 'ai');
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -91,9 +157,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
       style={{ fontFamily: 'Arial, sans-serif' }} // שינוי הפונט לאריאל
     >
       <div className="p-4 border-b border-indigo-100 flex-shrink-0">
-        <h2 className="font-bold text-lg bg-gradient-to-l from-indigo-600 to-cyan-500 bg-clip-text text-transparent">
-          שיחה עם ה-AI
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-lg bg-gradient-to-l from-indigo-600 to-cyan-500 bg-clip-text text-transparent">
+            שיחה עם ה-AI
+          </h2>
+          <UndoButton />
+        </div>
         {targetJobPosting && (
           <div className="mt-2 text-xs text-green-600 bg-green-50 p-2 rounded">
             ✅ משרת יעד נטענה ({targetJobPosting.slice(0, 50)}...)

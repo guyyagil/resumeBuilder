@@ -57,19 +57,60 @@ export const handleResumeUpdates = async (
     }
 
     if (patch.reorganize) {
-      const storeCompatibleData = {
-        experiences: patch.reorganize.experiences?.map(exp => ({
-          id: exp.id,
-          company: exp.company || '',
-          title: exp.title || '',
-          duration: exp.duration,
-          description: exp.description || []
-        })),
-        skills: patch.reorganize.skills,
-        summary: patch.reorganize.summary,
-        contact: patch.reorganize.contact as Partial<Pick<any, 'fullName' | 'email' | 'phone' | 'location' | 'title'>>
-      };
-      store.reorganizeResume(storeCompatibleData);
+      console.log('🔄 Processing reorganize operation:', patch.reorganize);
+      const currentData = store.resume;
+      if (!currentData) {
+        console.error('❌ No current resume data to reorganize');
+        return;
+      }
+      // Handle experience reorganization
+      if (patch.reorganize.experiences && Array.isArray(patch.reorganize.experiences)) {
+        const currentExperiences = currentData.experiences || [];
+        const newOrder = patch.reorganize.experiences;
+        // Check if we have strings (company names) or Experience objects
+        const isStringArray = newOrder.length > 0 && typeof (newOrder as any[])[0] === 'string';
+        if (isStringArray) {
+          // Handle string array (company names)
+          const reorderedExperiences = [];
+          
+          for (const companyName of newOrder as string[]) {
+            const experience = currentExperiences.find((exp: any) => 
+              exp.company === companyName || 
+              exp.company.includes(companyName) ||
+              companyName.includes(exp.company)
+            );
+            if (experience) {
+              reorderedExperiences.push(experience);
+            }
+          }
+          
+          // Add any experiences not found in the new order at the end
+          const addedCompanies = reorderedExperiences.map((exp: any) => exp.company);
+          const remainingExperiences = currentExperiences.filter((exp: any) => 
+            !addedCompanies.includes(exp.company)
+          );
+          
+          const finalExperiences = [...reorderedExperiences, ...remainingExperiences];
+          
+          // Update store with reordered experiences
+          const updatedData = {
+            ...currentData,
+            experiences: finalExperiences
+          };
+          
+          store.replaceEntireResume(updatedData);
+          console.log('✅ Experiences reordered successfully');
+        } else {
+          // Handle Experience objects - use existing store method with a properly typed payload
+          const dataForStore: Parameters<typeof store.reorganizeResume>[0] = {
+            experiences: patch.reorganize.experiences as any,
+            skills: patch.reorganize.skills,
+            summary: patch.reorganize.summary,
+            contact: patch.reorganize.contact as any
+          };
+          store.reorganizeResume(dataForStore);
+        }
+      }
       return;
     }
 
