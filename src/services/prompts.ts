@@ -6,6 +6,13 @@ type ExperienceLike = {
   duration?: string;
   description?: string[];
 };
+type EducationLike = {
+  id?: string;
+  institution?: string;
+  degree?: string;
+  duration?: string;
+  description?: string[];
+};
 type ResumeLike = {
   fullName?: string;
   email?: string;
@@ -14,6 +21,7 @@ type ResumeLike = {
   title?: string;
   summary?: string;
   experiences?: ExperienceLike[];
+  education?: EducationLike[];
   skills?: string[];
 };
 
@@ -47,12 +55,27 @@ const buildPlainTextResume = (resume: Partial<ResumeLike>): string => {
           if (/\d/.test(text)) hints.push('מספרים');
           if (/^(פיתחתי|ניהלתי|הובלתי|יצרתי|בניתי|תכננתי|עבדתי|אחראי|ביצעתי)/.test(text)) hints.push('פועל פעולה');
           if (text.split(/\s+/).length > 15) hints.push('מפורט');
-          add(`   ${idx + 1}. ${text} [${hints[0] ? hints.join(', ') : 'בסיסי'}]`);
+          add(`   ${idx + 1}. ${text}`);
         });
       } else add('   ❌ אין תיאורים');
       add('');
     });
   } else add('❌ אין ניסיון', '');
+
+  // Education
+  add('=== השכלה ===');
+  if (resume.education?.length) {
+    resume.education.forEach((e, i) => {
+      add(`${i + 1}. 🎓 ${e.institution || ''} - ${e.degree || ''}${e.duration ? ` (${e.duration})` : ''}`);
+      if (e.description?.length) {
+        e.description.forEach((d, idx) => {
+          const text = String(d ?? '').trim();
+          add(`   ${idx + 1}. ${text}`);
+        });
+      }
+      add('');
+    });
+  } else add('❌ אין השכלה', '');
 
   // Skills
   add('=== כישורים ===');
@@ -156,6 +179,11 @@ export const getSystemPrompt = (
     '• removeDescriptionLine – מחיקת שורת תיאור',
     '• updateExperienceDescription – החלפת כל התיאורים (זהירות: מוחק הכל!)',
     '',
+    '🎓 השכלה:',
+    '• education – הוספת השכלה חדשה',
+    '• updateEducation – עדכון השכלה (כל שדה)',
+    '• removeEducation – מחיקת השכלה',
+    '',
     '🎯 כישורים:',
     '• skills – הוספה',
     '• replaceSkills – החלפה מלאה',
@@ -183,6 +211,7 @@ export const getSystemPrompt = (
     '[RESUME_DATA]{"experience":{"company":"טכנולוגיות ABC","title":"מפתח תוכנה","duration":"2020-2023","description":["פיתחתי מערכות ווב מתקדמות","הובלתי צוות של 5 מפתחים"]}}[/RESUME_DATA]',
     '[RESUME_DATA]{"editExperienceField":{"company":"Microsoft","field":"title","newValue":"Senior Software Engineer"}}[/RESUME_DATA]',
     '[RESUME_DATA]{"addDescriptionLine":{"company":"Google","text":"פיתחתי פיצ\'ר שחסך 2M$ בשנה"}}[/RESUME_DATA]',
+    '[RESUME_DATA]{"education":{"institution":"אוניברסיטת תל אביב","degree":"תואר ראשון במדעי המחשב","duration":"2016-2019"}}[/RESUME_DATA]',
     '[RESUME_DATA]{"editDescriptionLine":{"company":"Google","lineIndex":0,"newText":"פיתחתי אלגוריתמי ML מתקדמים"}}[/RESUME_DATA]',
     '[RESUME_DATA]{"removeDescriptionLine":{"company":"Apple","lineIndex":1}}[/RESUME_DATA]',
     '[RESUME_DATA]{"summary":"מפתח תוכנה מנוסה עם 8 שנות ניסיון בפיתוח מערכות מתקדמות"}[/RESUME_DATA]',

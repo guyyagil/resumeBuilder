@@ -14,9 +14,18 @@ export interface Experience {
   description?: string[];
 }
 
+export interface Education {
+  id?: string;
+  institution?: string;
+  degree?: string;
+  duration?: string;
+  description?: string[];
+}
+
 export interface CompleteResume {
   contact?: ContactInfo;
   experiences?: Experience[];
+  education?: Education[];
   skills?: string[];
   summary?: string;
 }
@@ -74,6 +83,8 @@ export interface RawAIResumeData {
   operation?: Operation;
   experience?: Experience;
   experiences?: Experience[];
+  education?: Education;
+  educations?: Education[];
   skills?: string[];
   summary?: string;
   contact?: ContactInfo;
@@ -152,6 +163,8 @@ export interface NormalizedResumePatch {
   operation: Operation;
   experience?: Experience;
   experiences?: Experience[];
+  education?: Education;
+  educations?: Education[];
   skills?: string[];
   summary?: string;
   contact?: ContactInfo;
@@ -231,6 +244,8 @@ export interface ResumeDataPatch {
   operation?: Operation;
   experience?: Experience;
   experiences?: Experience[];
+  education?: Education;
+  educations?: Education[];
   skills?: string[];
   summary?: string;
   contact?: ContactInfo;

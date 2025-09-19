@@ -25,6 +25,20 @@ export interface ResumeDataPatch {
     location?: string;
     title?: string;
   };
+  education?: {
+    id?: string;
+    institution?: string;
+    degree?: string;
+    duration?: string | null;
+    description?: string[] | string | null;
+  };
+  educations?: Array<{
+    id?: string;
+    institution?: string;
+    degree?: string;
+    duration?: string | null;
+    description?: string[] | string | null;
+  }>;
   completeResume?: {
     contact?: {
       fullName?: string;
@@ -42,6 +56,13 @@ export interface ResumeDataPatch {
     }>;
     skills?: string[];
     summary?: string;
+    education?: Array<{
+      id?: string;
+      institution?: string;
+      degree?: string;
+      duration?: string | null;
+      description?: string[] | string | null;
+    }>;
   };
   // Enhanced deletion capabilities
   removeSkills?: string[];
@@ -318,6 +339,8 @@ export const parseResumeData = (aiResponse: string) => {
         operation: ['delete', 'rewrite'].includes(normalized.operation) ? 'patch' : normalized.operation as any,
         experience: normalized.experience,
         experiences: normalized.experiences,
+        education: (normalized as any).education,
+        educations: (normalized as any).educations,
         skills: normalized.skills,
         summary: normalized.summary,
         contact: normalized.contact,

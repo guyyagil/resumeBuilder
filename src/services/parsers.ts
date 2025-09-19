@@ -105,6 +105,12 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
   if (raw.editSkill) {
     patch.editSkill = raw.editSkill;
   }
+  // Handle both `education` and `updateEducation` from AI
+  const educationData = (raw as any).education || (raw as any).updateEducation;
+  if (educationData) {
+    (patch as any).education = educationData;
+  }
+
   if (raw.editSummary) {
     // Handle both string and object formats for editSummary
     if (typeof raw.editSummary === 'string') {
@@ -192,6 +198,9 @@ export const normalizeResumeData = (raw: RawAIResumeData): NormalizedResumePatch
     }
     if (typeof raw.completeResume.summary === 'string') {
       patch.summary = raw.completeResume.summary.trim();
+    }
+    if (Array.isArray(raw.completeResume.education)) {
+      (patch as any).educations = raw.completeResume.education;
     }
   }
 

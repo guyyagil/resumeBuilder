@@ -16,6 +16,7 @@ export const ResumePanel1: React.FC<ResumePanel1Props> = ({ userBasicInfo }) => 
   
   // Filter out English descriptions for display
   const displayExperiences = getDisplayExperiences(resume.experiences);
+  const displayEducation = getDisplayExperiences(resume.education || []);
 
   return (
     <div id="resume-pane" className="h-full flex flex-col resume1-print bg-white">
@@ -128,6 +129,45 @@ export const ResumePanel1: React.FC<ResumePanel1Props> = ({ userBasicInfo }) => 
           </div>
         </div>
         
+        {/* Education Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">
+            השכלה
+          </h3>
+          <div className="space-y-4 mt-4">
+            {displayEducation.map((edu: any) => {
+              const displayDuration = edu.duration && edu.duration.trim() 
+                ? edu.duration.trim() 
+                : 'תקופת לימודים לא צוינה';
+                
+              return (
+                <div key={edu.id || edu.institution}>
+                  <h3 className="font-semibold text-gray-900">{edu.degree}</h3>
+                  <p className="text-sm text-gray-600 mb-2">{edu.institution} • {displayDuration}</p>
+                  {edu.description && edu.description.length > 0 && (
+                    <div className="text-sm text-gray-700 space-y-1">
+                      {edu.description.map((desc: string, index: number) => {
+                          const cleanDesc = desc.replace(/^[•\-\s]+/, '');
+                          return (
+                            <div key={index} className="flex items-start gap-2">
+                              <span className="text-gray-400 mt-1 text-xs">•</span>
+                              <span className="flex-1">{cleanDesc}</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {displayEducation.length === 0 && (
+              <div className="text-gray-500 text-sm italic text-center py-4">
+                <p>ספר לי על ההשכלה שלך כדי למלא חלק זה</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Skills Section */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-200">

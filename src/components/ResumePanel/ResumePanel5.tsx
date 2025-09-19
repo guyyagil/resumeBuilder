@@ -15,6 +15,7 @@ export const ResumePanel5: React.FC<ResumePanel5Props> = ({ userBasicInfo }) => 
   const professionalSummary = generateProfessionalSummary(userBasicInfo, resume.summary);
   
   const displayExperiences = getDisplayExperiences(resume.experiences);
+  const displayEducation = getDisplayExperiences(resume.education || []);
 
   return (
     <div id="resume-pane" className="h-full flex flex-col resume5-print bg-white">
@@ -138,6 +139,30 @@ export const ResumePanel5: React.FC<ResumePanel5Props> = ({ userBasicInfo }) => 
                 תקציר מקצועי
               </h2>
               <p className="text-gray-700 leading-relaxed text-sm">{professionalSummary}</p>
+            </div>
+
+            {/* Education Section */}
+            <div className="bg-white rounded-lg shadow-lg p-6 border-l-4 border-gray-800">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <div className="w-6 h-6 bg-gray-800 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">🎓</span>
+                </div>
+                השכלה
+              </h2>
+              
+              {displayEducation.length > 0 ? (
+                <div className="space-y-4">
+                  {displayEducation.map((edu: any) => (
+                    <div key={edu.id || edu.institution}>
+                      <h3 className="font-bold text-gray-800">{edu.degree}</h3>
+                      <p className="text-sm text-gray-600 font-medium">{edu.institution}</p>
+                      {edu.duration && <p className="text-xs text-gray-500">{edu.duration}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm italic">אין מידע על השכלה.</p>
+              )}
             </div>
 
             {/* Skills Section */}

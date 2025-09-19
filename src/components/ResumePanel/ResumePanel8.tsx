@@ -14,8 +14,8 @@ export const ResumePanel8: React.FC<ResumePanel8Props> = ({ userBasicInfo }) => 
   const allSkills = combineSkills(userBasicInfo?.keySkills, resume.skills);
   const professionalSummary = generateProfessionalSummary(userBasicInfo, resume.summary);
 
-  // Filter out English descriptions for display
   const displayExperiences = getDisplayExperiences(resume.experiences);
+  const displayEducation = getDisplayExperiences(resume.education || []);
 
   return (
     <div id="resume-pane" className="h-full flex flex-col resume8-print bg-gradient-to-br from-blue-50 to-blue-100">
@@ -168,6 +168,64 @@ export const ResumePanel8: React.FC<ResumePanel8Props> = ({ userBasicInfo }) => 
                   <span className="text-2xl">💼</span>
                 </div>
                 <p className="text-gray-500 italic">ספר לי על הניסיון המקצועי שלך כדי למלא חלק זה</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Education Section - Modern Cards */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-blue-100">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm">🎓</span>
+            </div>
+            <h3 className="text-xl font-bold text-gray-900">השכלה</h3>
+          </div>
+
+          <div className="space-y-6">
+            {displayEducation.map((edu: any, index: number) => {
+              const displayDuration = edu.duration && edu.duration.trim()
+                ? edu.duration.trim()
+                : 'תקופת לימודים לא צוינה';
+
+              return (
+                <div key={edu.id || edu.institution} className="relative">
+                  {/* Timeline dot */}
+                  <div className="absolute right-0 top-2 w-3 h-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full"></div>
+                  {/* Timeline line */}
+                  {index < displayEducation.length - 1 && (
+                    <div className="absolute right-1.5 top-5 w-0.5 h-full bg-gradient-to-b from-blue-200 to-transparent"></div>
+                  )}
+
+                  <div className="mr-8 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-100">
+                    <h4 className="font-bold text-gray-900 text-lg">{edu.degree}</h4>
+                    <p className="text-blue-600 font-medium mb-3">{edu.institution} • {displayDuration}</p>
+                    {edu.description && edu.description.length > 0 && (
+                      <div className="text-gray-700 space-y-2">
+                        {edu.description
+                          .filter((desc: string) => desc.trim().split(/\s+/).length > 2)
+                          .map((desc: string, descIndex: number) => {
+                            const cleanDesc = desc.replace(/^[•\-\s]+/, '');
+                            return (
+                              <div key={descIndex} className="flex items-start gap-3">
+                                <span className="text-blue-400 mt-1">▶</span>
+                                <span className="flex-1">{cleanDesc}</span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {displayEducation.length === 0 && (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-2xl">🎓</span>
+                </div>
+                <p className="text-gray-500 italic">ספר לי על ההשכלה שלך כדי למלא חלק זה</p>
               </div>
             )}
           </div>

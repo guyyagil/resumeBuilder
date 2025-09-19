@@ -112,6 +112,9 @@ export const extractResumeFromPlainText = async (rawText: string) => {
       '    "experiences": [',
       '      { "company": "שם חברה", "title": "שם תפקיד", "duration": "תקופת העסקה", "description": ["תיאור משופר של התפקיד..."] }',
       '    ],',
+      '    "education": [',
+      '      { "institution": "שם מוסד", "degree": "שם תואר", "duration": "תקופת לימודים", "description": ["תיאור קצר..."] }',
+      '    ],',
       '    "skills": ["כישורים שנאספו מהטקסט..."]',
       '  }',
       '}',
@@ -157,4 +160,3 @@ export const extractResumeFromPlainText = async (rawText: string) => {
     };
   }
 };
-

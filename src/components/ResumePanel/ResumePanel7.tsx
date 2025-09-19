@@ -15,6 +15,7 @@ export const ResumePanel7: React.FC<ResumePanel7Props> = ({ userBasicInfo }) => 
   const professionalSummary = generateProfessionalSummary(userBasicInfo, resume.summary);
   
   const displayExperiences = getDisplayExperiences(resume.experiences);
+  const displayEducation = getDisplayExperiences(resume.education || []);
 
   return (
     <div id="resume-pane" className="h-full flex flex-col resume7-print bg-white">
@@ -166,6 +167,27 @@ export const ResumePanel7: React.FC<ResumePanel7Props> = ({ userBasicInfo }) => 
               <p className="body-text leading-relaxed text-justify">
                 {professionalSummary}
               </p>
+            </div>
+
+            {/* Education Section */}
+            <div>
+              <h2 className="section-title text-2xl">
+                השכלה
+              </h2>
+              
+              {displayEducation.length > 0 ? (
+                <div className="space-y-6">
+                  {displayEducation.map((edu: any) => (
+                    <div key={edu.id || edu.institution}>
+                      <h3 className="font-bold text-lg">{edu.degree}</h3>
+                      <p className="subtitle">{edu.institution}</p>
+                      {edu.duration && <p className="text-muted text-sm">{edu.duration}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted italic font-light">אין מידע על השכלה.</p>
+              )}
             </div>
 
             {/* Skills Section */}
