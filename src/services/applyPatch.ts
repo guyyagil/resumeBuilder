@@ -42,11 +42,14 @@ export const applyResumePatch = (patch: NormalizedResumePatch) => {
         location: patch.completeResume.contact?.location,
         title: patch.completeResume.contact?.title
       };
-      replaceEntireResume(resumeData);
+  replaceEntireResume({
+    ...resumeData,
+    education: Array.isArray((resumeData as any).education) ? (resumeData as any).education : []
+  });
       return;
     } else {
       // no completeResume provided — treat as reset/replace fallback
-      replaceEntireResume({ experiences: [], skills: [], summary: '' });
+  replaceEntireResume({ experiences: [], skills: [], summary: '', education: [] });    
       return;
     }
   }
