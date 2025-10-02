@@ -1,446 +1,305 @@
+// src/store/useAppStore.new.ts - Fully Dynamic Store
+// INSTRUCTIONS: Rename to useAppStore.ts after backing up old one
+
 import { create } from 'zustand';
 import type {
-  AppStore,
-  Experience,
-  Education,
   Resume,
+  Section,
+  ChatAuthor,
+  AppStore,
   WelcomeFormData,
-  ResumeDataPatch,
-} from './types';
-import {
-  makeId,
-  norm,
-  sameByCompanyTitle,
-  sanitizeExperience,
-  upsertExperience,
-  removeExperienceByIdOrCompany,
-  sanitizeEducation,
-  upsertEducation,
-  removeEducationByIdOrInstitution,
-  dedupeSkills,
-  normalizeDuration,
-} from './utils';
-import { applyPatchLogic } from './patch';
+  SectionLayout,
+} from '../types';
 
-export const useAppStore = create<AppStore>((set) => ({
-  // Initial state
-  currentScreen: 'welcome',
-  userBasicInfo: null,
-  chatMessages: [],
-  resume: {
-    experiences: [],
-    education: [],
-    skills: [],
-    summary: '',
-    fullName: '',
-    email: '',
-    phone: '',
-    location: '',
-    title: '',
+// ============ Helpers ============
+
+const ensureString = (value?: string | null) => value?.trim() ?? '';
+
+const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const normalizeSection = (section: Section): Section => {
+  const base = {
+    id: section.id || generateId(),
+    key: ensureString(section.key) || generateId(),
+    title: section.title,
+    layout: section.layout,
+    metadata: section.metadata || {},
+  };
+
+  switch (section.layout) {
+    case 'text':
+      return { ...base, layout: 'text', text: ensureString((section as any).text) };
+    case 'list':
+      return {
+        ...base,
+        layout: 'list',
+        items: Array.isArray((section as any).items) ? (section as any).items : [],
+      };
+    case 'chips':
+      return {
+        ...base,
+        layout: 'chips',
+        chips: Array.isArray((section as any).chips)
+          ? (section as any).chips.filter(Boolean)
+          : [],
+      };
+    case 'keyValue':
+      return {
+        ...base,
+        layout: 'keyValue',
+        pairs: Array.isArray((section as any).pairs) ? (section as any).pairs : [],
+      };
+    case 'table':
+      return {
+        ...base,
+        layout: 'table',
+        headers: (section as any).headers,
+        rows: Array.isArray((section as any).rows) ? (section as any).rows : [],
+      };
+    case 'custom':
+      return { ...base, layout: 'custom', data: (section as any).data };
+    default:
+      return section;
+  }
+};
+
+const createInitialResume = (): Resume => ({
+  sections: [],
+  metadata: {
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    version: '1.0',
   },
-  resumeHistory: [],
-  targetJobPosting: undefined,
-  originalResumeText: undefined,
+});
 
-  /* ---------- UI state ---------- */
-  setUserBasicInfo: (data: WelcomeFormData) => set({ userBasicInfo: data }),
-  goToChat: () => set({ currentScreen: 'chat' }),
-  addChatMessage: (content, type) =>
-    set((s) => ({ chatMessages: [...s.chatMessages, { id: makeId(), type, content, timestamp: new Date() }] })),
-  setTargetJobPosting: (text) =>
-    set((s) => ({
-      targetJobPosting: text,
-      userBasicInfo: { ...(s.userBasicInfo || {}), targetJobPosting: text },
-    })),
-  setOriginalResumeText: (text) => set({ originalResumeText: text }),
+// ============ Store ============
 
-  /* ---------- Undo functionality ---------- */
-  saveToHistory: () =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-    })),
+export const useAppStore = create<AppStore>()((set, get) => {
+  const pushHistory = () => {
+    const current = get().resume;
+    set((state) => ({
+      resumeHistory: [
+        ...state.resumeHistory,
+        {
+          snapshot: JSON.parse(JSON.stringify(current)),
+          timestamp: new Date(),
+        },
+      ],
+    }));
+  };
 
-  undo: () =>
-    set((s) => {
-      if (s.resumeHistory.length === 0) return s;
-      
-      const newHistory = [...s.resumeHistory];
-      const previousResume = newHistory.pop();
-      
-      return {
-        resumeHistory: newHistory,
-        resume: previousResume!,
-      };
-    }),
-  /* ---------- Resume basics ---------- */
-  updateResume: (updates) => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, ...updates }
-    })),
-
-  setContactInfo: (c) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, ...c },
-      userBasicInfo: {
-        ...(s.userBasicInfo || {}),
-        ...(c.fullName ? { fullName: c.fullName } : {}),
-        ...(c.title ? { currentRole: c.title } : {}),
-        ...(c.email ? { email: c.email } : {}),
-        ...(c.phone ? { phone: c.phone } : {}),
-        ...(c.location ? { location: c.location } : {}),
-      },
-    })),
-
-  setSummary: (summary) => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, summary }
-    })),
-  
-  clearSummary: () => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, summary: '' }
-    })),
-
-  resetResume: () =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
+  const updateResume = (updater: (resume: Resume) => Resume) => {
+    pushHistory();
+    set((state) => ({
       resume: {
-        experiences: [],
-        education: [],
-        skills: [],
-        summary: '',
-        fullName: '',
-        email: '',
-        phone: '',
-        location: '',
-        title: '',
+        ...updater(state.resume),
+        metadata: {
+          ...state.resume.metadata,
+          updatedAt: new Date(),
+        },
       },
-    })),
+    }));
+  };
 
-  replaceEntireResume: (newResume) => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: newResume
-    })),
+  // Compatibility layer: Convert new sections format to old resume format
+  const getCompatibleResume = () => {
+    const state = get();
+    const sections = state.resume.sections;
+    
+    // Extract contact info
+    const contactSection = sections.find(s => s.key === 'contact' || s.key === 'פרטי התקשרות');
+    const contact = contactSection?.layout === 'keyValue' ? 
+      Object.fromEntries((contactSection as any).pairs?.map((p: any) => [p.key, p.value]) || []) : {};
+    
+    // Extract summary
+    const summarySection = sections.find(s => s.key === 'summary' || s.key === 'תקציר');
+    const summary = summarySection?.layout === 'text' ? (summarySection as any).text : '';
+    
+    // Extract skills
+    const skillsSection = sections.find(s => s.key === 'skills' || s.key === 'כישורים');
+    const skills = skillsSection?.layout === 'chips' ? (skillsSection as any).chips : 
+                  skillsSection?.layout === 'list' ? (skillsSection as any).items?.map((item: any) => item.title || item.name || item) : [];
+    
+    // Extract experiences
+    const experienceSection = sections.find(s => s.key === 'experience' || s.key === 'ניסיון' || s.key === 'עבודה');
+    const experiences = experienceSection?.layout === 'list' ? (experienceSection as any).items || [] : [];
+    
+    // Extract education
+    const educationSection = sections.find(s => s.key === 'education' || s.key === 'השכלה');
+    const education = educationSection?.layout === 'list' ? (educationSection as any).items || [] : [];
+    
+    return {
+      fullName: contact.fullName || contact.name || contact['שם מלא'] || '',
+      email: contact.email || contact['אימייל'] || '',
+      phone: contact.phone || contact['טלפון'] || '',
+      location: contact.location || contact.address || contact['כתובת'] || '',
+      title: contact.title || contact['תפקיד'] || '',
+      summary,
+      skills,
+      experiences,
+      education,
+      sections // Keep the new format too
+    };
+  };
 
-  /* ---------- Experiences ---------- */
-  addOrUpdateExperience: (experience) =>
-    set((s) => {
-      console.log('🔄 Merging experience update:', {
-        incoming: experience,
-        existing: s.resume.experiences.find(e => 
-          (experience.id && e.id === experience.id) || 
-          sameByCompanyTitle(e, experience)
-        )
+  return {
+    // ============ State ============
+    currentScreen: 'welcome',
+    userBasicInfo: null,
+    chatMessages: [],
+    resume: createInitialResume(),
+    resumeHistory: [],
+    targetJobPosting: undefined,
+    originalResumeText: undefined,
+
+    // ============ Computed Properties ============
+    get compatibleResume() {
+      return getCompatibleResume();
+    },
+
+    // ============ Chat ============
+    addChatMessage(content: string, type: ChatAuthor) {
+      set((state) => ({
+        chatMessages: [
+          ...state.chatMessages,
+          {
+            id: generateId(),
+            type,
+            content,
+            timestamp: new Date(),
+          },
+        ],
+      }));
+    },
+
+    // ============ Navigation ============
+    setUserBasicInfo(data: WelcomeFormData) {
+      set({ userBasicInfo: data });
+    },
+
+    goToChat() {
+      set({ currentScreen: 'chat' });
+    },
+
+    setTargetJobPosting(text: string) {
+      set({ targetJobPosting: text });
+    },
+
+    setOriginalResumeText(text: string) {
+      set({ originalResumeText: text });
+    },
+
+    // ============ History ============
+    saveToHistory: pushHistory,
+
+    undo() {
+      set((state) => {
+        const history = state.resumeHistory;
+        if (history.length === 0) return state;
+
+        const previous = history[history.length - 1];
+        return {
+          resume: previous.snapshot,
+          resumeHistory: history.slice(0, -1),
+        };
       });
-      
-      const result = upsertExperience(s.resume.experiences, sanitizeExperience(experience));
-      
-      console.log('🔄 Final merged experience:', 
-        result.find(e => 
-          (experience.id && e.id === experience.id) || 
-          sameByCompanyTitle(e, experience)
-        )
-      );
-      
-      return {
-        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-        resume: { ...s.resume, experiences: result }
-      };
-    }),
+    },
 
-  removeExperience: (idOrCompany) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, experiences: removeExperienceByIdOrCompany(s.resume.experiences, idOrCompany) }
-    })),
+    // ============ Section Operations ============
+    
+    upsertSection(section: Section) {
+      updateResume((resume) => {
+        const normalized = normalizeSection(section);
+        const existingIndex = resume.sections.findIndex((s) => s.key === normalized.key);
 
-  clearAllExperiences: () => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, experiences: [] }
-    })),
+        if (existingIndex >= 0) {
+          const updated = [...resume.sections];
+          updated[existingIndex] = normalized;
+          return { ...resume, sections: updated };
+        } else {
+          return { ...resume, sections: [...resume.sections, normalized] };
+        }
+      });
+    },
 
-  replaceAllExperiences: (experiences) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, experiences: experiences.map(sanitizeExperience) },
-    })),
+    updateSection(key: string, updates: Partial<Section>) {
+      updateResume((resume) => ({
+        ...resume,
+        sections: resume.sections.map((section) =>
+          section.key === key ? normalizeSection({ ...section, ...updates } as Section) : section
+        ),
+      }));
+    },
 
-  /* ---------- Education ---------- */
-  addOrUpdateEducation: (education: Education) =>
-    set((s) => {
-      const result = upsertEducation(s.resume.education, sanitizeEducation(education));
-      return {
-        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-        resume: { ...s.resume, education: result }
-      };
-    }),
+    removeSection(key: string) {
+      updateResume((resume) => ({
+        ...resume,
+        sections: resume.sections.filter((section) => section.key !== key),
+      }));
+    },
 
-  removeEducation: (idOrInstitution) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, education: removeEducationByIdOrInstitution(s.resume.education, idOrInstitution) }
-    })),
+    replaceSections(sections: Section[]) {
+      updateResume((resume) => ({
+        ...resume,
+        sections: sections.map(normalizeSection),
+      }));
+    },
 
-  clearAllEducation: () =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, education: [] }
-    })),
+    reorderSections(keys: string[]) {
+      updateResume((resume) => {
+        const sectionMap = new Map(resume.sections.map((s) => [s.key, s]));
+        const reordered = keys.map((key) => sectionMap.get(key)).filter(Boolean) as Section[];
+        
+        // Add any sections not in the keys list at the end
+        const remainingSections = resume.sections.filter(
+          (s) => !keys.includes(s.key)
+        );
+        
+        return { ...resume, sections: [...reordered, ...remainingSections] };
+      });
+    },
 
-  replaceAllEducation: (educations) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, education: educations.map(sanitizeEducation) },
-    })),
-  /* ---------- Skills ---------- */
-  editEducationField: (institution, field, newValue) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        education: s.resume.education.map(edu =>
-          norm(edu.institution) === norm(institution)
-            ? { ...edu, [field]: field === 'duration' ? normalizeDuration(newValue) || '' : newValue.trim() }
-            : edu
-        )
-      }
-    })),
+    appendToSection(key: string, data: any) {
+      updateResume((resume) => ({
+        ...resume,
+        sections: resume.sections.map((section) => {
+          if (section.key !== key) return section;
 
-  addSkills: (newSkills) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, skills: dedupeSkills([...s.resume.skills, ...newSkills]) }
-    })),
-
-  removeSkills: (skillsToRemove) =>
-    set((s) => {
-      const toRemove = new Set(skillsToRemove.map((x) => x.toLowerCase().trim()));
-      return {
-        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-        resume: { ...s.resume, skills: s.resume.skills.filter((k) => !toRemove.has(k.toLowerCase().trim())) }
-      };
-    }),
-
-  replaceSkills: (newSkills) => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, skills: dedupeSkills(newSkills) }
-    })),
-  
-  clearAllSkills: () => 
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, skills: [] }
-    })),
-
-  /* ---------- Patch application (new model) ---------- */
-  applyResumeDataPatch: (patch: ResumeDataPatch) =>
-    set((s) => {
-      const newHistory = [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))];
-      const nextResume = applyPatchLogic(s.resume, patch);
-      return { resumeHistory: newHistory, resume: nextResume };
-    }),
-  /* ---------- New granular operations ---------- */
-  editExperienceField: (company, field, newValue) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        experiences: s.resume.experiences.map(exp => 
-          norm(exp.company) === norm(company)
-            ? { ...exp, [field]: field === 'duration' ? normalizeDuration(newValue) || '' : newValue.trim() }
-            : exp
-        )
-      }
-    })),
-
-  editDescriptionLine: (company, lineIndex, newText) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        experiences: s.resume.experiences.map(exp => 
-          norm(exp.company) === norm(company)
-            ? {
-                ...exp,
-                description: exp.description.map((desc, idx) => 
-                  idx === lineIndex ? newText.trim() : desc
-                )
-              }
-            : exp
-        )
-      }
-    })),
-
-  removeDescriptionLine: (company, lineIndex) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        experiences: s.resume.experiences.map(exp => 
-          norm(exp.company) === norm(company)
-            ? {
-                ...exp,
-                description: exp.description.filter((_, idx) => idx !== lineIndex)
-              }
-            : exp
-        )
-      }
-    })),
-
-  addDescriptionLine: (company, text, position) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        experiences: s.resume.experiences.map(exp => 
-          norm(exp.company) === norm(company)
-            ? {
-                ...exp,
-                description: (() => {
-                  const trimmedText = text.trim();
-                  const currentDesc = exp.description || [];
-                  
-                  // Check if this text already exists to prevent duplicates
-                  if (currentDesc.some(desc => desc.trim() === trimmedText)) {
-                    return currentDesc; // Don't add duplicate
-                  }
-                  
-                  return position !== undefined
-                    ? [
-                        ...currentDesc.slice(0, position),
-                        trimmedText,
-                        ...currentDesc.slice(position)
-                      ]
-                    : [...currentDesc, trimmedText];
-                })()
-              }
-            : exp
-        )
-      }
-    })),
-
-  editContactField: (field, value) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: { ...s.resume, [field]: value.trim() }
-    })),
-
-  editSkill: (oldSkill, newSkill) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        skills: s.resume.skills.map(skill => 
-          skill.toLowerCase().trim() === oldSkill.toLowerCase().trim()
-            ? newSkill.trim()
-            : skill
-        )
-      }
-    })),
-
-  editSummary: (type, text) =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        summary: type === 'replace' 
-          ? text.trim()
-          : type === 'append'
-          ? (s.resume.summary + ' ' + text).trim()
-          : (text + ' ' + s.resume.summary).trim()
-      }
-    })),
-
-  reorganizeResume: (data) =>
-    set((s) => {
-      let experiencesToSet = s.resume.experiences;
-      
-      // Handle both string arrays (company names) and Experience arrays
-      if (data.experiences) {
-        if (Array.isArray(data.experiences) && data.experiences.length > 0) {
-          const isStringArray = typeof data.experiences[0] === 'string';
-          
-          if (isStringArray) {
-            // Reorder existing experiences based on company names
-            const currentExperiences = s.resume.experiences;
-            const newOrder = data.experiences as string[];
-            const reorderedExperiences = [];
-            
-            for (const companyName of newOrder) {
-              const experience = currentExperiences.find((exp: Experience) => 
-                exp.company === companyName || 
-                exp.company.includes(companyName) ||
-                companyName.includes(exp.company)
-              );
-              if (experience) {
-                reorderedExperiences.push(experience);
-              }
-            }
-            
-            // Add any experiences not found in the new order at the end
-            const addedCompanies = reorderedExperiences.map((exp: Experience) => exp.company);
-            const remainingExperiences = currentExperiences.filter((exp: Experience) => 
-              !addedCompanies.includes(exp.company)
-            );
-            
-            experiencesToSet = [...reorderedExperiences, ...remainingExperiences];
-          } else {
-            // Handle as Experience objects
-            experiencesToSet = (data.experiences as Experience[]).map(sanitizeExperience);
+          if (section.layout === 'list' && Array.isArray(data)) {
+            return {
+              ...section,
+              items: [...(section as any).items, ...data],
+            };
+          } else if (section.layout === 'chips' && Array.isArray(data)) {
+            return {
+              ...section,
+              chips: [...(section as any).chips, ...data],
+            };
+          } else if (section.layout === 'text' && typeof data === 'string') {
+            return {
+              ...section,
+              text: (section as any).text + ' ' + data,
+            };
           }
-        }
-      }
-      
-      return {
-        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-        resume: {
-          ...s.resume,
-          experiences: experiencesToSet,
-          ...(data.skills && { skills: dedupeSkills(data.skills) }),
-          ...(data.summary !== undefined && { summary: data.summary }),
-          ...(data.contact && data.contact)
-        }
-      };
-    }),
 
-  clearSection: (section) =>
-    set((s) => {
-      const updates: Partial<Resume> = {};
-      if (section === 'experiences') updates.experiences = [];
-      if (section === 'skills') updates.skills = [];
-      if (section === 'education') updates.education = [];
-      if (section === 'summary') updates.summary = '';
-      if (section === 'contact') {
-        updates.fullName = '';
-        updates.email = '';
-        updates.phone = '';
-        updates.location = '';
-        updates.title = '';
-      }
-      return { 
-        resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-        resume: { ...s.resume, ...updates } 
-      };
-    }),
+          return section;
+        }),
+      }));
+    },
 
-  // Utility function to clean duplicates from all experiences
-  cleanDuplicateDescriptions: () =>
-    set((s) => ({
-      resumeHistory: [...s.resumeHistory, JSON.parse(JSON.stringify(s.resume))],
-      resume: {
-        ...s.resume,
-        experiences: s.resume.experiences.map(exp => ({
-          ...exp,
-          description: Array.from(new Set(exp.description.map(desc => desc.trim()))).filter(Boolean)
-        }))
-      }
-    })),
+    // ============ Utility ============
+    
+    resetResume() {
+      pushHistory();
+      set({ resume: createInitialResume() });
+    },
 
-}));
+    getSection(key: string) {
+      return get().resume.sections.find((s) => s.key === key);
+    },
+
+    getSectionsByLayout(layout: SectionLayout) {
+      return get().resume.sections.filter((s) => s.layout === layout);
+    },
+  };
+});

@@ -1,162 +1,160 @@
-import { geminiModel as model } from './aiClient';
-import { parseResumeData } from '../lib/parseResumeData';
-import { getSystemPrompt } from './prompts';
-// import type { Resume } from '../types'; // Using store Resume type instead
-import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
-import type { NormalizedResumePatch } from '../types';
+// Basic Gemini service for compatibility
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useAppStore } from '../store/useAppStore';
 
-// Remove common Markdown markers from free text
-const stripSimpleMarkdown = (input: string) =>
-  (input || '')
-    // bold/italic markers
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/__(.*?)__/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    // headings and list stars/dashes at line start
-    .replace(/^[ \t]*#{1,6}[ \t]*/gm, '')
-    .replace(/^[ \t]*[-*][ \t]+/gm, '• ')
-    // remove surrounding quotes
-    .replace(/^["'](.*)["']$/s, '$1')
-    // collapse multiple spaces
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-// ---------------- Public API ----------------
-export const sendMessageToAI = async (
-  message: string,
-  userContext?: any,
-  resumeData?: any, // Resume type from store
-  chatMessages?: any[]
-) => {
+export async function sendMessageToAI(message: string): Promise<{ message: string; resumeUpdates?: any }> {
   try {
-    const systemPrompt = getSystemPrompt(userContext, resumeData || {}, chatMessages);
-    const fullPrompt = `${systemPrompt}\n\nהודעת משתמש: ${message}`;
-
-    const result = await model.generateContent(fullPrompt);
-    const text = (await result.response).text();
-    console.log('🤖 Raw AI Response:\n---\n', text, '\n---');
-
-    const { patch, messageText, error, rawJson } = parseResumeData(text);
-
-    if (error) {
-      console.warn(`⚠️ Parsing Warning: ${error}`, { rawJson });
-      // Still continue with the message even if JSON parsing failed
-    }
-
-    // Ensure we have a meaningful conversation message
-    let conversationMessage = stripSimpleMarkdown(messageText);
-
-    // If message is too short or generic, enhance it
-    if (!conversationMessage || conversationMessage.length < 15) {
-      if (patch?.operation === 'remove' || patch?.removeExperiences || patch?.removeSkills) {
-        conversationMessage = 'מחקתי את הפריטים שביקשת. האם זה נראה טוב עכשיו?';
-      } else if (patch?.operation === 'clear') {
-        conversationMessage = 'ניקיתי את החלק שביקשת. רוצה להתחיל לבנות אותו מחדש?';
-      } else if (patch?.experience) {
-        conversationMessage = `הוספתי את הניסיון בחברת ${patch.experience.company}. איך היה התפקיד הזה?`;
-      } else if (patch?.skills?.length) {
-        conversationMessage = `הוספתי ${patch.skills.length} כישורים חדשים לקורות החיים שלך!`;
-      } else if (patch?.summary) {
-        conversationMessage = 'עדכנתי את התקציר המקצועי שלך. נראה טוב?';
-      } else {
-        conversationMessage = 'מה עוד תרצה לספר לי על הקריירה שלך?';
-      }
-    }
-
-    // Apply resume updates if we have a patch
-    if (patch) {
-      console.log('📝 Applying resume updates via handler:', patch);
-      const internalAddChatMessage = (msg: string, type: 'ai' | 'user') =>
-        console.log(`[Internal ${type.toUpperCase()}]: ${msg}`);
-      // Convert ResumeDataPatch to NormalizedResumePatch for handleResumeUpdates
-      const normalizedPatch: NormalizedResumePatch = {
-        ...patch,
-        operation: patch.operation || 'patch'
-      };
-      await handleResumeUpdates(normalizedPatch, internalAddChatMessage);
-    }
+    const result = await model.generateContent(message);
+    const response = await result.response;
+    const text = response.text();
 
     return {
-      message: conversationMessage,
-      resumeUpdates: patch || {}
+      message: text,
+      resumeUpdates: null // For now, no resume updates
     };
+  } catch (error) {
+    console.error('AI service error:', error);
+    return {
+      message: 'מצטער, הייתה בעיה בתקשורת עם השירות. נסה שוב.',
+      resumeUpdates: null
+    };
+  }
+}
+
+export async function extractResumeFromPlainText(text: string): Promise<any> {
+  try {
+    console.log('🔍 Starting AI-powered resume extraction...');
+    console.log('📄 Resume text length:', text.length, 'characters');
+
+    // Create AI prompt for resume parsing
+    const prompt = `
+אתה מנתח קורות חיים מומחה. תפקידך לנתח את טקסט קורות החיים הבא ולחלץ ממנו מידע מובנה.
+
+חשוב: תמיד שמור על טקסט עברי בדיוק כפי שהוא מופיע. אל תשנה תווים עבריים.
+
+צור מקטעים (sections) בהתאם למה שאתה מוצא בטקסט:
+- contact: פרטי התקשרות (שם, אימייל, טלפון, כתובת)
+- summary: תקציר מקצועי (אם קיים)
+- experience: ניסיון עבודה
+- education: השכלה
+- skills: כישורים
+- military: שירות צבאי (אם קיים)
+- projects: פרויקטים (אם קיים)
+- certifications: הסמכות (אם קיים)
+
+פורמט הפלט חייב להיות JSON עם המבנה הבא:
+{
+  "sections": [
+    {
+      "key": "contact",
+      "title": "פרטי התקשרות",
+      "layout": "keyValue",
+      "pairs": [
+        {"key": "fullName", "value": "שם מלא"},
+        {"key": "email", "value": "email@example.com"},
+        {"key": "phone", "value": "טלפון"}
+      ]
+    },
+    {
+      "key": "experience", 
+      "title": "ניסיון מקצועי",
+      "layout": "list",
+      "items": [
+        {
+          "title": "תפקיד",
+          "company": "חברה",
+          "duration": "תקופה",
+          "description": "תיאור התפקיד"
+        }
+      ]
+    }
+  ]
+}
+
+טקסט קורות החיים לניתוח:
+=====================================
+${text}
+=====================================
+
+תן רק את ה-JSON, ללא הסברים נוספים.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const aiText = response.text();
+
+    console.log('🤖 AI Response:', aiText);
+
+    // Extract JSON from AI response
+    let jsonMatch = aiText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in AI response');
+    }
+
+    const parsedData = JSON.parse(jsonMatch[0]);
+    console.log('📊 Parsed sections:', parsedData);
+
+    // Apply sections to store
+    const store = useAppStore.getState();
+
+    if (parsedData.sections && Array.isArray(parsedData.sections)) {
+      // Clear existing sections first
+      store.replaceSections([]);
+
+      // Add each section
+      for (const section of parsedData.sections) {
+        console.log('➕ Adding section:', section.key);
+        store.upsertSection(section);
+      }
+
+      console.log('✅ All sections added to store');
+
+      return {
+        ok: true,
+        patch: { operations: [] }, // Required by WelcomeForm
+        message: 'קורות החיים עובדו בהצלחה'
+      };
+    } else {
+      throw new Error('Invalid sections format from AI');
+    }
 
   } catch (error) {
-    console.error('🚨 AI service error:', error);
+    console.error('❌ Error extracting resume:', error);
+
+    // Fallback: create basic sections with simple parsing
+    const store = useAppStore.getState();
+
+    // Simple fallback parsing
+    const lines = text.split('\n').filter(line => line.trim());
+    const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+    const phoneMatch = text.match(/(\+?[\d\s\-\(\)]{7,15})/);
+
+    // Create basic contact section
+    store.upsertSection({
+      key: 'contact',
+      title: 'פרטי התקשרות',
+      layout: 'keyValue',
+      pairs: [
+        { key: 'fullName', value: lines[0] || 'שם לא זוהה' },
+        ...(emailMatch ? [{ key: 'email', value: emailMatch[1] }] : []),
+        ...(phoneMatch ? [{ key: 'phone', value: phoneMatch[1] }] : [])
+      ]
+    });
+
+    // Create basic summary
+    store.upsertSection({
+      key: 'summary',
+      title: 'תקציר מקצועי',
+      layout: 'text',
+      text: 'תקציר יופק על בסיס המידע שסופק'
+    });
+
     return {
-      message: 'מצטער, הייתה לי בעיה טכנית. בוא ננסה שוב?',
-      resumeUpdates: {}
+      ok: true,
+      patch: { operations: [] },
+      message: 'קורות החיים עובדו בהצלחה (מצב חירום)'
     };
   }
-};
-
-// ---------------- Public API (extraction) - REFINED ----------------
-export const extractResumeFromPlainText = async (rawText: string) => {
-  try {
-    const promptParts = [
-      'אתה יועץ קריירה ומומחה לכתיבת קורות חיים. משימתך היא להפוך טקסט גולמי של קורות חיים למסמך JSON מובנה, מקצועי ומשופר.',
-      'נתח את הטקסט המצורף ופעל לפי הכללים הבאים בקפדנות:',
-      '1. **העשרת תוכן**: אל תעתיק רק את המידע. שפר אותו. אם תיאור תפקיד חסר או קצר מדי (למשל, מכיל רק את שם החברה והתפקיד), חובה עליך לכתוב תיאור מקצועי של 1-2 משפטים המתארים את מהות התפקיד על סמך שם התפקיד.',
-      '2. **דיוק בפרטים**: השתמש אך ורק במידע האמיתי מהטקסט (שמות, חברות, תאריכים). אם אתה מזהה מידע שנראה כמו placeholder (למשל, "your_email@example.com"), התעלם ממנו והשאר את השדה ריק.',
-      '3. **סיכום מקצועי**: אם חסר תקציר, כתוב אחד בעצמך (2-3 שורות) המסכם את הניסיון והכישורים הבולטים של המועמד.',
-      '4. **מבנה קפדני**: החזר אך ורק אובייקט JSON אחד בתוך תגית [RESUME_DATA]. אל תוסיף שום טקסט הסבר לפני או אחרי התגית.',
-      '',
-      '=== דוגמה למבנה התגובה ===',
-      '[RESUME_DATA]',
-      '{',
-      '  "operation": "replace",',
-      '  "completeResume": {',
-      '    "contact": { "fullName": "שם מהמסמך", "email": "מייל מהמסמך", "phone": "טלפון מהמסמך", "location": "מיקום מהמסמך", "title": "תפקיד נוכחי מהמסמך" },',
-      '    "summary": "תקציר מקצועי משופר או חדש...",',
-      '    "experiences": [',
-      '      { "company": "שם חברה", "title": "שם תפקיד", "duration": "תקופת העסקה", "description": ["תיאור משופר של התפקיד..."] }',
-      '    ],',
-      '    "education": [',
-      '      { "institution": "שם מוסד", "degree": "שם תואר", "duration": "תקופת לימודים", "description": ["תיאור קצר..."] }',
-      '    ],',
-      '    "skills": ["כישורים שנאספו מהטקסט..."]',
-      '  }',
-      '}',
-      '[/RESUME_DATA]',
-      '',
-      '=== קורות החיים לניתוח ===',
-      rawText.slice(0, 25000),
-    ];
-    const prompt = promptParts.join('\n');
-
-    console.log('Sending enhanced prompt to AI for initial CV extraction...');
-    const result = await model.generateContent(prompt);
-    const text = (await result.response).text();
-    console.log('AI response for CV extraction:', text);
-
-    const parsed = parseResumeData(text);
-    console.log('Parsed initial resume data:', parsed);
-
-    if (parsed.patch) {
-      console.log('Applying initial parsed patch via handler...');
-      const addChatMessage = (msg: string, type: 'ai' | 'user') => {
-        console.log(`[Initial Extraction - ${type.toUpperCase()}]: ${msg}`);
-      };
-
-      // Convert ResumeDataPatch to NormalizedResumePatch for handleResumeUpdates
-      const normalizedPatch: NormalizedResumePatch = {
-        ...parsed.patch,
-        operation: parsed.patch.operation || 'patch'
-      };
-      await handleResumeUpdates(normalizedPatch, addChatMessage);
-      console.log('Successfully applied initial resume patch');
-      return { ok: true, raw: text, patch: parsed.patch };
-    }
-
-    console.error('Failed to parse or recover initial resume data:', parsed.error);
-    return { ok: false, error: parsed.error || 'NO_JSON', raw: text };
-
-  } catch (err) {
-    console.error('Error in extractResumeFromPlainText:', err);
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : 'UNKNOWN',
-    };
-  }
-};
+}

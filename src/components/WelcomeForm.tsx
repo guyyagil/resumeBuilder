@@ -71,16 +71,14 @@ const WelcomeForm: React.FC = () => {
 
       // Step 2: Get the fully parsed resume from the first AI call
       const initialParseResult = await extractResumeFromPlainText(pdfText);
-      if (!initialParseResult.ok || !initialParseResult.patch) {
+      if (!initialParseResult.ok) {
         throw new Error(initialParseResult.error || 'Failed to parse resume from PDF');
       }
 
       // Step 3: Send the second AI call with the now-populated resume data
       const updatedState = useAppStore.getState();
       const aiResponse = await sendMessageToAI(
-        `היי, כשאתה מקבל את ההודעה הראשונה, פנה למשתמש בשמו ("${updatedState.resume.fullName}"), הצג את עצמך כמדריך לשיפור קורות חיים, הסבר בקצרה שתעזור לו להתאים את הקורות חיים למשרת היעד, ותזמין אותו לשתף מידע נוסף או שאלות.`,
-        updatedState.userBasicInfo,
-        updatedState.resume
+        `היי, כשאתה מקבל את ההודעה הראשונה, פנה למשתמש בשמו ("${updatedState.compatibleResume.fullName}"), הצג את עצמך כמדריך לשיפור קורות חיים, הסבר בקצרה שתעזור לו להתאים את הקורות חיים למשרת היעד, ותזמין אותו לשתף מידע נוסף או שאלות.`
       );
       
       if (aiResponse.message) {

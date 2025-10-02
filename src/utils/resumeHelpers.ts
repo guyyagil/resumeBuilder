@@ -1,7 +1,7 @@
 // src/utils/resumeHelpers.ts
-import type { Experience } from '../types';
+// Resume helper functions for display components
 
-export const normalizeExperiences = (items: Experience[] = []) =>
+export const normalizeExperiences = (items: any[] = []) =>
   items
     .filter(e => e.company && e.title)
     .map(e => ({

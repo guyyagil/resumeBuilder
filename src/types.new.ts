@@ -1,5 +1,7 @@
-// src/types.ts - Fully Dynamic Resume System
+// src/types.new.ts - Fully Dynamic Resume System
 // NO predefined sections - everything is a dynamic section
+// 
+// INSTRUCTIONS: Rename this file to types.ts after backing up the old one
 
 export type Identifier = string;
 

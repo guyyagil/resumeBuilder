@@ -9,7 +9,7 @@ interface ResumePanel1Props {
 }
 
 export const ResumePanel1: React.FC<ResumePanel1Props> = ({ userBasicInfo }) => {
-  const { resume } = useAppStore();
+  const { compatibleResume: resume } = useAppStore();
   
   const allSkills = combineSkills(userBasicInfo?.keySkills, resume.skills);
   const professionalSummary = generateProfessionalSummary(userBasicInfo, resume.summary);

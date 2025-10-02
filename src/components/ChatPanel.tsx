@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { sendMessageToAI } from '../services/geminiService';
-// import type { AIResponse } from '../types'; // Removed unused import
 import { handleResumeUpdates } from '../utils/resumeUpdateHandler';
 
 // Clean AI message from technical tags
@@ -106,7 +105,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
       const userContext = {
         ...userBasicInfo,
         targetJobPosting: targetJobPosting || userBasicInfo?.targetJobPosting,
-        fullName: resume.fullName || userBasicInfo?.fullName,
+        fullName: (resume.sections.find(s => s.key === 'contact') as any)?.data?.fullName || userBasicInfo?.fullName,
       };
 
       console.log('🔍 Sending context to AI:', {
@@ -115,12 +114,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
         chatMessages: chatMessages // Send ALL messages for context
       });
 
-      const aiResponse = await sendMessageToAI(
-        userMessage,
-        userContext,
-        resume,
-        chatMessages // Send ALL chat history, not just slice(-5)
-      ) as any; // AIResponse type removed
+      const aiResponse = await sendMessageToAI(userMessage) as any;
       
       if (typeof aiResponse === 'object' && aiResponse.message) {
         // Handle resume updates FIRST, then send the message
@@ -175,7 +169,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ userBasicInfo }) => {
         className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth"
         style={{ scrollbarWidth: 'thin', scrollbarColor: '#c7d2fe #f1f5f9' }}
       >
-        {chatMessages.map((message) => (
+        {chatMessages.map((message: any) => (
           <div
             key={message.id}
             className={`rounded-lg p-3 max-w-[85%] ${
