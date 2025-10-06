@@ -6,14 +6,14 @@ interface TreeResumeRendererProps {
   className?: string;
 }
 
-export const TreeResumeRenderer: React.FC<TreeResumeRendererProps> = ({ 
-  tree, 
-  className = '' 
+export const TreeResumeRenderer: React.FC<TreeResumeRendererProps> = ({
+  tree,
+  className = ''
 }) => {
   return (
     <div className={`tree-resume ${className}`}>
       {tree.map((node) => (
-        <ResumeNodeRenderer key={node.uid} node={node} />
+        <ResumeNodeRenderer key={node.uid} node={node} depth={0} />
       ))}
     </div>
   );
@@ -21,88 +21,124 @@ export const TreeResumeRenderer: React.FC<TreeResumeRendererProps> = ({
 
 interface ResumeNodeRendererProps {
   node: ResumeNode;
-  depth?: number;
+  depth: number;
 }
 
-const ResumeNodeRenderer: React.FC<ResumeNodeRendererProps> = ({ 
-  node, 
-  depth = 0 
+const ResumeNodeRenderer: React.FC<ResumeNodeRendererProps> = ({
+  node,
+  depth
 }) => {
-  const { meta, title, content, children } = node;
-  
-  // Contact section special handling
-  if (meta?.type === 'contact') {
-    return (
-      <header className="mb-6 border-b border-gray-300 pb-2">
-        <h1 className="text-2xl font-semibold">
-          {children?.find(c => c.title.toLowerCase().includes('name'))?.content || title}
-        </h1>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 mt-1">
-          {children?.filter(c => !c.title.toLowerCase().includes('name')).map((child) => (
-            <span key={child.uid}>{child.content || child.title}</span>
-          ))}
-        </div>
-      </header>
-    );
-  }
-  
-  // Section level (depth 0)
-  if (meta?.type === 'section' || depth === 0) {
+  const { title, content, children, layout } = node;
+  const hasChildren = children && children.length > 0;
+  const isLeaf = !hasChildren;
+
+  // Root level (depth 0): Always render as section headers
+  if (depth === 0) {
     return (
       <section className="mb-6">
-        <h2 className="text-lg font-semibold border-b border-gray-300 pb-1 mb-3">
+        <h2 className="text-lg font-semibold border-b border-gray-300 pb-1 mb-3 uppercase">
           {title}
         </h2>
-        {content && (
-          <p className="text-sm text-gray-700 mb-3">{content}</p>
+        {content && !hasChildren && (
+          <p className="text-sm text-gray-700">{content}</p>
         )}
-        {children && (
-          <div className="space-y-4">
+        {hasChildren && (
+          <ChildrenRenderer layout={layout} depth={depth}>
             {children.map((child) => (
               <ResumeNodeRenderer key={child.uid} node={child} depth={depth + 1} />
             ))}
-          </div>
+          </ChildrenRenderer>
         )}
       </section>
     );
   }
-  
-  // Item level (depth 1) - jobs, projects, education
-  if (meta?.type === 'item' || depth === 1) {
+
+  // For all other depths: Use leaf vs parent logic
+
+  // LEAF NODE: Render as bullet point
+  if (isLeaf) {
     return (
-      <div className="mb-4">
-        <div className="flex justify-between items-start mb-1">
-          <h3 className="font-medium text-sm">{title}</h3>
-          {meta?.dateRange && (
-            <span className="text-xs text-gray-600 italic">
-              {meta.dateRange}
-            </span>
-          )}
-        </div>
-        
-        {meta?.location && (
-          <div className="text-xs text-gray-600 mb-1">{meta.location}</div>
-        )}
-        
-        {content && (
-          <p className="text-sm text-gray-700 mb-2">{content}</p>
-        )}
-        
-        {children && children.length > 0 && (
-          <ul className="list-disc list-inside space-y-1 ml-2">
-            {children.map((bullet) => (
-              <ResumeNodeRenderer key={bullet.uid} node={bullet} depth={depth + 1} />
-            ))}
-          </ul>
-        )}
-      </div>
+      <li className="text-sm text-gray-700">
+        {content || title}
+      </li>
     );
   }
-  
-  // Bullet level (depth 2+) or text nodes
+
+  // PARENT NODE: Render as item with children as bullets
   return (
-    <li className="text-sm text-gray-700">
-      {content || title}
-    </li>
+    <div className="mb-3">
+      {/* Title for parent items */}
+      <div className="font-medium text-sm mb-1">{title}</div>
+
+      {/* Content if different from title */}
+      {content && content !== title && (
+        <div className="text-sm text-gray-700 mb-1">{content}</div>
+      )}
+
+      {/* Children rendered as bulleted list */}
+      <ul className="list-disc list-inside space-y-1 ml-2">
+        {children.map((child) => (
+          <ResumeNodeRenderer key={child.uid} node={child} depth={depth + 1} />
+        ))}
+      </ul>
+    </div>
   );
+};
+
+// Component to handle different layout styles for children
+const ChildrenRenderer: React.FC<{
+  layout?: string;
+  depth: number;
+  children: React.ReactNode;
+}> = ({ layout, depth, children }) => {
+  switch (layout) {
+    case 'inline':
+      // Horizontal inline layout (contact info)
+      return (
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          {children}
+        </div>
+      );
+
+    case 'grid':
+      // Grid layout (skills)
+      return (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          {children}
+        </div>
+      );
+
+    case 'columns':
+      // Multi-column layout
+      return (
+        <div className="columns-2 gap-6">
+          {children}
+        </div>
+      );
+
+    case 'compact':
+      // Compact spacing
+      return (
+        <div className="space-y-1">
+          {children}
+        </div>
+      );
+
+    case 'card':
+      // Card layout with border
+      return (
+        <div className="grid grid-cols-1 gap-4">
+          {children}
+        </div>
+      );
+
+    case 'default':
+    default:
+      // Standard vertical list
+      return (
+        <div className="space-y-3">
+          {children}
+        </div>
+      );
+  }
 };

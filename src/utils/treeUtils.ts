@@ -1,5 +1,14 @@
+// Tree utility functions per architecture specification
+// Functions for finding, manipulating, and validating tree nodes
+
 import type { ResumeNode } from '../types';
 
+/**
+ * Find a node by its UID in the tree
+ * @param tree - The resume tree
+ * @param uid - The UID to search for
+ * @returns The node if found, null otherwise
+ */
 export function findNodeByUid(
   tree: ResumeNode[], 
   uid: string
@@ -14,6 +23,12 @@ export function findNodeByUid(
   return null;
 }
 
+/**
+ * Find the parent of a node by the child's UID
+ * @param tree - The resume tree
+ * @param childUid - The child node's UID
+ * @returns Object with parent node and child's index, or null if not found
+ */
 export function findParentByChildUid(
   tree: ResumeNode[], 
   childUid: string
@@ -35,14 +50,28 @@ export function findParentByChildUid(
   return null;
 }
 
+/**
+ * Deep clone a tree structure
+ * @param tree - The tree to clone
+ * @returns A deep copy of the tree
+ */
 export function cloneTree(tree: ResumeNode[]): ResumeNode[] {
   return JSON.parse(JSON.stringify(tree));
 }
 
+/**
+ * Generate a unique identifier for a node
+ * @returns A unique UID string
+ */
 export function generateUid(): string {
   return `uid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/**
+ * Validate the tree structure
+ * @param tree - The tree to validate
+ * @returns Array of error messages (empty if valid)
+ */
 export function validateTree(tree: ResumeNode[]): string[] {
   const errors: string[] = [];
   const seenUids = new Set<string>();
@@ -71,4 +100,46 @@ export function validateTree(tree: ResumeNode[]): string[] {
   
   walk(tree);
   return errors;
+}
+
+/**
+ * Get the depth of a node in the tree
+ * @param tree - The resume tree
+ * @param uid - The node's UID
+ * @returns The depth (0 for root level) or -1 if not found
+ */
+export function getNodeDepth(tree: ResumeNode[], uid: string): number {
+  function walk(nodes: ResumeNode[], depth: number): number {
+    for (const node of nodes) {
+      if (node.uid === uid) return depth;
+      if (node.children) {
+        const found = walk(node.children, depth + 1);
+        if (found !== -1) return found;
+      }
+    }
+    return -1;
+  }
+  
+  return walk(tree, 0);
+}
+
+/**
+ * Count total nodes in the tree
+ * @param tree - The resume tree
+ * @returns Total number of nodes
+ */
+export function countNodes(tree: ResumeNode[]): number {
+  let count = 0;
+  
+  function walk(nodes: ResumeNode[]): void {
+    for (const node of nodes) {
+      count++;
+      if (node.children) {
+        walk(node.children);
+      }
+    }
+  }
+  
+  walk(tree);
+  return count;
 }

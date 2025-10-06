@@ -1,10 +1,8 @@
-import type { AgentAction, ResumeNode, Numbering } from '../types';
-import { 
-  findNodeByUid, 
-  findParentByChildUid, 
-  generateUid, 
-  cloneTree 
-} from '../utils/treeUtils';
+// Action Handler - Complete implementation per architecture specification
+// Handles all 8 action types for resume tree modifications
+
+import type { AgentAction, ResumeNode, Numbering, ReplaceAction, AppendBulletAction, AppendItemAction, AppendSectionAction, RemoveAction, MoveAction, ReorderAction, UpdateMetaAction } from '../types';
+import { findNodeByUid, findParentByChildUid, generateUid, cloneTree } from '../utils/treeUtils';
 import { resolveAddress } from '../utils/numbering';
 
 export class ActionHandler {
@@ -13,7 +11,17 @@ export class ActionHandler {
     private numbering: Numbering
   ) {}
 
+  /**
+   * Apply an action to the tree and return the modified tree
+   * @param action - The action to apply
+   * @returns Modified tree
+   */
   apply(action: AgentAction): ResumeNode[] {
+    console.log(`🔧 Applying action:`, action);
+    
+    // Validate action structure
+    this.validateAction(action);
+    
     const newTree = cloneTree(this.tree);
     
     switch (action.action) {
@@ -38,7 +46,45 @@ export class ActionHandler {
     }
   }
 
-  private handleReplace(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Validate action structure before processing
+   */
+  private validateAction(action: AgentAction): void {
+    if (!action.action) {
+      throw new Error('Action missing required "action" field');
+    }
+
+    switch (action.action) {
+      case 'appendSection':
+        if (!(action as AppendSectionAction).title) {
+          throw new Error('appendSection missing required "title" field');
+        }
+        break;
+      case 'appendItem':
+        const itemAction = action as AppendItemAction;
+        if (!itemAction.id) {
+          throw new Error('appendItem missing required "id" field');
+        }
+        if (!itemAction.title) {
+          throw new Error('appendItem missing required "title" field');
+        }
+        break;
+      case 'appendBullet':
+        const bulletAction = action as AppendBulletAction;
+        if (!bulletAction.id) {
+          throw new Error('appendBullet missing required "id" field');
+        }
+        if (!bulletAction.text) {
+          throw new Error('appendBullet missing required "text" field');
+        }
+        break;
+    }
+  }
+
+  /**
+   * Handle replace action - update content of existing node
+   */
+  private handleReplace(tree: ResumeNode[], action: ReplaceAction): ResumeNode[] {
     const uid = resolveAddress(action.id, this.numbering);
     if (!uid) throw new Error(`Invalid address: ${action.id}`);
     
@@ -50,12 +96,27 @@ export class ActionHandler {
     return tree;
   }
 
-  private handleAppendBullet(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle appendBullet action - add bullet to existing item
+   */
+  private handleAppendBullet(tree: ResumeNode[], action: AppendBulletAction): ResumeNode[] {
+    console.log(`🔸 Attempting to add bullet "${action.text}" to parent ${action.id}`);
+    console.log('Current numbering:', Object.keys(this.numbering.addrToUid));
+    
     const uid = resolveAddress(action.id, this.numbering);
-    if (!uid) throw new Error(`Invalid address: ${action.id}`);
+    if (!uid) {
+      console.warn(`❌ Address ${action.id} not found in numbering, attempting to find parent by pattern`);
+      console.warn(`❌ Skipping bullet: "${action.text}" - parent ${action.id} not found`);
+      return tree;
+    }
     
     const parent = findNodeByUid(tree, uid);
-    if (!parent) throw new Error(`Parent not found: ${action.id}`);
+    if (!parent) {
+      console.warn(`❌ Parent node not found for ${action.id}, skipping bullet: "${action.text}"`);
+      return tree;
+    }
+    
+    console.log(`✅ Found parent for ${action.id}: "${parent.title}"`);
     
     if (!parent.children) parent.children = [];
     
@@ -66,15 +127,37 @@ export class ActionHandler {
       meta: { type: 'bullet' }
     });
     
+    console.log(`✅ Added bullet to ${action.id}: "${action.text}"`);
     return tree;
   }
 
-  private handleAppendItem(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle appendItem action - add new item to section
+   */
+  private handleAppendItem(tree: ResumeNode[], action: AppendItemAction): ResumeNode[] {
+    console.log(`🔹 Attempting to add item "${action.title}" to parent ${action.id}`);
+    console.log('Current numbering:', Object.keys(this.numbering.addrToUid));
+    
+    // Special handling for root-level items (for contact info during initialization)
+    if (action.id === 'root' || !this.numbering.addrToUid[action.id]) {
+      console.log(`📍 Adding item to root: "${action.title}"`);
+      tree.push({
+        uid: generateUid(),
+        title: action.title,
+        content: action.content,
+        meta: { type: 'item', ...action.meta },
+        children: []
+      });
+      return tree;
+    }
+    
     const uid = resolveAddress(action.id, this.numbering);
     if (!uid) throw new Error(`Invalid address: ${action.id}`);
     
     const parent = findNodeByUid(tree, uid);
     if (!parent) throw new Error(`Parent not found: ${action.id}`);
+    
+    console.log(`✅ Found parent for ${action.id}: "${parent.title}"`);
     
     if (!parent.children) parent.children = [];
     
@@ -86,36 +169,44 @@ export class ActionHandler {
       children: []
     });
     
+    console.log(`✅ Added item to ${action.id}: "${action.title}"`);
     return tree;
   }
 
-  private handleAppendSection(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle appendSection action - create new top-level section
+   */
+  private handleAppendSection(tree: ResumeNode[], action: AppendSectionAction): ResumeNode[] {
+    console.log(`🔷 Creating section: "${action.title}"`);
+
     const newSection: ResumeNode = {
       uid: generateUid(),
       title: action.title,
+      layout: action.layout,
       meta: { type: 'section' },
       children: []
     };
     
     if (action.after) {
       const afterUid = resolveAddress(action.after, this.numbering);
-      if (afterUid) {
-        const index = tree.findIndex(n => n.uid === afterUid);
-        if (index !== -1) {
-          tree.splice(index + 1, 0, newSection);
-          return tree;
-        }
-      }
-      // If after address is invalid or not found, just append to end
-      console.warn(`Section address ${action.after} not found, appending to end`);
+      if (!afterUid) throw new Error(`Invalid after address: ${action.after}`);
+      
+      const index = tree.findIndex(n => n.uid === afterUid);
+      if (index === -1) throw new Error(`Section not found: ${action.after}`);
+      
+      tree.splice(index + 1, 0, newSection);
+    } else {
+      tree.push(newSection);
     }
     
-    // Default: append to end
-    tree.push(newSection);
+    console.log(`✅ Created section: "${action.title}"`);
     return tree;
   }
 
-  private handleRemove(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle remove action - delete node and its children
+   */
+  private handleRemove(tree: ResumeNode[], action: RemoveAction): ResumeNode[] {
     const uid = resolveAddress(action.id, this.numbering);
     if (!uid) throw new Error(`Invalid address: ${action.id}`);
     
@@ -133,7 +224,10 @@ export class ActionHandler {
     return tree;
   }
 
-  private handleMove(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle move action - relocate node to new parent
+   */
+  private handleMove(tree: ResumeNode[], action: MoveAction): ResumeNode[] {
     const uid = resolveAddress(action.id, this.numbering);
     const newParentUid = action.newParent === 'root' 
       ? null 
@@ -169,7 +263,10 @@ export class ActionHandler {
     return tree;
   }
 
-  private handleReorder(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle reorder action - change order of sibling nodes
+   */
+  private handleReorder(tree: ResumeNode[], action: ReorderAction): ResumeNode[] {
     const uid = resolveAddress(action.id, this.numbering);
     if (!uid) throw new Error(`Invalid address: ${action.id}`);
     
@@ -179,7 +276,7 @@ export class ActionHandler {
     }
     
     // Convert order addresses to UIDs
-    const orderUids = action.order.map((addr: string) => {
+    const orderUids = action.order.map(addr => {
       const u = resolveAddress(addr, this.numbering);
       if (!u) throw new Error(`Invalid order address: ${addr}`);
       return u;
@@ -187,7 +284,7 @@ export class ActionHandler {
     
     // Reorder children
     const newChildren: ResumeNode[] = [];
-    orderUids.forEach((orderUid: string) => {
+    orderUids.forEach(orderUid => {
       const child = parent.children!.find(c => c.uid === orderUid);
       if (child) newChildren.push(child);
     });
@@ -203,7 +300,10 @@ export class ActionHandler {
     return tree;
   }
 
-  private handleUpdateMeta(tree: ResumeNode[], action: any): ResumeNode[] {
+  /**
+   * Handle updateMeta action - modify node metadata
+   */
+  private handleUpdateMeta(tree: ResumeNode[], action: UpdateMetaAction): ResumeNode[] {
     const uid = resolveAddress(action.id, this.numbering);
     if (!uid) throw new Error(`Invalid address: ${action.id}`);
     

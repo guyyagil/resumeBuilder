@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { ExportButton } from '../Controls/ExportButton';
 import { TreeResumeRenderer } from './TreeResumeRenderer';
 import { computeNumbering } from '../../utils/numbering';
+import { useAppStore } from '../../store/useAppStore';
+import { UndoRedoButtons } from '../Controls/UndoRedoButtons';
 
 interface TreeResumePanelProps {
   userBasicInfo?: any;
@@ -32,10 +34,7 @@ export const TreeResumePanel: React.FC<TreeResumePanelProps> = () => {
     return tree;
   }, [resumeTree]);
   
-  const handlePrint = () => {
-    window.print();
-  };
-  
+
   return (
     <div id="resume-pane" className="rounded-2xl border border-gray-200 bg-white shadow-lg flex flex-col h-[calc(100vh-2rem)]">
       <style>{`
@@ -71,12 +70,8 @@ export const TreeResumePanel: React.FC<TreeResumePanelProps> = () => {
       <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-4 flex-shrink-0">
         <h1 className="text-lg font-bold text-gray-900">Resume</h1>
         <div className="flex gap-2">
-          <button
-            onClick={handlePrint}
-            className="rounded-lg bg-gradient-to-r from-indigo-500 to-cyan-500 px-4 py-2 text-xs font-medium text-white shadow hover:from-indigo-600 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all"
-          >
-            Print / Export PDF
-          </button>
+          <UndoRedoButtons />
+          <ExportButton />
         </div>
       </div>
 

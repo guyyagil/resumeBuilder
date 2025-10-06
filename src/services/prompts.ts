@@ -1,7 +1,13 @@
-// prompts.ts
+// Resume serialization functions for LLM prompts
+// Converts tree structure into readable text format for AI processing
 
 import type { ResumeNode } from '../types';
 
+/**
+ * Serialize resume tree for LLM with addresses
+ * @param tree - The resume tree
+ * @returns Formatted string representation
+ */
 export function serializeForLLM(tree: ResumeNode[]): string {
   const lines: string[] = [];
   
@@ -18,7 +24,7 @@ export function serializeForLLM(tree: ResumeNode[]): string {
         lines.push(`${indent}${addr} ${node.title}`);
       }
       
-      if (node.children) {
+      if (node.children && node.children.length > 0) {
         walk(node.children, depth + 1);
       }
     });
@@ -28,6 +34,11 @@ export function serializeForLLM(tree: ResumeNode[]): string {
   return lines.join('\n');
 }
 
+/**
+ * Serialize resume tree with metadata for LLM
+ * @param tree - The resume tree
+ * @returns Formatted string with metadata included
+ */
 export function serializeWithMeta(tree: ResumeNode[]): string {
   const lines: string[] = [];
   
@@ -54,7 +65,7 @@ export function serializeWithMeta(tree: ResumeNode[]): string {
         lines.push(`${indent}  ${node.content}`);
       }
       
-      if (node.children) {
+      if (node.children && node.children.length > 0) {
         walk(node.children, depth + 1);
       }
     });

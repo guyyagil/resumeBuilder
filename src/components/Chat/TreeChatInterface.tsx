@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { ChatController } from '../../services/chatController';
+import { JobDescriptionInput } from '../Controls/JobDescriptionInput';
+import { ChatMessage } from './ChatMessage';
 
 // Initialize chat controller with API key
 const chatController = new ChatController(
@@ -8,7 +10,7 @@ const chatController = new ChatController(
 );
 
 export const TreeChatInterface: React.FC = () => {
-  const { messages, isProcessing, jobDescription, setJobDescription } = useAppStore();
+  const { messages, isProcessing } = useAppStore();
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -42,19 +44,7 @@ export const TreeChatInterface: React.FC = () => {
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <h2 className="text-lg font-bold text-gray-900 mb-3">AI Resume Assistant</h2>
         
-        {/* Job Description Input */}
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Target Job Description (Optional)
-          </label>
-          <textarea
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
-            placeholder="Paste the job description here to get tailored suggestions..."
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={3}
-          />
-        </div>
+        <JobDescriptionInput />
       </div>
       
       {/* Messages */}
@@ -78,32 +68,7 @@ export const TreeChatInterface: React.FC = () => {
           </div>
         ) : (
           messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-800'
-                }`}
-              >
-                <div className="whitespace-pre-wrap text-sm">{message.content}</div>
-                
-                {/* Show action preview for assistant messages */}
-                {message.action && (
-                  <div className="mt-2 p-2 bg-white bg-opacity-20 rounded text-xs">
-                    <strong>Action:</strong> {message.action.action}
-                    {('id' in message.action) && ` at ${message.action.id}`}
-                  </div>
-                )}
-                
-                <div className="text-xs mt-1 opacity-70">
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </div>
-              </div>
-            </div>
+            <ChatMessage key={message.id} message={message} />
           ))
         )}
         
