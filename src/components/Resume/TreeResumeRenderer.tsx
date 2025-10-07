@@ -90,7 +90,7 @@ const ChildrenRenderer: React.FC<{
   layout?: string;
   depth: number;
   children: React.ReactNode;
-}> = ({ layout, depth, children }) => {
+}> = ({ layout, children }) => {
   switch (layout) {
     case 'inline':
       // Horizontal inline layout (contact info)

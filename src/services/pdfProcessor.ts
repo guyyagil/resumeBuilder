@@ -17,9 +17,9 @@ export class PDFProcessor {
     }
 
     /**
-     * Main entry point: PDF file -> Resume tree
+     * Main entry point: PDF file -> Resume tree and title
      */
-    async processResume(file: File): Promise<ResumeNode[]> {
+    async processResume(file: File): Promise<{ tree: ResumeNode[], title: string }> {
         console.log('📄 Starting PDF processing...');
 
         // Step 1: Extract text from PDF
@@ -34,15 +34,16 @@ export class PDFProcessor {
         const images = await this.convertPDFToImages(file);
         console.log('✅ Converted PDF to', images.length, 'images');
 
-        // Step 3: AI converts text + images to actions
-        const actions = await this.geminiService.structureResumeFromTextAndImages(text, images);
+        // Step 3: AI converts text + images to actions and extracts title
+        const { actions, title } = await this.geminiService.structureResumeFromTextAndImages(text, images);
         console.log('✅ AI generated', actions.length, 'actions');
+        console.log('✅ AI extracted title:', title);
 
         // Step 4: Build tree from actions
         const tree = this.buildTreeFromActions(actions);
         console.log('✅ Built tree with', this.countNodes(tree), 'nodes');
 
-        return tree;
+        return { tree, title };
     }
 
     /**

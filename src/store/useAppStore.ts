@@ -37,9 +37,10 @@ type AppPhase =
 interface AppState {
   // Phase management
   phase: AppPhase;
-  
+
   // Core data
   resumeTree: ResumeNode[];
+  resumeTitle: string;
   numbering: Numbering;
   jobDescription: string;
   
@@ -58,8 +59,9 @@ interface AppState {
   // Actions
   setPhase: (phase: AppPhase) => void;
   setResumeTree: (tree: ResumeNode[]) => void;
+  setResumeTitle: (title: string) => void;
   applyAction: (action: AgentAction, description: string) => void;
-  
+
   // Initialization
   initializeFromPDF: (file: File, jobDesc: string) => Promise<void>;
   setJobDescription: (desc: string) => void;
@@ -98,6 +100,7 @@ const historyEntry = (
 const initialState = {
   phase: 'welcome' as AppPhase,
   resumeTree: [],
+  resumeTitle: '',
   numbering: { addrToUid: {}, uidToAddr: {} },
   jobDescription: '',
   messages: [],
@@ -116,7 +119,7 @@ export const useAppStore = create<AppState>()(
     setPhase: (phase) => set((state) => {
       state.phase = phase;
     }),
-    
+
     setResumeTree: (tree) =>
       set((state) => {
         const errors = validateTree(tree);
@@ -128,6 +131,11 @@ export const useAppStore = create<AppState>()(
         state.numbering = computeNumbering(state.resumeTree);
         state.history = [historyEntry(state.resumeTree, state.numbering, 'Resume loaded')];
         state.historyIndex = 0;
+      }),
+
+    setResumeTitle: (title) =>
+      set((state) => {
+        state.resumeTitle = title;
       }),
 
     applyAction: (action, description) =>
@@ -246,10 +254,14 @@ export const useAppStore = create<AppState>()(
         
         const { PDFProcessor } = await import('../services/pdfProcessor');
         const processor = new PDFProcessor(apiKey);
-        const tree = await processor.processResume(file);
-        
+        const { tree, title } = await processor.processResume(file);
+
+        console.log('🏪 Store: Setting resumeTitle to:', title);
+        console.log('🏪 Store: Title length:', title?.length);
+
         set((state) => {
           state.resumeTree = tree;
+          state.resumeTitle = title;
           state.numbering = computeNumbering(tree);
           state.isInitializing = false;
           state.phase = 'active';

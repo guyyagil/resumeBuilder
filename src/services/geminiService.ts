@@ -30,8 +30,12 @@ export class GeminiService {
     });
   }
 
-  async structureResumeFromText(resumeText: string): Promise<AgentAction[]> {
-    const prompt = `${RESUME_STRUCTURING_PROMPT}\n\nResume Text to Parse:\n${resumeText}`;
+  async structureResumeFromText(resumeText: string): Promise<{ actions: AgentAction[], title: string }> {
+    const prompt = `${RESUME_STRUCTURING_PROMPT}\n\nResume Text to Parse:\n${resumeText}
+
+IMPORTANT: Before the action array, on the first line, output the main title/header of the resume (usually the person's name or main header). Format:
+TITLE: [main title here]
+Then output the JSON action array on the following lines.`;
 
     console.log('🤖 Sending resume to AI for structuring...');
     console.log('Prompt length:', prompt.length);
@@ -44,6 +48,10 @@ export class GeminiService {
       console.log('Response length:', response.length);
       console.log('Full response:', response);
 
+      // Extract title
+      const titleMatch = response.match(/TITLE:\s*(.+)/);
+      const title = titleMatch ? titleMatch[1].trim() : '';
+
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         console.error('❌ No JSON array found in AI response');
@@ -53,15 +61,16 @@ export class GeminiService {
 
       const actions = JSON.parse(jsonMatch[0]) as AgentAction[];
       console.log('✅ Parsed actions:', actions.length);
+      console.log('✅ Extracted title:', title);
 
-      return actions;
+      return { actions, title };
     } catch (error) {
       console.error('❌ Failed to structure resume:', error);
       throw new Error('Failed to parse resume structure');
     }
   }
 
-  async structureResumeFromTextAndImages(resumeText: string, images: string[]): Promise<AgentAction[]> {
+  async structureResumeFromTextAndImages(resumeText: string, images: string[]): Promise<{ actions: AgentAction[], title: string }> {
     const visualPrompt = `${RESUME_STRUCTURING_PROMPT}
 
 VISUAL ANALYSIS INSTRUCTIONS:
@@ -78,7 +87,11 @@ You are seeing the actual PDF resume as images. Use the visual layout to:
 Resume Text (for content extraction):
 ${resumeText}
 
-Analyze the images above and the text to generate the action array.`;
+IMPORTANT: Before the action array, on the first line, output the main title/header of the resume (usually the person's name or main header that you see prominently at the top of the visual). Format:
+TITLE: [main title here]
+Then output the JSON action array on the following lines.
+
+Analyze the images above and the text to generate the title and action array.`;
 
     console.log('🤖 Sending resume with images to AI for structuring...');
     console.log('Prompt length:', visualPrompt.length);
@@ -89,7 +102,7 @@ Analyze the images above and the text to generate the action array.`;
       const contentParts: any[] = [];
 
       // Add each image
-      images.forEach((imageBase64, index) => {
+      images.forEach((imageBase64) => {
         contentParts.push({
           inlineData: {
             data: imageBase64,
@@ -110,6 +123,10 @@ Analyze the images above and the text to generate the action array.`;
       console.log('Response length:', response.length);
       console.log('Full response:', response);
 
+      // Extract title
+      const titleMatch = response.match(/TITLE:\s*(.+)/);
+      const title = titleMatch ? titleMatch[1].trim() : '';
+
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         console.error('❌ No JSON array found in AI response');
@@ -119,8 +136,9 @@ Analyze the images above and the text to generate the action array.`;
 
       const actions = JSON.parse(jsonMatch[0]) as AgentAction[];
       console.log('✅ Parsed actions:', actions.length);
+      console.log('✅ Extracted title:', title);
 
-      return actions;
+      return { actions, title };
     } catch (error) {
       console.error('❌ Failed to structure resume with images:', error);
       throw new Error('Failed to parse resume structure with visual analysis');

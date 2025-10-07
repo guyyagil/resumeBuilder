@@ -5,7 +5,10 @@ import { useAppStore } from '../../store/useAppStore';
 import { TreeResumeRenderer } from './TreeResumeRenderer';
 
 export const ResumeView: React.FC = () => {
-  const { resumeTree } = useAppStore();
+  const { resumeTree, resumeTitle } = useAppStore();
+
+  console.log('📋 ResumeView render - resumeTitle:', resumeTitle);
+  console.log('📋 ResumeView render - resumeTree length:', resumeTree.length);
 
   if (resumeTree.length === 0) {
     return (
@@ -24,6 +27,11 @@ export const ResumeView: React.FC = () => {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto p-8 bg-white min-h-full">
+        {resumeTitle && (
+          <h1 className="text-2xl font-bold text-center mb-6 text-gray-900">
+            {resumeTitle}
+          </h1>
+        )}
         <TreeResumeRenderer tree={resumeTree} />
       </div>
     </div>

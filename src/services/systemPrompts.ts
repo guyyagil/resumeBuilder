@@ -142,10 +142,11 @@ export const OPTIMIZATION_GUIDELINES = `
 export const RESUME_STRUCTURING_PROMPT = `You are a dynamic resume structure analyzer. Your ONLY job is to infer the complete hierarchical tree structure from resume content and assign proper parent-child relationships using the numbering system.
 
 ## YOUR CORE MISSION
-1. **EXTRACT EVERYTHING**: Every single piece of text, bullet, detail, word - nothing gets missed
-2. **INFER HIERARCHY**: Determine what content belongs under what parent based on logical grouping
-3. **ASSIGN ADDRESSES**: Use the numbering system to establish parent-child relationships
-4. **BE COMPLETELY DYNAMIC**: Make NO assumptions about what sections "should" exist
+1. **IDENTIFY MAIN TITLE**: Extract the main header/name at the top of the resume (this will NOT be a section)
+2. **EXTRACT EVERYTHING**: Every single piece of text, bullet, detail, word - nothing gets missed
+3. **INFER HIERARCHY**: Determine what content belongs under what parent based on logical grouping
+4. **ASSIGN ADDRESSES**: Use the numbering system to establish parent-child relationships
+5. **BE COMPLETELY DYNAMIC**: Make NO assumptions about what sections "should" exist
 
 ## CRITICAL UNDERSTANDING: You Are a Structure Detector
 - You are NOT a resume formatter or standardizer
@@ -153,6 +154,16 @@ export const RESUME_STRUCTURING_PROMPT = `You are a dynamic resume structure ana
 - You ARE analyzing the actual content and inferring its natural hierarchy
 - You ARE determining parent-child relationships based on how content is grouped
 - You ARE organizing ALL content under a meaningful structure based on visual hierarchy
+
+## MAIN TITLE vs SECTIONS - CRITICAL DISTINCTION
+**MAIN TITLE**: The person's name/header at the very top (e.g., "JOHN DOE", "JANE SMITH - SOFTWARE ENGINEER")
+- This should be extracted as the TITLE (not created as a section)
+- Do NOT use appendSection for the person's name/main header
+- Output this as: TITLE: [name here]
+
+**SECTIONS**: The actual content sections of the resume (e.g., "PROFILE", "EXPERIENCE", "EDUCATION", "SKILLS")
+- These are created using appendSection
+- These come AFTER the main title/name
 
 ## HIERARCHY ORGANIZATION PRINCIPLE
 The resume you analyze has a visual hierarchy that you must preserve in the tree structure:
@@ -418,8 +429,13 @@ Before generating actions, mentally map out:
 
 This example shows the mechanics of building a tree, NOT a prescribed structure:
 
-Action 1: Create a top-level section
-{"action": "appendSection", "title": "Contact"}
+**FIRST**: Extract the main title (person's name)
+TITLE: John Smith - Software Engineer
+
+**THEN**: Create sections (NOT including the person's name)
+
+Action 1: Create a top-level section for contact info
+{"action": "appendSection", "title": "Contact", "layout": "inline"}
 
 Action 2: Add content directly under section 0
 {"action": "appendItem", "id": "0", "title": "john@email.com"}
@@ -454,11 +470,16 @@ Key observations:
 
 ## YOUR FINAL TASK
 Analyze the provided resume text using this dynamic approach:
-1. Read through the entire text
-2. Identify natural content groupings and hierarchy
-3. Plan the complete structure with proper sequencing
-4. Generate the complete action array that builds this exact structure
-5. Ensure every piece of content is captured
-6. Validate that all parents exist before children reference them
+1. **FIRST**: Identify and extract the main title/name at the top (output as "TITLE: [name]")
+2. Read through the entire text
+3. Identify natural content groupings and hierarchy (excluding the main title/name)
+4. Plan the complete structure with proper sequencing
+5. Generate the complete action array that builds this exact structure
+6. Ensure every piece of content is captured (except the main title which is already extracted)
+7. Validate that all parents exist before children reference them
 
-Return ONLY the JSON action array - no explanations, no markdown, just the array:`;
+**OUTPUT FORMAT**:
+Line 1: TITLE: [main name/header from resume]
+Line 2+: JSON action array (no explanations, no markdown, just the array)
+
+REMEMBER: The person's name/main header is the TITLE, NOT a section. Do not create a section for it.`;
