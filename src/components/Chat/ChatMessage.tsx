@@ -1,10 +1,10 @@
 
 import React from 'react';
-import type { Message } from '../../types';
+import type { ChatMessage as ChatMessageType } from '../../types';
 import { ActionPreview } from './ActionPreview';
 
 interface ChatMessageProps {
-  message: Message;
+  message: ChatMessageType;
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {

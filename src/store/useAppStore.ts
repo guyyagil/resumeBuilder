@@ -43,6 +43,8 @@ interface AppState {
   resumeTitle: string;
   numbering: Numbering;
   jobDescription: string;
+  textDirection: 'ltr' | 'rtl';
+  language: string;
   
   // Chat
   messages: ChatMessage[];
@@ -103,6 +105,8 @@ const initialState = {
   resumeTitle: '',
   numbering: { addrToUid: {}, uidToAddr: {} },
   jobDescription: '',
+  textDirection: 'ltr' as 'ltr' | 'rtl',
+  language: 'en',
   messages: [],
   isProcessing: false,
   history: [],
@@ -141,11 +145,21 @@ export const useAppStore = create<AppState>()(
     applyAction: (action, description) =>
       set((state) => {
         try {
+          console.log('🏪 Store: Before action - tree length:', state.resumeTree.length);
+          console.log('🏪 Store: Action:', action);
+          
           const handler = new ActionHandler(state.resumeTree, state.numbering);
           const updatedTree = handler.apply(action);
 
+          console.log('🏪 Store: After action - tree length:', updatedTree.length);
+          console.log('🏪 Store: Updated tree:', updatedTree);
+
           state.resumeTree = updatedTree;
+          const oldNumbering = { ...state.numbering };
           state.numbering = computeNumbering(state.resumeTree);
+          
+          console.log('🏪 Store: Old numbering:', oldNumbering);
+          console.log('🏪 Store: New numbering:', state.numbering);
 
           if (state.historyIndex < state.history.length - 1) {
             state.history = state.history.slice(0, state.historyIndex + 1);
@@ -158,6 +172,8 @@ export const useAppStore = create<AppState>()(
             state.history = state.history.slice(-state.maxHistorySize);
             state.historyIndex = state.history.length - 1;
           }
+          
+          console.log('🏪 Store: Action applied successfully, new tree length:', state.resumeTree.length);
         } catch (error) {
           console.error('Failed to apply action:', error);
           throw error;
@@ -254,14 +270,17 @@ export const useAppStore = create<AppState>()(
         
         const { PDFProcessor } = await import('../services/pdfProcessor');
         const processor = new PDFProcessor(apiKey);
-        const { tree, title } = await processor.processResume(file);
+        const { tree, title, textDirection, language } = await processor.processResume(file);
 
         console.log('🏪 Store: Setting resumeTitle to:', title);
         console.log('🏪 Store: Title length:', title?.length);
+        console.log('🏪 Store: Text direction:', textDirection, 'Language:', language);
 
         set((state) => {
           state.resumeTree = tree;
           state.resumeTitle = title;
+          state.textDirection = textDirection;
+          state.language = language;
           state.numbering = computeNumbering(tree);
           state.isInitializing = false;
           state.phase = 'active';

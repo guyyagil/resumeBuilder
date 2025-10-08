@@ -1,5 +1,7 @@
 import React from 'react';
 import type { ResumeNode } from '../../types';
+import { useAppStore } from '../../store/useAppStore';
+import { UnifiedBlock } from './UnifiedBlock';
 
 interface TreeResumeRendererProps {
   tree: ResumeNode[];
@@ -10,135 +12,31 @@ export const TreeResumeRenderer: React.FC<TreeResumeRendererProps> = ({
   tree,
   className = ''
 }) => {
+  const textDirection = useAppStore((state) => state.textDirection);
+  const historyIndex = useAppStore((state) => state.historyIndex); // Force re-render on changes
+  
+  console.log('🌳 TreeRenderer: Rendering tree with', tree.length, 'nodes');
+  console.log('🌳 TreeRenderer: Tree structure:', tree);
+  console.log('🌳 TreeRenderer: History index:', historyIndex);
+
   return (
-    <div className={`tree-resume ${className}`}>
-      {tree.map((node) => (
-        <ResumeNodeRenderer key={node.uid} node={node} depth={0} />
+    <div
+      className={`resume-document ${className}`}
+      dir={textDirection}
+      style={{ direction: textDirection }}
+      key={`tree-${historyIndex}`} // Force re-render when history changes
+    >
+      {tree.map((node, index) => (
+        <UnifiedBlock
+          key={`${node.uid}-${historyIndex}-${index}`}
+          node={node}
+          depth={0}
+          textDirection={textDirection}
+          showAddresses={false} // Can be made configurable
+        />
       ))}
     </div>
   );
 };
 
-interface ResumeNodeRendererProps {
-  node: ResumeNode;
-  depth: number;
-}
 
-const ResumeNodeRenderer: React.FC<ResumeNodeRendererProps> = ({
-  node,
-  depth
-}) => {
-  const { title, content, children, layout } = node;
-  const hasChildren = children && children.length > 0;
-  const isLeaf = !hasChildren;
-
-  // Root level (depth 0): Always render as section headers
-  if (depth === 0) {
-    return (
-      <section className="mb-6">
-        <h2 className="text-lg font-semibold border-b border-gray-300 pb-1 mb-3 uppercase">
-          {title}
-        </h2>
-        {content && !hasChildren && (
-          <p className="text-sm text-gray-700">{content}</p>
-        )}
-        {hasChildren && (
-          <ChildrenRenderer layout={layout} depth={depth}>
-            {children.map((child) => (
-              <ResumeNodeRenderer key={child.uid} node={child} depth={depth + 1} />
-            ))}
-          </ChildrenRenderer>
-        )}
-      </section>
-    );
-  }
-
-  // For all other depths: Use leaf vs parent logic
-
-  // LEAF NODE: Render as bullet point
-  if (isLeaf) {
-    return (
-      <li className="text-sm text-gray-700">
-        {content || title}
-      </li>
-    );
-  }
-
-  // PARENT NODE: Render as item with children as bullets
-  return (
-    <div className="mb-3">
-      {/* Title for parent items */}
-      <div className="font-medium text-sm mb-1">{title}</div>
-
-      {/* Content if different from title */}
-      {content && content !== title && (
-        <div className="text-sm text-gray-700 mb-1">{content}</div>
-      )}
-
-      {/* Children rendered as bulleted list */}
-      <ul className="list-disc list-inside space-y-1 ml-2">
-        {children.map((child) => (
-          <ResumeNodeRenderer key={child.uid} node={child} depth={depth + 1} />
-        ))}
-      </ul>
-    </div>
-  );
-};
-
-// Component to handle different layout styles for children
-const ChildrenRenderer: React.FC<{
-  layout?: string;
-  depth: number;
-  children: React.ReactNode;
-}> = ({ layout, children }) => {
-  switch (layout) {
-    case 'inline':
-      // Horizontal inline layout (contact info)
-      return (
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-          {children}
-        </div>
-      );
-
-    case 'grid':
-      // Grid layout (skills)
-      return (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-          {children}
-        </div>
-      );
-
-    case 'columns':
-      // Multi-column layout
-      return (
-        <div className="columns-2 gap-6">
-          {children}
-        </div>
-      );
-
-    case 'compact':
-      // Compact spacing
-      return (
-        <div className="space-y-1">
-          {children}
-        </div>
-      );
-
-    case 'card':
-      // Card layout with border
-      return (
-        <div className="grid grid-cols-1 gap-4">
-          {children}
-        </div>
-      );
-
-    case 'default':
-    default:
-      // Standard vertical list
-      return (
-        <div className="space-y-3">
-          {children}
-        </div>
-      );
-  }
-};

@@ -28,7 +28,7 @@ export const ResumeUpload = () => {
     setError(null);
 
     try {
-  await initializeFromPDF(file, apiKey);
+      await initializeFromPDF(file, '');
     } catch (err) {
       console.error('Upload error:', err);
       setError((err as Error).message || 'Failed to parse resume');

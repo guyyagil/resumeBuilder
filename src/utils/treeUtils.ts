@@ -68,38 +68,21 @@ export function generateUid(): string {
 }
 
 /**
- * Validate the tree structure
+ * Validate the tree structure (legacy wrapper)
  * @param tree - The tree to validate
  * @returns Array of error messages (empty if valid)
  */
 export function validateTree(tree: ResumeNode[]): string[] {
-  const errors: string[] = [];
-  const seenUids = new Set<string>();
+  // Import validation function dynamically to avoid circular imports
+  const { validateTreeWithConstraints } = require('./validation');
+  const result = validateTreeWithConstraints(tree);
   
-  function walk(nodes: ResumeNode[], path: string = 'root'): void {
-    nodes.forEach((node, idx) => {
-      const currentPath = `${path}[${idx}]`;
-      
-      if (!node.uid) {
-        errors.push(`${currentPath}: Missing uid`);
-      } else if (seenUids.has(node.uid)) {
-        errors.push(`${currentPath}: Duplicate uid "${node.uid}"`);
-      } else {
-        seenUids.add(node.uid);
-      }
-      
-      if (!node.title) {
-        errors.push(`${currentPath}: Missing title`);
-      }
-      
-      if (node.children) {
-        walk(node.children, currentPath);
-      }
-    });
-  }
+  const messages: string[] = [];
+  result.errors.forEach(error => {
+    messages.push(`${error.path}: ${error.message}`);
+  });
   
-  walk(tree);
-  return errors;
+  return messages;
 }
 
 /**

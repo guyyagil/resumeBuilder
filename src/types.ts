@@ -1,125 +1,171 @@
-// Complete type definitions per architecture specification
-// This file ensures all required types are defined correctly
+// Unified Node System Type Definitions
+// Single node type replaces section/item/bullet/text with layout-driven presentation
 
-export type LayoutType =
-  | 'default'      // Standard vertical list
-  | 'inline'       // Horizontal inline items (for contact info)
-  | 'grid'         // Grid layout (for skills)
-  | 'columns'      // Multi-column layout
-  | 'compact'      // Compact spacing
-  | 'card';        // Card-style with border/shadow
+// =============================================================================
+// CORE UNIFIED NODE SYSTEM
+// =============================================================================
 
+/**
+ * Single unified node type for all resume content
+ * Presentation is controlled by layout and style, not node type
+ */
 export type ResumeNode = {
-  uid: string;              // Stable unique identifier (e.g., "uid_abc123")
-  addr?: string;            // Computed numeric address (e.g., "2.1.3")
-  title: string;            // Node display title
-  content?: string;         // Free-form text content (paragraphs, bullets, etc.)
-  layout?: LayoutType;      // How to render this node's children
-  meta?: {                  // Extensible metadata
-    type?: NodeType;        // 'section' | 'item' | 'bullet' | 'text' | 'contact'
-    dateRange?: string;     // For experience/education
-    location?: string;      // For jobs/schools
-    company?: string;       // For work items
-    role?: string;          // For positions
-    tags?: string[];        // Skill categories, keywords
-    [key: string]: any;
-  };
-  children?: ResumeNode[];  // Nested nodes
+  uid: string;                 // Stable unique identifier
+  addr?: string;               // Computed address (e.g., "2.1.3")
+
+  // Content
+  title?: string;              // Short title/heading for the block (optional)
+  text?: string;               // Rich/plain text content (optional)
+
+  // Presentation (purely visual/semantic hints)
+  layout?: LayoutKind;         // How to render this block
+  style?: StyleHints;          // Typography & spacing hints
+
+  // Semantics / metadata (AI- and export-facing)
+  meta?: Record<string, any>;  // e.g., dateRange, role, company, tags, etc.
+
+  children?: ResumeNode[];     // Recursive tree
 };
 
-export type NodeType = 
-  | 'section'      // Top-level sections (Experience, Education, etc.)
-  | 'item'         // Mid-level items (Job, Project, Degree)
-  | 'bullet'       // Achievement/responsibility bullet point
-  | 'text'         // Free-form text block
-  | 'contact';     // Contact information
+/**
+ * Layout types determine how a node is rendered
+ */
+export type LayoutKind =
+  | 'heading'        // Large label like section headers
+  | 'paragraph'      // Text block
+  | 'list-item'      // One bullet/numbered line
+  | 'key-value'      // Label:value, for contacts or facts
+  | 'grid'           // Multi-column container (children define cells)
+  | 'container';     // Generic group (no inherent visual bullets)
 
-export type ResumeTree = ResumeNode[];  // Root is always an array
+/**
+ * Style hints for typography and spacing
+ */
+export type StyleHints = {
+  level?: number;              // e.g., heading level (1..4), or list nesting level
+  listMarker?: 'bullet' | 'number' | 'dash' | 'none';
+  indent?: number;             // px/em indentation hint
+  weight?: 'regular' | 'medium' | 'semibold' | 'bold';
+  italic?: boolean;
+  align?: 'left' | 'center' | 'right';
+  
+  // Extended style properties
+  fontSize?: string;           // e.g., "16px", "1.2em"
+  color?: string;              // Text color
+  backgroundColor?: string;    // Background color
+  marginTop?: string;          // Spacing above
+  marginBottom?: string;       // Spacing below
+  paddingLeft?: string;        // Left padding
+  paddingRight?: string;       // Right padding
+  borderBottom?: string;       // Bottom border
+  lineHeight?: string | number; // Line spacing
+  
+  // Extensible for additional properties
+  [key: string]: any;
+};
 
+/**
+ * Root resume tree type
+ */
+export type ResumeTree = ResumeNode[];
+
+/**
+ * Bidirectional address-to-UID mapping
+ */
 export type Numbering = {
   addrToUid: Record<string, string>;  // "2.1.3" → "uid_xyz"
   uidToAddr: Record<string, string>;  // "uid_xyz" → "2.1.3"
 };
 
-// Agent Actions - All 8 types as per specification
+// =============================================================================
+// GENERIC ACTION SYSTEM
+// =============================================================================
 
-export type AgentAction = 
-  | ReplaceAction
-  | AppendBulletAction
-  | AppendItemAction
-  | AppendSectionAction
-  | RemoveAction
+/**
+ * Generic, address-based operations for all node types
+ */
+export type AgentAction =
+  | AppendChildAction
+  | InsertSiblingAction
+  | ReplaceTextAction
+  | UpdateAction
   | MoveAction
-  | ReorderAction
-  | UpdateMetaAction;
+  | RemoveAction
+  | ReorderAction;
 
-// Replace content of existing node
-export type ReplaceAction = {
-  action: 'replace';
-  id: string;           // Numeric address (e.g., "3.1.2")
-  text: string;         // New content
+/**
+ * Create any block (heading, list-item, paragraph) under parent
+ */
+export type AppendChildAction = {
+  action: 'appendChild';
+  parent: string;              // Parent address
+  node: Partial<ResumeNode>;   // Node properties to create
 };
 
-// Add bullet to existing item
-export type AppendBulletAction = {
-  action: 'appendBullet';
-  id: string;           // Parent item address (e.g., "3.1")
-  text: string;         // Bullet content
+/**
+ * Insert sibling after specified node (for linear building from PDFs)
+ */
+export type InsertSiblingAction = {
+  action: 'insertSibling';
+  after: string;               // Reference node address
+  node: Partial<ResumeNode>;   // Node properties to create
 };
 
-// Add new item to section
-export type AppendItemAction = {
-  action: 'appendItem';
-  id: string;           // Parent section address (e.g., "3.0")
-  title: string;        // Item title
-  content?: string;     // Item description
-  meta?: Record<string, any>;  // Metadata (dates, location, etc.)
+/**
+ * Convenience for updating text content only
+ */
+export type ReplaceTextAction = {
+  action: 'replaceText';
+  id: string;                  // Node address
+  text: string;                // New text content
 };
 
-// Add new top-level section
-export type AppendSectionAction = {
-  action: 'appendSection';
-  title: string;        // Section title
-  layout?: LayoutType;  // How to render children (optional)
-  after?: string;       // Insert after this address (optional)
+/**
+ * Patch title, layout, style, meta, etc.
+ */
+export type UpdateAction = {
+  action: 'update';
+  id: string;                  // Node address
+  patch: Partial<ResumeNode>;  // Properties to update
 };
 
-// Remove node and its children
-export type RemoveAction = {
-  action: 'remove';
-  id: string;           // Address to remove
-};
-
-// Move node to new parent
+/**
+ * Move node to new parent
+ */
 export type MoveAction = {
   action: 'move';
-  id: string;           // Node to move
-  newParent: string;    // Destination parent address
-  position?: number;    // Index in new parent's children
+  id: string;                  // Node to move
+  newParent: string;           // Destination parent address
+  position?: number;           // Index in new parent's children
 };
 
-// Reorder children of a node
+/**
+ * Remove node and its children
+ */
+export type RemoveAction = {
+  action: 'remove';
+  id: string;                  // Address to remove
+};
+
+/**
+ * Change order of sibling nodes
+ */
 export type ReorderAction = {
   action: 'reorder';
-  id: string;           // Parent node address
-  order: string[];      // New order of child addresses
+  id: string;                  // Parent node address
+  order: string[];             // New order of child addresses
 };
 
-// Update node metadata
-export type UpdateMetaAction = {
-  action: 'updateMeta';
-  id: string;           // Node address
-  meta: Record<string, any>;  // New/updated metadata fields
-};
-
-// Chat and History types
+// =============================================================================
+// CHAT AND HISTORY TYPES
+// =============================================================================
 
 export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
-  action?: AgentAction;  // The action that was applied (if any)
+  action?: AgentAction;        // The action that was applied (if any)
 };
 
 export type HistoryEntry = {
@@ -127,37 +173,39 @@ export type HistoryEntry = {
   tree: ResumeNode[];
   numbering: Numbering;
   timestamp: number;
-  description: string;  // What changed
+  description: string;         // What changed
   action?: AgentAction;
 };
 
-// Legacy resume shapes (for conversion utilities)
-export type LegacySection = {
-  title: string;
-  items?: Array<{
-    title?: string;
-    subtitle?: string;
-    bullets?: string[];
-    [key: string]: any;
-  }>;
-  bullets?: string[];
-  [key: string]: any;
+// =============================================================================
+// LEGACY COMPATIBILITY TYPES (for migration)
+// =============================================================================
+
+/**
+ * Legacy action types for backward compatibility during migration
+ * These will be mapped to the new unified actions
+ */
+export type LegacyAction = 
+  | { action: 'append'; parent?: string; content: string; layout?: LayoutKind; style?: StyleHints; meta?: Record<string, any> }
+  | { action: 'replace'; id: string; text: string }
+  | { action: 'updateMeta'; id: string; meta: Record<string, any> };
+
+// =============================================================================
+// VALIDATION AND ERROR TYPES
+// =============================================================================
+
+export type ValidationError = {
+  type: 'missing_uid' | 'invalid_layout' | 'empty_container' | 'invalid_address' | 'missing_content';
+  message: string;
+  path: string;
+  severity: 'error' | 'warning';
 };
 
-export type LegacyResume = {
-  sections: LegacySection[];
-  [key: string]: any;
+export type ValidationResult = {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationError[];
 };
 
-// Chat message shape used by ChatMessage component
-export type Message = {
-  id: string;
-  role?: 'user' | 'assistant' | 'system' | string;
-  text?: string;
-  content?: string;
-  action?: any;
-  error?: string;
-  timestamp?: number;
-  [key: string]: any;
-};
+
 
