@@ -115,7 +115,7 @@ const HeadingBlock: React.FC<BlockProps> = ({ node, depth, textDirection, showAd
             </div>
             {children && children.length > 0 && (
                 <div style={buildChildrenContainerStyle('container', depth, textDirection)}>
-                    {children.map((child, index) => (
+                    {children.map((child) => (
                         <UnifiedBlock
                             key={child.uid}
                             node={child}
@@ -147,7 +147,7 @@ const ParagraphBlock: React.FC<BlockProps> = ({ node, depth, textDirection, show
             </div>
             {children && children.length > 0 && (
                 <div style={buildChildrenContainerStyle('container', depth, textDirection)}>
-                    {children.map((child, index) => (
+                    {children.map((child) => (
                         <UnifiedBlock
                             key={child.uid}
                             node={child}
@@ -186,7 +186,7 @@ const ListItemBlock: React.FC<BlockProps> = ({ node, depth, textDirection, showA
             </div>
             {children && children.length > 0 && (
                 <div style={buildChildrenContainerStyle('container', depth, textDirection)}>
-                    {children.map((child, index) => (
+                    {children.map((child) => (
                         <UnifiedBlock
                             key={child.uid}
                             node={child}
@@ -222,7 +222,7 @@ const KeyValueBlock: React.FC<BlockProps> = ({ node, depth, textDirection, showA
             </div>
             {children && children.length > 0 && (
                 <div style={buildChildrenContainerStyle('container', depth, textDirection)}>
-                    {children.map((child, index) => (
+                    {children.map((child) => (
                         <UnifiedBlock
                             key={child.uid}
                             node={child}
@@ -253,7 +253,7 @@ const GridBlock: React.FC<BlockProps> = ({ node, depth, textDirection, showAddre
             )}
             {children && children.length > 0 && (
                 <div style={buildChildrenContainerStyle('grid', depth, textDirection)}>
-                    {children.map((child, index) => (
+                    {children.map((child) => (
                         <UnifiedBlock
                             key={child.uid}
                             node={child}
@@ -284,7 +284,7 @@ const ContainerBlock: React.FC<BlockProps> = ({ node, depth, textDirection, show
             )}
             {children && children.length > 0 && (
                 <div style={buildChildrenContainerStyle('container', depth, textDirection)}>
-                    {children.map((child, index) => (
+                    {children.map((child) => (
                         <UnifiedBlock
                             key={child.uid}
                             node={child}
