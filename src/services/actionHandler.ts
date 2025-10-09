@@ -12,9 +12,9 @@ import type {
   MoveAction,
   RemoveAction,
   ReorderAction
-} from '../types';
-import { findNodeByUid, findParentByChildUid, generateUid, cloneTree } from '../utils/treeUtils';
-import { resolveAddress } from '../utils/numbering';
+} from '../shared/types';
+import { findNodeByUid, findParentByChildUid, generateUid, cloneTree } from '../shared/utils/tree/treeUtils';
+import { resolveAddress } from '../shared/utils/tree/numbering';
 import { validateAction } from '../utils/validation';
 
 export class ActionHandler {

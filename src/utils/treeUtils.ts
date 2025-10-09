@@ -1,7 +1,7 @@
 // Tree utility functions per architecture specification
 // Functions for finding, manipulating, and validating tree nodes
 
-import type { ResumeNode } from '../types';
+import type { ResumeNode } from '../shared/types';
 
 /**
  * Find a node by its UID in the tree

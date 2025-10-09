@@ -1,7 +1,7 @@
 // Numbering system utilities per architecture specification
 // Generates and maintains bidirectional mappings between numeric addresses and UIDs
 
-import type { ResumeNode, Numbering } from '../types';
+import type { ResumeNode, Numbering } from '../shared/types';
 
 /**
  * Compute numbering for the entire tree (1-based indexing)

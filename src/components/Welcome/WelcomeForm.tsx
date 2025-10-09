@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store';
 
 export const WelcomeForm: React.FC = () => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);

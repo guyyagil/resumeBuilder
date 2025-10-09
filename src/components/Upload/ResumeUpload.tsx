@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent } from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
 
 export const ResumeUpload = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -17,10 +17,10 @@ export const ResumeUpload = () => {
       return;
     }
 
-    const apiKey = GEMINI_API_KEY;
+    const apiKey = OPENAI_API_KEY;
 
     if (!apiKey) {
-      setError('Gemini API key is not configured.');
+      setError('OpenAI API key is not configured.');
       return;
     }
 

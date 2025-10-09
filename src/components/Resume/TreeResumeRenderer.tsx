@@ -1,6 +1,6 @@
 import React from 'react';
-import type { ResumeNode } from '../../types';
-import { useAppStore } from '../../store/useAppStore';
+import type { ResumeNode } from '../../shared/types';
+import { useAppStore } from '../../store';
 import { UnifiedBlock } from './UnifiedBlock';
 
 interface TreeResumeRendererProps {

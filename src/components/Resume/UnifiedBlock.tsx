@@ -1,6 +1,6 @@
 
 import React from 'react';
-import type { ResumeNode, LayoutKind, StyleHints } from '../../types';
+import type { ResumeNode, LayoutKind, StyleHints } from '../../shared/types';
 
 interface UnifiedBlockProps {
     node: ResumeNode;

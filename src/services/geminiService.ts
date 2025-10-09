@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { ResumeNode, AgentAction, LayoutKind, StyleHints } from '../types';
-import { serializeWithMeta } from './prompts';
-import { generateUid } from '../utils/treeUtils';
+import type { ResumeNode, AgentAction, LayoutKind, StyleHints } from '../shared/types';
+// import { serializeWithMeta } from './prompts'; // TODO: Implement this function
+import { generateUid } from '../shared/utils/tree/treeUtils';
 import {
   RESUME_AGENT_SYSTEM_PROMPT,
   JOB_TAILORING_SYSTEM_ADDITION,
-  RESUME_STRUCTURING_PROMPT,
+  RESUME_STRUCTURING_PROMPT
 } from './systemPrompts';
 
 interface ConversationMessage {
@@ -31,7 +31,7 @@ export class GeminiService {
     });
   }
 
-  async structureResumeFromText(resumeText: string): Promise<{ actions: AgentAction[], title: string }> {
+  async structureResumeFromText(resumeText: string): Promise<{ tree: ResumeNode[], title: string }> {
     const prompt = `${RESUME_STRUCTURING_PROMPT}\n\nResume Text to Parse:\n${resumeText}
 
 IMPORTANT: Before the action array, on the first line, output the main title/header of the resume (usually the person's name or main header). Format:
@@ -64,7 +64,11 @@ Then output the JSON action array on the following lines.`;
       console.log('✅ Parsed actions:', actions.length);
       console.log('✅ Extracted title:', title);
 
-      return { actions, title };
+      // Convert actions to tree
+      const tree = this.buildTreeFromAppendActions(actions);
+      console.log('✅ Built tree with', this.countNodes(tree), 'nodes');
+
+      return { tree, title };
     } catch (error) {
       console.error('❌ Failed to structure resume:', error);
       throw new Error('Failed to parse resume structure');
@@ -276,11 +280,9 @@ Analyze the images above and the text to generate the title and action array wit
     jobDescription?: string,
     conversationHistory: ConversationMessage[] = [],
   ): Promise<{ explanation: string; action?: AgentAction }> {
-    const resumeText = serializeWithMeta(resumeTree);
-
-    // Import the serializeForLLM function for numbered outline
-    const { serializeForLLM } = await import('../utils/numbering');
-    const numberedOutline = serializeForLLM(resumeTree);
+    // Use the new address-based context instead of old serialization
+    const { createResumeContextSummary } = await import('../utils/resumeSerializer');
+    const resumeContext = createResumeContextSummary(resumeTree);
 
     let systemPrompt = RESUME_AGENT_SYSTEM_PROMPT;
     if (jobDescription) {
@@ -290,17 +292,17 @@ Analyze the images above and the text to generate the title and action array wit
       )}`;
     }
 
-    // Add numbered outline to system prompt
-    systemPrompt += `\n\n## Current Resume Structure (with addresses):\n\n${numberedOutline}`;
+    // Add address-based resume context
+    systemPrompt += `\n\n${resumeContext}`;
 
-    console.log('🤖 System prompt includes numbered outline:', numberedOutline.substring(0, 200) + '...');
+    console.log('🤖 System prompt includes address-based context:', resumeContext.substring(0, 200) + '...');
 
     const messages = [
       {
         role: 'user',
         parts: [
           {
-            text: `${systemPrompt}\n\n## Current Resume:\n\n${resumeText}`,
+            text: systemPrompt,
           },
         ],
       },
@@ -329,7 +331,7 @@ Analyze the images above and the text to generate the title and action array wit
     resumeTree: ResumeNode[],
     jobDescription?: string,
   ): Promise<string[]> {
-    const resumeText = serializeWithMeta(resumeTree);
+    const resumeText = JSON.stringify(resumeTree); // Temporary implementation
 
     let prompt = `Analyze this resume and provide 3-5 specific, actionable suggestions for improvement. Focus on:\n1. Quantifying achievements\n2. Using stronger action verbs\n3. Adding missing technical details\n4. Improving clarity and impact\n\nResume:\n${resumeText}`;
 
@@ -444,13 +446,47 @@ Analyze the images above and the text to generate the title and action array wit
     console.log('🔍 Parsing AI response:', response);
 
     // Try to extract JSON from code blocks first (```json ... ```)
-    const codeBlockMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    const codeBlockMatch = response.match(/```(?:json)?\s*([\{\[][\s\S]*?[\}\]])\s*```/);
 
     if (codeBlockMatch) {
       try {
-        const action = JSON.parse(codeBlockMatch[1]) as AgentAction;
+        const parsed = JSON.parse(codeBlockMatch[1]);
         const explanation = response.substring(0, codeBlockMatch.index).trim() ||
           response.substring((codeBlockMatch.index || 0) + codeBlockMatch[0].length).trim();
+
+        // Handle array of actions - validate and pick first valid one
+        if (Array.isArray(parsed)) {
+          console.log(`⚠️ AI returned ${parsed.length} actions in array`);
+
+          // Validate for duplicates
+          const usedIds = new Set<string>();
+          for (const action of parsed) {
+            const id = action.id || action.address;
+            if (id && usedIds.has(id)) {
+              console.error(`❌ Duplicate action on address ${id} - ignoring invalid actions`);
+              return {
+                explanation: `I need to reorder items, but I made an error in my action. Let me provide the correct reorder action.`,
+              };
+            }
+            if (id) usedIds.add(id);
+          }
+
+          // For reorder actions with multiple items, keep as single action
+          if (parsed.length === 1) {
+            const action = parsed[0] as AgentAction;
+            console.log('✅ Parsed single action from array:', action);
+            return { explanation, action };
+          }
+
+          // If multiple different actions, warn and use first
+          console.warn('⚠️ Multiple actions detected, using first action only');
+          const action = parsed[0] as AgentAction;
+          console.log('✅ Using first action:', action);
+          return { explanation, action };
+        }
+
+        // Single action object
+        const action = parsed as AgentAction;
         console.log('✅ Parsed action from code block:', action);
         console.log('📝 Explanation:', explanation);
         return { explanation, action };
@@ -460,7 +496,7 @@ Analyze the images above and the text to generate the title and action array wit
     }
 
     // Fallback: try to find JSON object directly
-    const jsonMatch = response.match(/\{[\s\S]*?\}/);
+    const jsonMatch = response.match(/[\{\[][\s\S]*?[\}\]]/);
 
     if (!jsonMatch) {
       console.log('ℹ️ No JSON found in response, returning as explanation only');
@@ -468,8 +504,20 @@ Analyze the images above and the text to generate the title and action array wit
     }
 
     try {
-      const action = JSON.parse(jsonMatch[0]) as AgentAction;
+      const parsed = JSON.parse(jsonMatch[0]);
       const explanation = response.substring(0, jsonMatch.index).trim();
+
+      // Handle arrays same as above
+      if (Array.isArray(parsed)) {
+        console.log(`⚠️ AI returned ${parsed.length} actions in array`);
+        if (parsed.length > 0) {
+          const action = parsed[0] as AgentAction;
+          console.log('✅ Using first action from array:', action);
+          return { explanation, action };
+        }
+      }
+
+      const action = parsed as AgentAction;
       console.log('✅ Parsed action:', action);
       console.log('📝 Explanation:', explanation);
       return { explanation, action };

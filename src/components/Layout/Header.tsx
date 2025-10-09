@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { useAppStore } from '../../store';
 import { UndoRedoButtons } from '../Controls/UndoRedoButtons';
 import { ExportButton } from '../Controls/ExportButton';
 import { NewResumeButton } from '../Controls/NewResumeButton';

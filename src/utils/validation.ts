@@ -1,7 +1,7 @@
 // Validation utilities for unified node system
 // Enforces constraints and validates tree structure integrity
 
-import type { ResumeNode, LayoutKind, ValidationError, ValidationResult } from '../types';
+import type { ResumeNode, LayoutKind, ValidationError, ValidationResult } from '../shared/types';
 
 /**
  * Validate a single node
