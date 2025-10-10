@@ -120,7 +120,7 @@ export const createEditingSlice: StateCreator<AppStore, [["zustand/immer", never
         try {
             // Import and use editing agent
             // const { EditingAgent } = await import('../../features/editing/services/EditingAgent');
-            const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
             if (!apiKey) {
                 throw new Error('Gemini API key is not configured');

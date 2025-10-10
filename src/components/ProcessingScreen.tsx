@@ -50,12 +50,12 @@ export const ProcessingScreen: React.FC = () => {
           <StepIndicator
             label="Analyze"
             isActive={stage === 'structuring'}
-            isCompleted={stage === 'designing'}
+            isCompleted={stage === null}
           />
           <div className="h-0.5 w-8 bg-gray-300" />
           <StepIndicator
-            label="Design"
-            isActive={stage === 'designing'}
+            label="Ready"
+            isActive={stage === null}
             isCompleted={false}
           />
         </div>

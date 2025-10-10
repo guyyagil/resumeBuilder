@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../store';
-import { OpenAIService } from '../../shared/services/ai/OpenAIClient';
+import { GeminiService } from '../../shared/services/ai/GeminiClient';
 import { ChatMessage } from './ChatMessage';
 
 /**
@@ -27,12 +27,12 @@ export const SimpleChatInterface: React.FC = () => {
     useAppStore.getState().setProcessing(true);
 
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) {
-        throw new Error('OpenAI API key is not configured');
+        throw new Error('Gemini API key is not configured');
       }
 
-      const openaiService = new OpenAIService(apiKey);
+      const geminiService = new GeminiService(apiKey);
       
       // Get conversation history
       const history = messages.slice(-10).map((msg) => ({
@@ -52,7 +52,7 @@ User question: ${message}
 
 Provide a helpful, conversational response. Do not include any JSON actions.`;
 
-      const result = await openaiService.processUserMessage(
+      const result = await geminiService.processUserMessage(
         conversationalPrompt,
         [], // No actions needed for chat
         jobDescription || '',

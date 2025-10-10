@@ -1,13 +1,17 @@
-// Gemini AI service - moved from geminiService.ts
+// Gemini AI service - updated to use centralized prompts
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { ResumeNode, AgentAction, LayoutKind, StyleHints } from '../../types';
+import type { ResumeNode, AgentAction } from '../../types';
 import { generateUid } from '../../utils/tree/treeUtils';
-import {
-  RESUME_STRUCTURING_PROMPT
-} from './PromptTemplates';
+import { PromptBuilder } from './PromptTemplates';
 
-interface ConversationMessage {
-  role: 'user' | 'assistant';
+export interface GeminiResponse {
+  actions: AgentAction[];
+  explanation: string;
+  confidence: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
@@ -24,111 +28,214 @@ export class GeminiService {
         topP: 0.95,
         topK: 40,
         maxOutputTokens: 8192,
-      },
+      }
     });
   }
 
-  async structureResumeFromText(resumeText: string): Promise<{ tree: ResumeNode[], title: string }> {
-    const prompt = `${RESUME_STRUCTURING_PROMPT}\n\nResume Text to Parse:\n${resumeText}
-
-IMPORTANT: Before the action array, on the first line, output the main title/header of the resume (usually the person's name or main header). Format:
-TITLE: [main title here]
-Then output the JSON action array on the following lines.`;
-
-    console.log('🤖 Sending resume to AI for structuring...');
-
+  async processUserMessage(
+    prompt: string,
+    _actions: AgentAction[], // Unused for guidance-only responses
+    _resumeContent: string, // Unused - context is in prompt
+    chatHistory: ChatMessage[] = []
+  ): Promise<GeminiResponse> {
     try {
-      const result = await this.model.generateContent(prompt);
+      // Build conversation history for Gemini
+      // Filter out any leading assistant messages (Gemini requires first message to be 'user')
+      let filteredHistory = chatHistory;
+      while (filteredHistory.length > 0 && filteredHistory[0].role === 'assistant') {
+        filteredHistory = filteredHistory.slice(1);
+      }
+
+      const history = filteredHistory.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      }));
+
+      const chat = this.model.startChat({
+        history,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+        }
+      });
+
+      const result = await chat.sendMessage(prompt);
       const response = result.response.text();
 
-      console.log('🤖 AI Response received');
+      return {
+        actions: [], // No actions for guidance-only responses
+        explanation: response,
+        confidence: 0.9
+      };
+    } catch (error) {
+      console.error('Gemini API error:', error);
+      throw new Error(`Gemini API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 
-      const titleMatch = response.match(/TITLE:\s*(.+)/);
-      const title = titleMatch ? titleMatch[1].trim() : '';
+  async generateResumeStructure(
+    pdfText: string,
+    jobDescription?: string
+  ): Promise<{
+    title: string;
+    sections: Array<{
+      type: 'heading' | 'container' | 'list-item';
+      text: string;
+      children?: Array<{
+        type: 'heading' | 'container' | 'list-item';
+        text: string;
+      }>;
+    }>;
+  }> {
+    const prompt = PromptBuilder.buildPDFStructurePrompt(pdfText, jobDescription);
+    console.log('🤖 Calling Gemini API with model: gemini-2.5-flash');
 
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('AI did not return valid action array');
+    const structureModel = this.genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: 0.3,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 12000 // Increased for longer Hebrew content
+      }
+    });
+
+    let response = '';
+
+    try {
+      const result = await structureModel.generateContent(prompt);
+      response = result.response.text();
+
+      console.log('🤖 Gemini API response received');
+      console.log('🤖 Response content:', response);
+
+      if (!response) {
+        console.error('❌ No response content from Gemini');
+        throw new Error('No response from Gemini');
       }
 
-      const actions = JSON.parse(jsonMatch[0]) as AgentAction[];
-      const tree = this.buildTreeFromAppendActions(actions);
+      // Clean the response - remove markdown code blocks if present
+      let cleanResponse = response.trim();
+      if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.replace(/```json\s*/, '').replace(/```\s*$/, '');
+      } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.replace(/```\s*/, '').replace(/```\s*$/, '');
+      }
 
+      const parsed = JSON.parse(cleanResponse);
+      console.log('✅ Successfully parsed JSON response:', parsed);
+      return parsed;
+    } catch (error) {
+      console.error('Gemini structure generation error:', error);
+      console.error('❌ Failed to parse response:', response.substring(0, 500) + '...');
+
+      // Try to extract JSON from partial response with multiple strategies
+      try {
+        // Strategy 1: Find complete JSON object
+        const jsonStart = response.indexOf('{');
+        const jsonEnd = response.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+          const partialJson = response.substring(jsonStart, jsonEnd + 1);
+          console.log('🔧 Attempting to parse partial JSON (strategy 1)...');
+          const partialParsed = JSON.parse(partialJson);
+          console.log('✅ Successfully parsed partial JSON response');
+          return partialParsed;
+        }
+
+        // Strategy 2: Try to fix truncated JSON by adding closing braces
+        if (jsonStart !== -1) {
+          let partialJson = response.substring(jsonStart);
+
+          // Count open braces and try to close them
+          const openBraces = (partialJson.match(/\{/g) || []).length;
+          const closeBraces = (partialJson.match(/\}/g) || []).length;
+          const missingBraces = openBraces - closeBraces;
+
+          if (missingBraces > 0) {
+            // Remove any trailing incomplete content after last complete field
+            partialJson = partialJson.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*"?[^}]*$/, '');
+            // Add missing closing braces
+            partialJson += '}]}'.repeat(Math.min(missingBraces, 3));
+
+            console.log('🔧 Attempting to parse fixed JSON (strategy 2)...');
+            console.log('🔧 Fixed JSON preview:', partialJson.substring(partialJson.length - 200));
+            const fixedParsed = JSON.parse(partialJson);
+            console.log('✅ Successfully parsed fixed JSON response');
+            return fixedParsed;
+          }
+        }
+      } catch (partialError) {
+        console.error('❌ All partial JSON parsing strategies failed:', partialError);
+      }
+
+      throw new Error(`Failed to generate resume structure: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async structureResumeFromText(resumeText: string): Promise<{ tree: ResumeNode[], title: string }> {
+    try {
+      const structuredData = await this.generateResumeStructure(resumeText);
+      const tree = this.convertToResumeNodes(structuredData.sections);
+      const title = structuredData.title;
+      console.log('✅ Successfully converted to tree with', tree.length, 'root nodes');
       return { tree, title };
     } catch (error) {
-      console.error('❌ Failed to structure resume:', error);
-      throw new Error('Failed to parse resume structure');
+      console.warn('❌ New method failed, trying legacy method:', error);
+      // Fallback to old method if new one fails
+      return this.legacyStructureResumeFromText(resumeText);
     }
   }
 
-  private buildTreeFromAppendActions(actions: any[]): ResumeNode[] {
-    const tree: ResumeNode[] = [];
-    const nodeMap = new Map<string, ResumeNode>();
-    let rootCounter = 0;
-
-    for (let i = 0; i < actions.length; i++) {
-      const action = actions[i];
-      if (action.action !== 'append') continue;
-
-      const isHeading = !action.parent && (
-        action.content?.match(/^[A-Z\s]+$/) ||
-        (action.style?.fontWeight && action.style.fontWeight >= 600) ||
-        (action.style?.textTransform === 'uppercase')
-      );
-
-      const newNode: ResumeNode = {
+  private convertToResumeNodes(sections: any[]): ResumeNode[] {
+    return sections.map((section, index) => {
+      const node: ResumeNode = {
         uid: generateUid(),
-        text: action.content || '',
-        layout: (action.layout as LayoutKind) || (isHeading ? 'heading' : 'paragraph'),
-        style: action.style as StyleHints,
-        meta: action.meta || {},
-        children: []
+        addr: (index + 1).toString(),
+        layout: section.type as any,
+        text: section.text,
+        children: section.children ? this.convertChildNodes(section.children, (index + 1).toString()) : undefined
       };
+      return node;
+    });
+  }
 
-      if (!action.parent) {
-        rootCounter++;
-        const realAddress = rootCounter.toString();
-        newNode.addr = realAddress;
+  private convertChildNodes(children: any[], parentAddr: string): ResumeNode[] {
+    return children.map((child, index) => {
+      const childAddr = `${parentAddr}.${index + 1}`;
+      const node: ResumeNode = {
+        uid: generateUid(),
+        addr: childAddr,
+        layout: child.type as any,
+        text: child.text,
+        children: child.children ? this.convertChildNodes(child.children, childAddr) : undefined
+      };
+      return node;
+    });
+  }
 
-        const aiIndex = (i + 1).toString();
-        nodeMap.set(aiIndex, newNode);
-        tree.push(newNode);
-      } else {
-        const parentNode = nodeMap.get(action.parent);
-        if (!parentNode) {
-          rootCounter++;
-          const realAddress = rootCounter.toString();
-          newNode.addr = realAddress;
-          const aiIndex = (i + 1).toString();
-          nodeMap.set(aiIndex, newNode);
-          tree.push(newNode);
-        } else {
-          if (!parentNode.children) parentNode.children = [];
-          const childIndex = parentNode.children.length + 1;
-          const realAddress = `${parentNode.addr}.${childIndex}`;
-          newNode.addr = realAddress;
+  private async legacyStructureResumeFromText(resumeText: string): Promise<{ tree: ResumeNode[], title: string }> {
+    console.log('🤖 Sending resume to AI for structuring (legacy method)...');
 
-          const aiIndex = (i + 1).toString();
-          nodeMap.set(aiIndex, newNode);
-          parentNode.children.push(newNode);
-        }
-      }
+    try {
+      // Try to parse the response as the new JSON format first
+      const structuredData = await this.generateResumeStructure(resumeText);
+      const tree = this.convertToResumeNodes(structuredData.sections);
+      const title = structuredData.title;
+      console.log('✅ Legacy method successfully used new format with', tree.length, 'root nodes');
+      return { tree, title };
+    } catch (error) {
+      console.warn('❌ Legacy method also failed:', error);
+      // Return empty structure as last resort
+      return {
+        tree: [],
+        title: 'Resume'
+      };
     }
-
-    return tree;
   }
 
-  async processUserMessage(
-    _userMessage: string,
-    _resumeTree: ResumeNode[],
-    _jobDescription?: string,
-    _conversationHistory: ConversationMessage[] = [],
-  ): Promise<{ explanation: string; action?: AgentAction }> {
-    // Simple implementation for now
-    return {
-      explanation: "I understand your request. This is a placeholder response while the full chat system is being integrated.",
-    };
-  }
+
+
+
 
   async generateSuggestions(
     _resumeTree: ResumeNode[],

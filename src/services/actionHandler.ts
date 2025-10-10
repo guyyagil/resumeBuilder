@@ -87,6 +87,14 @@ export class ActionHandler {
       children: action.node.children || []
     };
 
+    // Handle root-level additions
+    if (action.parent === '' || action.parent === 'root') {
+      tree.push(newNode);
+      const content = newNode.title || newNode.text || '(empty)';
+      console.log(`✅ Appended child to root: "${content}"`);
+      return tree;
+    }
+
     // Find parent by address
     const parentUid = resolveAddress(action.parent, this.numbering);
     if (!parentUid) {

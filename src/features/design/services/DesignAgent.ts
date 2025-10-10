@@ -1,17 +1,14 @@
 // Design generation service - moved from designAgent.ts
 import type { ResumeNode } from '../../../shared/types';
 import type { DesignTemplate, GeneratedResumeDesign } from '../types/design.types';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PromptBuilder, CORE_PROMPTS } from '../../../shared/services/ai/PromptTemplates';
 
 export class DesignAgent {
-  private client: OpenAI;
+  private genAI: GoogleGenerativeAI;
 
   constructor(apiKey: string) {
-    this.client = new OpenAI({
-      apiKey,
-      dangerouslyAllowBrowser: true
-    });
+    this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
   async generateResumeHTML(
@@ -25,23 +22,29 @@ export class DesignAgent {
     const prompt = this.buildDesignPrompt(tree, title, template, jobDescription);
 
     try {
-      const completion = await this.client.chat.completions.create({
-        model: 'gpt-5-mini',
-        messages: [
-          {
-            role: 'system',
-            content: CORE_PROMPTS.RESUME_DESIGNER
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 20000 // Higher limit for GPT-5-mini reasoning
+      const designModel = this.genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          temperature: 0.7,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 16384,
+        }
       });
 
-      const response = completion.choices[0]?.message?.content || '';
+      const fullPrompt = `${CORE_PROMPTS.RESUME_DESIGNER}\n\n${prompt}`;
+
+      const result = await designModel.generateContent(fullPrompt);
+      const response = result.response.text();
+      
+      console.log('🎨 DesignAgent: Raw response length:', response.length);
+      console.log('🎨 DesignAgent: First 200 chars:', response.substring(0, 200));
+      console.log('🎨 DesignAgent: Last 200 chars:', response.substring(response.length - 200));
+      
       const { html, css } = this.parseResponse(response);
+      
+      console.log('🎨 DesignAgent: Parsed HTML length:', html.length);
+      console.log('🎨 DesignAgent: Parsed CSS length:', css.length);
 
       return {
         html,
@@ -89,15 +92,20 @@ export class DesignAgent {
   }
 
   private parseResponse(response: string): { html: string; css: string } {
+    console.log('🔧 DesignAgent: Parsing response...');
+    
     let htmlMatch = response.match(/```html\s*([\s\S]*?)```/);
     
     if (!htmlMatch) {
+      console.log('🔧 DesignAgent: No closed HTML block found, trying open block...');
       htmlMatch = response.match(/```html\s*([\s\S]*)/);
     }
 
     if (!htmlMatch) {
+      console.log('🔧 DesignAgent: No HTML block found, trying DOCTYPE match...');
       const docMatch = response.match(/(<!DOCTYPE[\s\S]*<\/html>)/i);
       if (docMatch) {
+        console.log('🔧 DesignAgent: Found DOCTYPE match');
         const fullHtml = docMatch[1].trim();
         const cssMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
         const css = cssMatch ? cssMatch[1].trim() : '';
@@ -106,9 +114,12 @@ export class DesignAgent {
     }
 
     if (!htmlMatch) {
+      console.error('❌ DesignAgent: Could not parse HTML from response');
+      console.error('❌ Response preview:', response.substring(0, 500));
       throw new Error('Could not parse HTML from AI response');
     }
 
+    console.log('✅ DesignAgent: Found HTML match');
     const fullHtml = htmlMatch[1].trim();
     const cssMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
     const css = cssMatch ? cssMatch[1].trim() : '';

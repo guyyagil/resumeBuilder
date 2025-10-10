@@ -3,13 +3,14 @@
 export type AppPhase = 
   | 'welcome'      // Initial state, showing upload form
   | 'processing'   // Parsing PDF and building tree
-  | 'active'       // Main app with resume and chat
+  | 'editing'      // Manual editing with AI chat assistance
+  | 'designing'    // Generating final visual design
+  | 'active'       // Final resume with design preview
   | 'error';       // Error state with retry option
 
 export type ProcessingStage = 
   | 'extracting'   // Extracting text from PDF
   | 'structuring'  // Converting to tree structure
-  | 'designing'    // Generating visual design
   | null;
 
 export type TextDirection = 'ltr' | 'rtl';

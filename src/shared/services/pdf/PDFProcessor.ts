@@ -2,16 +2,16 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import type { ResumeNode } from '../../types';
-import { OpenAIService } from '../ai/OpenAIClient';
+import { GeminiService } from '../ai/GeminiClient';
 import { detectTextDirection, detectLanguage } from '../../utils/languageDetection';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export class SimplePDFProcessor {
-    private openaiService: OpenAIService;
+    private geminiService: GeminiService;
 
     constructor(apiKey: string) {
-        this.openaiService = new OpenAIService(apiKey);
+        this.geminiService = new GeminiService(apiKey);
     }
 
     async processResume(file: File): Promise<{ tree: ResumeNode[], title: string, textDirection: 'ltr' | 'rtl', language: string }> {
@@ -24,9 +24,7 @@ export class SimplePDFProcessor {
             throw new Error('PDF text is too short. Please upload a valid resume.');
         }
 
-        const structuredData = await this.openaiService.generateResumeStructure(text);
-        const tree = this.convertToResumeNodes(structuredData.sections);
-        const title = structuredData.title;
+        const { tree, title } = await this.geminiService.structureResumeFromText(text);
         console.log('✅ AI generated tree with', this.countNodes(tree), 'nodes');
 
         this.applyBasicStyling(tree);
@@ -96,32 +94,7 @@ export class SimplePDFProcessor {
         applyStyles(tree, 0);
     }
 
-    private convertToResumeNodes(sections: any[]): ResumeNode[] {
-        return sections.map((section, index) => {
-            const node: ResumeNode = {
-                uid: `node_${Date.now()}_${index}`,
-                addr: (index + 1).toString(),
-                layout: section.type as any,
-                text: section.text,
-                children: section.children ? this.convertChildNodes(section.children, (index + 1).toString()) : undefined
-            };
-            return node;
-        });
-    }
 
-    private convertChildNodes(children: any[], parentAddr: string): ResumeNode[] {
-        return children.map((child, index) => {
-            const childAddr = `${parentAddr}.${index + 1}`;
-            const node: ResumeNode = {
-                uid: `node_${Date.now()}_${parentAddr}_${index}`,
-                addr: childAddr,
-                layout: child.type as any,
-                text: child.text,
-                children: child.children ? this.convertChildNodes(child.children, childAddr) : undefined
-            };
-            return node;
-        });
-    }
 
     private countNodes(tree: ResumeNode[]): number {
         let count = 0;

@@ -1,19 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../../store';
 import { GeminiService } from '../../../shared/services/ai/GeminiClient';
-import { PromptBuilder } from '../../../shared/services/ai/PromptTemplates';
-import type { ResumeNode } from '../../../shared/types';
+import type { ResumeNode, AgentAction } from '../../../shared/types';
 
-interface SmallChatAssistantProps {
+interface ActionChatAssistantProps {
   onClose: () => void;
 }
 
-export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose }) => {
-  const { resumeTree, resumeTitle, selectedBlocks, getNodeByAddress, clearBlockSelection, applyAction } = useAppStore();
+export const ActionChatAssistant: React.FC<ActionChatAssistantProps> = ({ onClose }) => {
+  const { 
+    resumeTree, 
+    selectedBlocks, 
+    getNodeByAddress, 
+    clearBlockSelection,
+    applyAction 
+  } = useAppStore();
+  
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: 'Hi! I\'m here to help you improve your resume. I can suggest better wording, help with formatting, or provide guidance on content. What would you like help with?'
+      content: selectedBlocks.length > 0 
+        ? `I can see you've selected ${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''}. I can help you improve them or make specific changes. What would you like me to do?`
+        : 'Hi! Select blocks in your resume and I can help improve them, or ask me general questions about your resume content.'
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -31,7 +39,7 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
       const indent = '  '.repeat(depth);
       const content = node.text || node.title || '';
       if (content.trim()) {
-        result += `${indent}${content}\n`;
+        result += `${indent}[${node.addr}] ${content}\n`;
       }
       if (node.children && node.children.length > 0) {
         result += serializeResumeForContext(node.children, depth + 1);
@@ -44,12 +52,12 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
   const getSelectedBlocksContent = (): string => {
     if (selectedBlocks.length === 0) return '';
     
-    let selectedContent = '\n--- SELECTED BLOCKS FOR REFERENCE ---\n';
+    let selectedContent = '\n--- SELECTED BLOCKS FOR MODIFICATION ---\n';
     selectedBlocks.forEach((addr, index) => {
       const node = getNodeByAddress(addr);
       if (node) {
         const content = node.text || node.title || '';
-        selectedContent += `${index + 1}. [${node.layout}] ${content}\n`;
+        selectedContent += `${index + 1}. [Address: ${addr}] [Type: ${node.layout}] ${content}\n`;
         
         // Include children if any
         if (node.children && node.children.length > 0) {
@@ -86,15 +94,8 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
       const selectedBlocksContent = getSelectedBlocksContent();
       const fullResumeContent = currentResumeContent + selectedBlocksContent;
       
-      // Build the chat prompt using centralized prompt builder
-      const guidancePrompt = PromptBuilder.buildChatPrompt(
-        userMessage,
-        fullResumeContent,
-        resumeTitle
-      );
-
-      // Build a prompt that can generate actions if user wants modifications
-      const actionPrompt = selectedBlocksContent.length > 0 ? `
+      // Build a prompt that can generate actions
+      const actionPrompt = `
 You are a resume improvement assistant that can make specific changes to resume content.
 
 CURRENT RESUME CONTENT:
@@ -104,7 +105,7 @@ USER REQUEST: ${userMessage}
 
 INSTRUCTIONS:
 1. If the user is asking for specific improvements to selected blocks, generate actions to modify them
-2. If no blocks are selected or user wants guidance, provide general advice
+2. If no blocks are selected, provide general guidance
 3. For modifications, respond with both explanation AND actions
 
 RESPONSE FORMAT:
@@ -139,20 +140,13 @@ Remember:
 - Keep the same language (Hebrew/English) as the original
 - Make improvements that are professional and impactful
 - Only generate actions if the user is asking for specific changes
-` : guidancePrompt;
-
-      // Filter out the initial assistant message and only pass user/assistant pairs
-      // Gemini requires first message to be 'user', so skip the welcome message
-      const chatHistory = messages
-        .slice(1) // Skip the initial assistant welcome message
-        .slice(-5) // Only keep last 5 messages for context
-        .map(msg => ({ role: msg.role, content: msg.content }));
+`;
 
       const result = await geminiService.processUserMessage(
         actionPrompt,
         [],
         fullResumeContent,
-        chatHistory
+        messages.slice(-5).map(msg => ({ role: msg.role, content: msg.content }))
       );
 
       // Parse the response to extract actions if any
@@ -161,7 +155,7 @@ Remember:
       
       if (actionsMatch) {
         try {
-          const actions = JSON.parse(actionsMatch[1]) as any[];
+          const actions = JSON.parse(actionsMatch[1]) as AgentAction[];
           const explanation = response.replace(/ACTIONS:[\s\S]*$/, '').replace('EXPLANATION:', '').trim();
           
           // Apply the actions
@@ -204,15 +198,15 @@ Remember:
   };
 
   const quickSuggestions = selectedBlocks.length > 0 ? [
-    "How can I improve the selected content?",
-    "Suggest better wording for the selection",
-    "Help me make this more impactful",
-    "Rewrite this to be more professional"
+    "Make this more professional and impactful",
+    "Add quantifiable achievements to this",
+    "Improve the wording and action verbs",
+    "Make this more concise and powerful"
   ] : [
-    "How can I make this bullet point stronger?",
-    "Suggest better action verbs",
-    "Help me quantify this achievement",
-    "Is this section well organized?"
+    "Help me improve my work experience section",
+    "Suggest better action verbs throughout",
+    "How can I quantify my achievements?",
+    "Review my resume for improvements"
   ];
 
   return (
@@ -221,17 +215,17 @@ Remember:
       <div className="p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">AI Assistant</h3>
+              <h3 className="font-semibold text-gray-900">AI Editor</h3>
               <p className="text-xs text-gray-500">
                 {selectedBlocks.length > 0 
-                  ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} selected`
-                  : 'Writing guidance & tips'
+                  ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} selected - I can modify them`
+                  : 'Select blocks to make changes'
                 }
               </p>
             </div>
@@ -248,14 +242,14 @@ Remember:
         
         {/* Selected Blocks Indicator */}
         {selectedBlocks.length > 0 && (
-          <div className="mt-3 p-2 bg-blue-100 rounded-lg">
+          <div className="mt-3 p-2 bg-green-100 rounded-lg">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-blue-800 font-medium">
-                Focusing on selected content
+              <span className="text-xs text-green-800 font-medium">
+                Ready to modify selected content
               </span>
               <button
                 onClick={clearBlockSelection}
-                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                className="text-xs text-green-600 hover:text-green-800 underline"
               >
                 Clear selection
               </button>
@@ -288,7 +282,7 @@ Remember:
             <div className="bg-gray-100 p-3 rounded-lg">
               <div className="flex items-center space-x-2">
                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600"></div>
-                <span className="text-sm text-gray-600">Thinking...</span>
+                <span className="text-sm text-gray-600">Making changes...</span>
               </div>
             </div>
           </div>
@@ -300,7 +294,7 @@ Remember:
       {/* Quick Suggestions */}
       {messages.length === 1 && (
         <div className="p-3 border-t border-gray-100">
-          <p className="text-xs text-gray-500 mb-2">Quick suggestions:</p>
+          <p className="text-xs text-gray-500 mb-2">Quick actions:</p>
           <div className="space-y-1">
             {quickSuggestions.map((suggestion, index) => (
               <button
@@ -322,15 +316,15 @@ Remember:
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask for writing help..."
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            placeholder={selectedBlocks.length > 0 ? "Tell me how to improve the selected blocks..." : "Ask me to improve your resume..."}
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             rows={2}
             disabled={isProcessing}
           />
           <button
             onClick={handleSend}
             disabled={!inputMessage.trim() || isProcessing}
-            className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

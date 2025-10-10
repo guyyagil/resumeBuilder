@@ -74,6 +74,15 @@ export interface ResumeSlice {
   // Initialization
   initializeFromPDF: (file: File, jobDesc: string) => Promise<void>;
   
+  // Phase transitions
+  startDesignPhase: () => Promise<void>;
+  
+  // Block selection for chat
+  selectedBlocks: string[]; // Array of node addresses
+  setSelectedBlocks: (blocks: string[]) => void;
+  toggleBlockSelection: (blockAddr: string) => void;
+  clearBlockSelection: () => void;
+  
   // Design regeneration
   regenerateDesign: () => Promise<void>;
   
@@ -115,6 +124,7 @@ const initialResumeState = {
   maxHistorySize: 50,
   isInitializing: false,
   initializationError: null,
+  selectedBlocks: [] as string[],
 };
 
 export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]], [], ResumeSlice> = (set, get) => ({
@@ -166,15 +176,23 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
   }),
 
   applyAction: (action, description) => {
+    console.log('📝 applyAction called:', { action, description });
+
     // Apply the action synchronously
     set((state) => {
       try {
+        console.log('📊 Current tree nodes:', state.resumeTree.length);
+        console.log('📊 Current numbering addresses:', Object.keys(state.numbering.addrToUid));
+
         const handler = new ActionHandler(state.resumeTree, state.numbering);
         const updatedTree = handler.apply(action);
 
         state.resumeTree = updatedTree;
         state.numbering = computeNumbering(state.resumeTree);
         state.addressMap = new AddressMap(state.resumeTree);
+
+        console.log('✅ Tree updated, new node count:', state.resumeTree.length);
+        console.log('✅ New numbering addresses:', Object.keys(state.numbering.addrToUid));
 
         // Update history
         if (state.historyIndex < state.history.length - 1) {
@@ -189,7 +207,7 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
           state.historyIndex = state.history.length - 1;
         }
       } catch (error) {
-        console.error('Failed to apply action:', error);
+        console.error('❌ Failed to apply action:', error);
         throw error;
       }
     });
@@ -267,9 +285,9 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
     });
 
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) {
-        throw new Error('OpenAI API key is not configured. Please set VITE_OPENAI_API_KEY in your .env file.');
+        throw new Error('Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your .env file.');
       }
 
       // Stage 1: Extract and structure resume
@@ -278,27 +296,18 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       const processor = new SimplePDFProcessor(apiKey);
       const { tree, title, textDirection, language } = await processor.processResume(file);
 
-      // Stage 2: Generate design
-      set((state) => { state.processingStage = 'designing'; });
-      const { DesignAgent } = await import('../../features/design/services/DesignAgent');
-      const { selectDesignTemplate } = await import('../../features/design/templates');
-
-      const designAgent = new DesignAgent(apiKey);
-      const resumeText = JSON.stringify(tree);
-      const selectedTemplate = selectDesignTemplate(resumeText, jobDesc);
-      const design = await designAgent.generateResumeHTML(tree, title, selectedTemplate, jobDesc);
-
+      // Complete processing - go directly to editing phase
       set((state) => {
         state.resumeTree = tree;
         state.resumeTitle = title;
         state.textDirection = textDirection;
         state.language = language;
-        state.resumeDesign = design;
+        state.resumeDesign = null; // No design yet - will be generated after editing
         state.numbering = computeNumbering(tree);
         state.addressMap = new AddressMap(tree);
         state.isInitializing = false;
         state.processingStage = null;
-        state.phase = 'active';
+        state.phase = 'editing'; // Go to editing phase instead of active
 
         // Initialize history
         const entry = createHistoryEntry(tree, state.numbering, 'Resume initialized from PDF');
@@ -326,7 +335,7 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
     try {
       console.log('🎨 Regenerating design after edit...');
 
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) return;
 
       const { DesignAgent } = await import('../../features/design/services/DesignAgent');
@@ -356,6 +365,75 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
     const result = validateTreeWithConstraints(state.resumeTree);
     return result.errors.map(e => `${e.path}: ${e.message}`);
   },
+
+  startDesignPhase: async () => {
+    const state = get();
+    
+    // Transition to designing phase
+    set((draft) => { 
+      draft.phase = 'designing';
+      draft.isRegeneratingDesign = true;
+    });
+
+    try {
+      console.log('🎨 Starting design phase...');
+
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+      if (!apiKey) {
+        throw new Error('Gemini API key is not configured');
+      }
+
+      const { DesignAgent } = await import('../../features/design/services/DesignAgent');
+      const { selectDesignTemplate } = await import('../../features/design/templates');
+
+      const designAgent = new DesignAgent(apiKey);
+      const resumeText = JSON.stringify(state.resumeTree);
+      const selectedTemplate = selectDesignTemplate(resumeText, state.jobDescription);
+      
+      console.log('🎨 Selected template:', selectedTemplate.name);
+      
+      const design = await designAgent.generateResumeHTML(
+        state.resumeTree,
+        state.resumeTitle,
+        selectedTemplate,
+        state.jobDescription
+      );
+      
+      console.log('🎨 Design generation completed');
+
+      set((draft) => {
+        draft.resumeDesign = design;
+        draft.isRegeneratingDesign = false;
+        draft.phase = 'active'; // Move to final active phase
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to generate design:', error);
+      set((draft) => { 
+        draft.isRegeneratingDesign = false;
+        draft.phase = 'editing'; // Go back to editing on error
+      });
+      throw error;
+    }
+  },
+
+  // Block selection methods
+  setSelectedBlocks: (blocks) => set((state) => {
+    state.selectedBlocks = blocks;
+  }),
+
+  toggleBlockSelection: (blockAddr) => set((state) => {
+    const index = state.selectedBlocks.indexOf(blockAddr);
+    if (index === -1) {
+      state.selectedBlocks.push(blockAddr);
+    } else {
+      state.selectedBlocks.splice(index, 1);
+    }
+  }),
+
+  clearBlockSelection: () => set((state) => {
+    state.selectedBlocks = [];
+  }),
 
   reset: () => set(() => ({
     ...initialResumeState,

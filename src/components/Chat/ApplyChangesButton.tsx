@@ -26,9 +26,9 @@ export const ApplyChangesButton: React.FC<ApplyChangesButtonProps> = ({
     onApplyStart();
 
     try {
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) {
-        throw new Error('OpenAI API key is not configured');
+        throw new Error('Gemini API key is not configured');
       }
 
       // Create editing agent

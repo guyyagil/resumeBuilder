@@ -1,25 +1,26 @@
 import React from 'react';
+import { useAppStore } from '../../../store';
 import { Header } from './Header';
-import { ResumePreview } from '../../../features/resume/components/ResumePreview';
-import { ManualEditor } from '../../../features/editing/components/ManualEditor';
+import { WelcomePhase } from './phases/WelcomePhase';
+import { ProcessingPhase } from './phases/ProcessingPhase';
+import { EditingPhase } from './phases/EditingPhase';
+import { DesignPhase } from './phases/DesignPhase';
 
 export const AppLayout: React.FC = () => {
+  const phase = useAppStore(state => state.phase);
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50">
+      {/* Consistent Header Across All Phases */}
       <Header />
-      
-      <div className="flex-1 flex overflow-hidden">
-        {/* Resume Preview Panel */}
-        <div className="w-1/2 border-r border-gray-200 overflow-y-auto bg-white">
-          <ResumePreview />
-        </div>
-        
-        {/* Manual Editor Panel */}
-        <div className="w-1/2 flex flex-col bg-gray-50">
-          <ManualEditor />
-        </div>
-      </div>
+
+      {/* Main Content Area - Changes Per Phase */}
+      <main className="flex-1 overflow-hidden">
+        {phase === 'welcome' && <WelcomePhase />}
+        {phase === 'processing' && <ProcessingPhase />}
+        {phase === 'editing' && <EditingPhase />}
+        {(phase === 'designing' || phase === 'active') && <DesignPhase />}
+      </main>
     </div>
   );
 };
-

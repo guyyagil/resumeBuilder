@@ -79,11 +79,13 @@ Format as JSON with this structure:
 
 REQUIREMENTS:
 - Generate ONLY the resume content HTML/CSS
+- MUST include the person's name/title prominently at the TOP of the resume
 - Do NOT include any split layout, panels, or editing interfaces
 - Focus on making the resume content beautiful and professional
 - Make it print-ready and ATS-friendly
 - Use clean, modern styling
 - Ensure proper spacing and typography
+- The name should be the first and most prominent element
 
 Return format:
 \`\`\`html

@@ -1,5 +1,5 @@
 // Specialized editing agent for batch processing resume modifications
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { ResumeNode, AgentAction } from '../../../shared/types';
 import type { EditInstruction, EditingResult, EditingAgentConfig } from '../types/editing.types';
 import { createResumeContextSummary } from '../../../shared/utils/resumeSerializer';
@@ -8,14 +8,11 @@ import { PromptBuilder, CORE_PROMPTS } from '../../../shared/services/ai/PromptT
 
 
 export class EditingAgent {
-  private client: OpenAI;
+  private genAI: GoogleGenerativeAI;
   private config: EditingAgentConfig;
 
   constructor(apiKey: string, config?: Partial<EditingAgentConfig>) {
-    this.client = new OpenAI({
-      apiKey,
-      dangerouslyAllowBrowser: true
-    });
+    this.genAI = new GoogleGenerativeAI(apiKey);
 
     this.config = {
       maxInstructionsPerBatch: 10,
@@ -46,23 +43,19 @@ export class EditingAgent {
       const resumeContext = createResumeContextSummary(resumeTree);
       const prompt = PromptBuilder.buildEditingPrompt(limitedInstructions, resumeContext, jobDescription);
       
-      const completion = await this.client.chat.completions.create({
-        model: 'gpt-5-mini',
-        messages: [
-          {
-            role: 'system',
-            content: CORE_PROMPTS.EDITING_AGENT
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 12000, // Higher limit for GPT-5-mini reasoning
-        response_format: { type: 'json_object' }
+      const editingModel = this.genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 8192
+        }
       });
 
-      const response = completion.choices[0]?.message?.content || '';
+      const fullPrompt = `${CORE_PROMPTS.EDITING_AGENT}\n\n${prompt}`;
+      const result = await editingModel.generateContent(fullPrompt);
+      const response = result.response.text();
 
       return this.parseEditingResponse(response, limitedInstructions);
     } catch (error) {

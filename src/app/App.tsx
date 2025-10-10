@@ -15,8 +15,14 @@ export const App: React.FC = () => {
     case 'processing':
       return <LoadingScreen />;
     
+    case 'editing':
+      return <AppLayout />; // Show editing interface
+    
+    case 'designing':
+      return <LoadingScreen />; // Show loading while generating design
+    
     case 'active':
-      return <AppLayout />;
+      return <AppLayout />; // Show final interface with design
     
     case 'error':
       return <ErrorScreen />;

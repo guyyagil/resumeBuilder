@@ -33,12 +33,17 @@ export const AddNodeButton: React.FC<AddNodeButtonProps> = ({ onAdd, label, icon
   return (
     <button
       onClick={onAdd}
-      className="w-full p-4 border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 text-gray-600 hover:text-blue-600"
+      className="group w-full p-5 border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 rounded-xl transition-all duration-300 flex items-center justify-center space-x-3 text-gray-600 hover:text-blue-700 shadow-sm hover:shadow-md"
     >
-      <div className="p-1 bg-gray-100 hover:bg-blue-100 rounded-full transition-colors">
-        {getIcon()}
+      <div className="p-2 bg-white group-hover:bg-blue-600 rounded-lg transition-all duration-300 shadow-sm">
+        <div className="group-hover:text-white transition-colors">
+          {getIcon()}
+        </div>
       </div>
-      <span className="font-medium">{label}</span>
+      <span className="font-semibold text-base">{label}</span>
+      <svg className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
     </button>
   );
 };
