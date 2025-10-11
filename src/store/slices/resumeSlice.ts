@@ -61,6 +61,7 @@ export interface ResumeSlice {
   
   // Tree operations
   applyAction: (action: AgentAction, description: string) => void;
+  applyActions: (actions: AgentAction[]) => void;
   getNodeByAddress: (address: string) => ResumeNode | undefined;
   recomputeNumbering: () => void;
   rebuildAddressMap: () => void;
@@ -217,6 +218,63 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       const { regenerateDesign } = get();
       regenerateDesign().catch(error => {
         console.warn('Design regeneration failed after action:', error);
+      });
+    }, 100); // Small delay to ensure state is updated
+  },
+
+  applyActions: (actions) => {
+    console.log('📝 applyActions called with', actions.length, 'actions');
+
+    // Apply all actions synchronously
+    set((state) => {
+      try {
+        console.log('📊 Current tree nodes:', state.resumeTree.length);
+
+        let currentTree = state.resumeTree;
+        let currentNumbering = state.numbering;
+
+        // Apply each action sequentially
+        for (const action of actions) {
+          const handler = new ActionHandler(currentTree, currentNumbering);
+          currentTree = handler.apply(action);
+          currentNumbering = computeNumbering(currentTree);
+        }
+
+        state.resumeTree = currentTree;
+        state.numbering = currentNumbering;
+        state.addressMap = new AddressMap(state.resumeTree);
+
+        console.log('✅ All actions applied, new node count:', state.resumeTree.length);
+
+        // Update history
+        if (state.historyIndex < state.history.length - 1) {
+          state.history = state.history.slice(0, state.historyIndex + 1);
+        }
+
+        state.history.push(
+          createHistoryEntry(
+            state.resumeTree,
+            state.numbering,
+            `Applied ${actions.length} editing action${actions.length > 1 ? 's' : ''}`
+          )
+        );
+        state.historyIndex = state.history.length - 1;
+
+        if (state.history.length > state.maxHistorySize) {
+          state.history = state.history.slice(-state.maxHistorySize);
+          state.historyIndex = state.history.length - 1;
+        }
+      } catch (error) {
+        console.error('❌ Failed to apply actions:', error);
+        throw error;
+      }
+    });
+
+    // Trigger design regeneration asynchronously after all actions
+    setTimeout(() => {
+      const { regenerateDesign } = get();
+      regenerateDesign().catch(error => {
+        console.warn('Design regeneration failed after actions:', error);
       });
     }, 100); // Small delay to ensure state is updated
   },

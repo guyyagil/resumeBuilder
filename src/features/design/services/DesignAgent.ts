@@ -73,14 +73,28 @@ export class DesignAgent {
 
     for (const node of tree) {
       const indent = '  '.repeat(depth);
-      const content = node.text || node.title || '';
-      result += `${indent}${content}\n`;
 
+      // Only include content - NO style information
+      // This ensures AI generates fresh design from scratch
+      const content = node.text || node.title || '';
+      if (content.trim()) {
+        result += `${indent}${content}\n`;
+      }
+
+      // Include layout hint for semantic structure only
+      if (node.layout) {
+        result += `${indent}  [${node.layout}]\n`;
+      }
+
+      // Include semantic metadata (dates, locations, etc.) but NOT style
       if (node.meta) {
-        const metaStr = Object.entries(node.meta)
+        const semanticMeta = Object.entries(node.meta)
+          .filter(([key]) => !key.toLowerCase().includes('style') && !key.toLowerCase().includes('color'))
           .map(([key, value]) => `${key}: ${value}`)
           .join(', ');
-        result += `${indent}  [${metaStr}]\n`;
+        if (semanticMeta) {
+          result += `${indent}  [${semanticMeta}]\n`;
+        }
       }
 
       if (node.children && node.children.length > 0) {

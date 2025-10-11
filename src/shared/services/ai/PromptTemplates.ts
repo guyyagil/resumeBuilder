@@ -144,25 +144,24 @@ export class PromptBuilder {
   }
 
   static buildDesignPrompt(
-    resumeText: string, 
-    title: string, 
-    template: any, 
+    resumeText: string,
+    title: string,
+    template: any,
     jobDescription?: string
   ): string {
     const hasHebrew = /[\u0590-\u05FF]/.test(resumeText + title);
     const isRTL = hasHebrew;
-    
+
     let designPrompt = [
       CORE_PROMPTS.RESUME_DESIGNER,
       `# RESUME CONTENT\nTitle: ${title}\n${resumeText}`,
       jobDescription ? `# JOB DESCRIPTION\n${jobDescription}` : '',
-      `# DESIGN TEMPLATE: ${template.name}\nStyle: ${template.style}\nDescription: ${template.description}`,
-      `## Colors\n- Primary: ${template.colors.primary}\n- Secondary: ${template.colors.secondary}\n- Text: ${template.colors.text}\n- Background: ${template.colors.background}`,
-      `## Typography\n- Heading Font: ${template.fonts.heading}\n- Body Font: ${template.fonts.body}`,
+      `# DESIGN STYLE: ${template.name}\n${template.description}`,
+      `## Style Guidelines (as inspiration only - use your creativity)\n- Style: ${template.style}\n- Layout: ${template.layout.singleColumn ? 'Single column' : 'Two column'}\n- Choose professional, subtle colors that complement the content\n- Use clean, modern typography\n- Ensure excellent readability and ATS compatibility`,
       TASK_PROMPTS.DESIGN_GENERATION
-        .replace('{FONT_FAMILY}', template.fonts.body)
-        .replace('{TEXT_COLOR}', template.colors.text)
-        .replace('{BACKGROUND_COLOR}', template.colors.background)
+        .replace('{FONT_FAMILY}', 'system-ui, -apple-system, sans-serif')
+        .replace('{TEXT_COLOR}', '#1a1a1a')
+        .replace('{BACKGROUND_COLOR}', '#ffffff')
         .replace('{RTL_STYLES}', isRTL ? '\n        direction: rtl;\n        text-align: right;' : '')
     ].filter(Boolean).join('\n\n');
 

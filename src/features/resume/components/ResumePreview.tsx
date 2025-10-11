@@ -6,12 +6,12 @@ export const ResumePreview: React.FC = () => {
 
   if (isRegeneratingDesign) {
     return (
-      <div className="flex items-center justify-center h-full bg-gradient-to-br from-purple-50 to-pink-50">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="relative mb-6">
             <div className="w-20 h-20 mx-auto">
-              <div className="absolute inset-0 border-4 border-purple-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-purple-600 rounded-full border-t-transparent animate-spin"></div>
+              <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
             </div>
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Regenerating Design...</h3>
@@ -38,10 +38,10 @@ export const ResumePreview: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col items-center p-8 bg-gray-100 overflow-auto">
+    <div className="h-full flex flex-col items-center p-8 overflow-auto">
       {/* A4 Paper Container - better proportions */}
       <div
-        className="w-full max-w-[210mm] bg-white shadow-2xl my-auto"
+        className="w-full max-w-[210mm] bg-white shadow-2xl my-auto rounded-lg"
         style={{
           minHeight: '297mm',
           aspectRatio: '210/297'

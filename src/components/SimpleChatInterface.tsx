@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../../store';
-import { GeminiService } from '../../shared/services/ai/GeminiClient';
+import { useAppStore } from '../store';
+import { GeminiService } from '../shared/services/ai/GeminiClient';
 import { ChatMessage } from './ChatMessage';
+
 
 /**
  * Simple chat interface for general questions and conversations

@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../../store';
-import type { EditInstruction } from '../../features/editing/types/editing.types';
+import { useAppStore } from '../store';
+import type { EditInstruction } from '../features/editing/types/editing.types';
 import { EditInstructionCard } from './EditInstructionCard';
 import { ApplyChangesButton } from './ApplyChangesButton';
+
+
 
 export const EditingInterface: React.FC = () => {
   const { messages, isProcessing } = useAppStore();

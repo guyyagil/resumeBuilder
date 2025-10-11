@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm run dev:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(for file in \"ExportButton\" \"Sidebar\" \"MainLayout\" \"EditingInterface\" \"EditInstructionCard\" \"JobDescriptionInput\" \"UndoRedoButtons\" \"NewResumeButton\" \"WelcomeForm\" \"TreeResumeRenderer\" \"ResumeView\" \"ErrorScreen\" \"ChatMessage\" \"UnifiedBlock\" \"HTMLResumeRenderer\" \"ApplyChangesButton\" \"SimpleChatInterface\")",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
