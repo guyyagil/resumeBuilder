@@ -3,6 +3,7 @@ import { useAppStore } from '../../../store';
 import { GeminiService } from '../../../shared/services/ai/GeminiClient';
 import { PromptBuilder } from '../../../shared/services/ai/PromptTemplates';
 import type { ResumeNode } from '../../../shared/types';
+import { detectTextDirection } from '../../../shared/utils/languageDetection';
 
 interface SmallChatAssistantProps {
   onClose: () => void;
@@ -13,7 +14,7 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: 'Hi! I\'m here to help you improve your resume. I can suggest better wording, help with formatting, or provide guidance on content. What would you like help with?'
+      content: '👋 Hi! I\'m your AI resume assistant. I can:\n\n• Modify and improve your resume blocks\n• Suggest better wording and phrasing\n• Help with formatting and structure\n• Provide professional writing guidance\n\n💡 Tip: Click on blocks in your resume to cite them as references, then ask me to improve them!'
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -24,14 +25,15 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Serialize resume tree to text for AI context
+  // Serialize resume tree to text for AI context with addresses
   const serializeResumeForContext = (tree: ResumeNode[], depth: number = 0): string => {
     let result = '';
     for (const node of tree) {
       const indent = '  '.repeat(depth);
       const content = node.text || node.title || '';
+      const addr = node.addr || '?';
       if (content.trim()) {
-        result += `${indent}${content}\n`;
+        result += `${indent}[${addr}] ${content}\n`;
       }
       if (node.children && node.children.length > 0) {
         result += serializeResumeForContext(node.children, depth + 1);
@@ -40,23 +42,53 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
     return result;
   };
 
+  // Get root-level block addresses for reordering operations
+  const getRootBlocksStructure = (): string => {
+    if (resumeTree.length === 0) return '';
+
+    let structure = '\n--- ROOT LEVEL BLOCKS STRUCTURE ---\n';
+    structure += 'These are all the main sections in order:\n';
+    resumeTree.forEach((node, index) => {
+      const title = node.text || node.title || 'Untitled';
+      structure += `${index + 1}. ADDRESS: "${node.addr}" | TITLE: ${title}\n`;
+    });
+    structure += '--- END ROOT BLOCKS STRUCTURE ---\n\n';
+    return structure;
+  };
+
   // Get selected blocks content for AI context
   const getSelectedBlocksContent = (): string => {
     if (selectedBlocks.length === 0) return '';
-    
+
     let selectedContent = '\n--- SELECTED BLOCKS FOR REFERENCE ---\n';
+    let hasHeadingsWithContent = false;
+
     selectedBlocks.forEach((addr, index) => {
       const node = getNodeByAddress(addr);
       if (node) {
         const content = node.text || node.title || '';
-        selectedContent += `${index + 1}. [${node.layout}] ${content}\n`;
-        
-        // Include children if any
+        // CRITICAL: Include the address so AI knows which block to modify
+        selectedContent += `${index + 1}. ADDRESS: "${addr}" | LAYOUT: [${node.layout}] | CONTENT: ${content}\n`;
+
+        // Include children if any (but note they have their own addresses)
         if (node.children && node.children.length > 0) {
-          selectedContent += serializeResumeForContext(node.children, 1);
+          if (node.layout === 'heading') {
+            hasHeadingsWithContent = true;
+          }
+          node.children.forEach((child, childIndex) => {
+            const childContent = child.text || child.title || '';
+            if (childContent.trim() && child.addr) {
+              selectedContent += `   - Child ADDRESS: "${child.addr}" | LAYOUT: [${child.layout}] | CONTENT: ${childContent}\n`;
+            }
+          });
         }
       }
     });
+
+    if (hasHeadingsWithContent) {
+      selectedContent += '\nNOTE: Some selected blocks are headings with content underneath. To modify the content (not the heading title), use the CHILD addresses shown above.\n';
+    }
+
     selectedContent += '--- END SELECTED BLOCKS ---\n\n';
     return selectedContent;
   };
@@ -78,13 +110,16 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
       const geminiService = new GeminiService(apiKey);
       
       // Get current resume content for context
-      const currentResumeContent = resumeTree.length > 0 
+      const currentResumeContent = resumeTree.length > 0
         ? serializeResumeForContext(resumeTree)
         : '';
-      
+
+      // Add root blocks structure for reordering operations
+      const rootBlocksStructure = getRootBlocksStructure();
+
       // Add selected blocks context if any
       const selectedBlocksContent = getSelectedBlocksContent();
-      const fullResumeContent = currentResumeContent + selectedBlocksContent;
+      const fullResumeContent = currentResumeContent + rootBlocksStructure + selectedBlocksContent;
       
       // Build the chat prompt using centralized prompt builder
       const guidancePrompt = PromptBuilder.buildChatPrompt(
@@ -102,42 +137,51 @@ ${fullResumeContent}
 
 USER REQUEST: ${userMessage}
 
-INSTRUCTIONS:
-1. If the user is asking for specific improvements to selected blocks, generate actions to modify them
-2. If no blocks are selected or user wants guidance, provide general advice
-3. For modifications, respond with both explanation AND actions
+CRITICAL INSTRUCTIONS FOR TARGETING THE CORRECT BLOCKS:
+1. The user has selected specific blocks with their ADDRESSES shown above in the "SELECTED BLOCKS FOR REFERENCE" section
+2. Each block has an ADDRESS (e.g., "1.1", "2.3.1") - this is the EXACT identifier you MUST use in the "id" field
+3. Look at the LAYOUT type to understand what field to modify:
+   - If LAYOUT is "heading": modify the "title" field (NOT text)
+   - If LAYOUT is "container": modify the "text" field
+   - If LAYOUT is "list-item": modify the "text" field
+   - If LAYOUT is "paragraph": modify the "text" field
+4. NEVER guess the address - use the EXACT address shown in the selected blocks
+5. If the user wants to modify content inside a parent, look at the CHILDREN addresses and target those
+
+AVAILABLE ACTIONS:
+1. UPDATE - Modify the content of a block:
+   {"action": "update", "id": "ADDRESS", "patch": {"text": "new content"}}
+
+2. REORDER - Change the order of root-level sections (use ONLY for root blocks like "1", "2", "3", NOT nested like "1.1"):
+   {"action": "reorder", "id": "", "order": ["new", "order", "of", "addresses"]}
+
+   IMPORTANT FOR REORDER:
+   - Use the "ROOT LEVEL BLOCKS STRUCTURE" section above to see all root addresses
+   - The "id" field should be empty string "" for root-level reordering
+   - The "order" array must contain ALL root addresses in the new desired order
+   - Example: To move section "6" to first position when you have sections ["1", "2", "3", "4", "5", "6"]:
+     {"action": "reorder", "id": "", "order": ["6", "1", "2", "3", "4", "5"]}
 
 RESPONSE FORMAT:
 If making changes, use this format:
 EXPLANATION: [Your explanation of the changes]
 
 ACTIONS:
-[JSON array of actions, each action should be:]
-{
-  "action": "update",
-  "id": "block_address",
-  "patch": {
-    "text": "new improved text"
-  }
-}
+[JSON array of actions - use the EXACT ADDRESS from the sections above]
 
-If just providing guidance, respond normally without the ACTIONS section.
+EXAMPLE 1 - UPDATE content:
+If selected block shows: "1. ADDRESS: "1.1" | LAYOUT: [container] | CONTENT: Some text"
+Action: [{"action": "update", "id": "1.1", "patch": {"text": "Improved text"}}]
 
-EXAMPLE ACTIONS:
-[
-  {
-    "action": "update", 
-    "id": "1.1",
-    "patch": {
-      "text": "Led cross-functional team of 15+ employees, implementing strategic task allocation and quality assurance protocols that improved productivity by 25%"
-    }
-  }
-]
+EXAMPLE 2 - REORDER sections:
+If user wants to move "פרטי קשר" (address "6") to be first, and root structure shows ["1", "2", "3", "4", "5", "6"]:
+Action: [{"action": "reorder", "id": "", "order": ["6", "1", "2", "3", "4", "5"]}]
 
 Remember:
-- Use the exact address from the selected blocks
+- Use EXACT addresses from the sections above
+- Match field name to layout type (title for headings, text for everything else)
+- For reordering, include ALL root addresses in the new order
 - Keep the same language (Hebrew/English) as the original
-- Make improvements that are professional and impactful
 - Only generate actions if the user is asking for specific changes
 ` : guidancePrompt;
 
@@ -158,28 +202,98 @@ Remember:
       // Parse the response to extract actions if any
       const response = result.explanation;
       const actionsMatch = response.match(/ACTIONS:\s*(\[[\s\S]*?\])/);
-      
+
       if (actionsMatch) {
         try {
           const actions = JSON.parse(actionsMatch[1]) as any[];
           const explanation = response.replace(/ACTIONS:[\s\S]*$/, '').replace('EXPLANATION:', '').trim();
-          
-          // Apply the actions
-          for (const action of actions) {
+
+          console.log('🤖 AI generated actions:', actions);
+          console.log('📍 Selected block addresses:', selectedBlocks);
+
+          // Validate that AI is targeting the correct blocks
+          const validActions = actions.filter(action => {
+            // Handle reorder action separately
+            if (action.action === 'reorder') {
+              if (!action.order || !Array.isArray(action.order)) {
+                console.warn(`⚠️ Reorder action missing valid 'order' array`);
+                return false;
+              }
+
+              // Validate that all addresses in order exist
+              const allValid = action.order.every((addr: string) => {
+                const node = getNodeByAddress(addr);
+                if (!node) {
+                  console.warn(`⚠️ Reorder contains non-existent address: ${addr}`);
+                  return false;
+                }
+                return true;
+              });
+
+              if (!allValid) {
+                return false;
+              }
+
+              console.log(`✅ Reorder action validated with ${action.order.length} addresses`);
+              return true;
+            }
+
+            // Handle update/other actions
+            const targetAddr = action.id;
+            const node = getNodeByAddress(targetAddr);
+
+            if (!node) {
+              console.warn(`⚠️ AI tried to target non-existent address: ${targetAddr}`);
+              return false;
+            }
+
+            // Check if the action is modifying the correct field for the layout type
+            const patch = action.patch || {};
+            const hasTitle = 'title' in patch;
+            const hasText = 'text' in patch;
+
+            if (node.layout === 'heading' && hasText && !hasTitle) {
+              console.warn(`⚠️ AI tried to modify 'text' field on heading node ${targetAddr}, should modify 'title' instead`);
+              // Auto-fix: convert text to title for headings
+              if (hasText) {
+                action.patch.title = action.patch.text;
+                delete action.patch.text;
+                console.log(`✅ Auto-fixed: moved 'text' to 'title' for heading node ${targetAddr}`);
+              }
+            }
+
+            return true;
+          });
+
+          if (validActions.length === 0) {
+            console.error('❌ No valid actions to apply');
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `${explanation}\n\n⚠️ I couldn't apply the changes because the target blocks were not found. Please try selecting the blocks again.`
+            }]);
+            return;
+          }
+
+          console.log(`✅ Applying ${validActions.length} valid actions`);
+
+          // Apply the valid actions
+          for (const action of validActions) {
+            console.log(`🔧 Applying action to node ${action.id}:`, action.patch);
             applyAction(action, `AI suggestion: ${userMessage}`);
           }
-          
-          setMessages(prev => [...prev, { 
-            role: 'assistant', 
-            content: `${explanation}\n\n✅ Applied ${actions.length} change${actions.length > 1 ? 's' : ''} to your resume.`
+
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `${explanation}\n\n✅ Applied ${validActions.length} change${validActions.length > 1 ? 's' : ''} to your resume.`
           }]);
-          
+
           // Clear selection after applying changes
           if (selectedBlocks.length > 0) {
             clearBlockSelection();
           }
         } catch (parseError) {
-          console.error('Failed to parse actions:', parseError);
+          console.error('❌ Failed to parse actions:', parseError);
+          console.error('Raw response:', response);
           setMessages(prev => [...prev, { role: 'assistant', content: response }]);
         }
       } else {
@@ -204,43 +318,44 @@ Remember:
   };
 
   const quickSuggestions = selectedBlocks.length > 0 ? [
-    "How can I improve the selected content?",
-    "Suggest better wording for the selection",
-    "Help me make this more impactful",
-    "Rewrite this to be more professional"
+    "Improve the selected content",
+    "Make this more impactful and professional",
+    "Add quantifiable metrics to this",
+    "Rewrite with stronger action verbs"
   ] : [
-    "How can I make this bullet point stronger?",
-    "Suggest better action verbs",
-    "Help me quantify this achievement",
-    "Is this section well organized?"
+    "How can I make my resume stronger?",
+    "What are best practices for resume writing?",
+    "Help me with formatting tips",
+    "Suggest improvements for my content"
   ];
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-indigo-50">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 bg-gray-50">
+      <div className="p-5 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
+              <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">AI Assistant</h3>
-              <p className="text-xs text-gray-500">
-                {selectedBlocks.length > 0 
-                  ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} selected`
-                  : 'Writing guidance & tips'
+              <h3 className="font-bold text-white text-lg">AI Assistant</h3>
+              <p className="text-xs text-blue-100">
+                {selectedBlocks.length > 0
+                  ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} cited`
+                  : 'Click blocks to cite them'
                 }
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+            className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+            title="Close chat"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -248,40 +363,54 @@ Remember:
         
         {/* Selected Blocks Indicator */}
         {selectedBlocks.length > 0 && (
-          <div className="mt-3 p-2 bg-blue-100 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-blue-800 font-medium">
-                Focusing on selected content
-              </span>
+          <div className="mt-3 p-3 bg-white/90 backdrop-blur rounded-xl shadow-lg border border-blue-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2">
+                <div className="p-1 bg-green-500 rounded-full">
+                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-sm text-gray-900 font-semibold">
+                  {selectedBlocks.length} Block{selectedBlocks.length > 1 ? 's' : ''} Cited
+                </span>
+              </div>
               <button
                 onClick={clearBlockSelection}
-                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-100 transition-colors"
               >
-                Clear selection
+                Clear
               </button>
             </div>
+            <p className="text-xs text-gray-600">
+              Ask me to improve, rewrite, or modify the cited content
+            </p>
           </div>
         )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white/50">
+        {messages.map((message, index) => {
+          const textDir = detectTextDirection(message.content);
+          return (
             <div
-              className={`max-w-[85%] p-3 rounded-lg text-sm ${
-                message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-900'
-              }`}
+              key={index}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              {message.content}
+              <div
+                dir={textDir}
+                className={`max-w-[85%] p-3 rounded-xl text-sm shadow-md ${
+                  message.role === 'user'
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
+                    : 'bg-white text-gray-900 border border-gray-200'
+                }`}
+              >
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {isProcessing && (
           <div className="flex justify-start">
@@ -299,16 +428,19 @@ Remember:
 
       {/* Quick Suggestions */}
       {messages.length === 1 && (
-        <div className="p-3 border-t border-gray-100">
-          <p className="text-xs text-gray-500 mb-2">Quick suggestions:</p>
-          <div className="space-y-1">
+        <div className="p-4 border-t-2 border-gray-200 bg-gradient-to-b from-gray-50 to-white">
+          <p className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">Quick Actions</p>
+          <div className="space-y-2">
             {quickSuggestions.map((suggestion, index) => (
               <button
                 key={index}
                 onClick={() => setInputMessage(suggestion)}
-                className="w-full text-left text-xs p-2 bg-gray-50 hover:bg-gray-100 rounded text-gray-700 transition-colors"
+                className="w-full text-left text-xs p-3 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg text-gray-700 transition-all shadow-sm hover:shadow-md"
               >
-                {suggestion}
+                <div className="flex items-center space-x-2">
+                  <span className="text-blue-600">→</span>
+                  <span>{suggestion}</span>
+                </div>
               </button>
             ))}
           </div>
@@ -316,26 +448,37 @@ Remember:
       )}
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-200">
-        <div className="flex space-x-2">
+      <div className="p-4 border-t-2 border-gray-200 bg-white">
+        <div className="flex flex-col space-y-2">
           <textarea
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask for writing help..."
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={2}
+            dir={detectTextDirection(inputMessage || 'en')}
+            placeholder={selectedBlocks.length > 0
+              ? "Ask me to improve the cited blocks..."
+              : "Ask for writing help or guidance..."}
+            className="w-full px-4 py-3 text-sm border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-gray-50 focus:bg-white transition-colors"
+            rows={3}
             disabled={isProcessing}
           />
-          <button
-            onClick={handleSend}
-            disabled={!inputMessage.trim() || isProcessing}
-            className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-          </button>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {selectedBlocks.length > 0
+                ? "💡 I can modify the cited blocks"
+                : "💡 Tip: Select blocks first for targeted help"}
+            </p>
+            <button
+              onClick={handleSend}
+              disabled={!inputMessage.trim() || isProcessing}
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+            >
+              <span>Send</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

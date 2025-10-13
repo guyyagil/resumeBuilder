@@ -9,7 +9,7 @@ export const ManualEditor: React.FC = () => {
   console.log('🔧 ManualEditor: Component rendering');
   const { resumeTree, applyAction, phase, resumeTitle, selectedBlocks, clearBlockSelection } = useAppStore();
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(true); // Chat visible by default
   const autoScrollIntervalRef = React.useRef<number | null>(null);
 
   console.log('🔧 ManualEditor: Resume tree has', resumeTree.length, 'nodes');
@@ -195,6 +195,22 @@ export const ManualEditor: React.FC = () => {
 
   return (
     <div className="h-full flex bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* Chat Toggle Button - Fixed position */}
+      {!showChat && (
+        <button
+          onClick={() => setShowChat(true)}
+          className="fixed right-6 bottom-6 p-4 bg-blue-600 text-white rounded-full shadow-2xl hover:bg-blue-700 transition-all z-50 group hover:scale-110"
+          title="Open AI Assistant"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+            AI Assistant
+          </span>
+        </button>
+      )}
+
       {/* Main Editing Area */}
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
@@ -202,29 +218,49 @@ export const ManualEditor: React.FC = () => {
             
             {/* Selected Blocks Indicator */}
             {selectedBlocks.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 mb-6 shadow-md">
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-5 mb-6 shadow-lg">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-600 rounded-lg">
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-md">
+                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
                       </svg>
                     </div>
                     <div>
-                      <span className="text-blue-900 font-bold text-lg">
-                        {selectedBlocks.length} block{selectedBlocks.length > 1 ? 's' : ''} selected
-                      </span>
-                      <p className="text-blue-700 text-sm">
-                        Ready for AI assistance
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-900 font-bold text-xl">
+                          {selectedBlocks.length} block{selectedBlocks.length > 1 ? 's' : ''} cited
+                        </span>
+                        <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-bold rounded-full">
+                          AI Ready
+                        </span>
+                      </div>
+                      <p className="text-green-700 text-sm mt-1 flex items-center space-x-1">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Use the AI chat to improve, rewrite, or modify these blocks</span>
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
+                    {!showChat && (
+                      <button
+                        onClick={() => setShowChat(true)}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span>Open Chat</span>
+                      </button>
+                    )}
                     <button
                       onClick={clearBlockSelection}
-                      className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-all shadow-sm"
+                      className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
                     >
-                      Clear Selection
+                      Clear
                     </button>
                   </div>
                 </div>
@@ -295,9 +331,9 @@ export const ManualEditor: React.FC = () => {
         </div>
       </div>
 
-      {/* Small Chat Assistant */}
+      {/* AI Chat Assistant Panel */}
       {showChat && (
-        <div className="w-80 border-l border-gray-200 bg-white">
+        <div className="w-96 border-l-2 border-gray-300 bg-white shadow-2xl flex flex-col">
           <SmallChatAssistant onClose={() => setShowChat(false)} />
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../../store';
 import type { ResumeNode } from '../../../shared/types';
+import { detectTextDirection } from '../../../shared/utils/languageDetection';
 
 interface EditableNodeProps {
   node: ResumeNode;
@@ -31,6 +32,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   const [dropZone, setDropZone] = useState<DropZone>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
+  const isDragTargetRef = useRef<boolean>(false);
 
   // Block selection state
   const { selectedBlocks, toggleBlockSelection } = useAppStore();
@@ -43,6 +45,14 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
       textareaRef.current.select();
     }
   }, [isEditing]);
+
+  // Reset drag target when dragging ends globally
+  useEffect(() => {
+    if (!draggedNode) {
+      isDragTargetRef.current = false;
+      setDropZone(null);
+    }
+  }, [draggedNode]);
 
   const handleSave = () => {
     if (!node.addr) {
@@ -94,16 +104,37 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
     setDropZone(null);
   };
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!draggedNode || draggedNode === node.addr || !node.addr) {
+      return;
+    }
+
+    // Only handle the initial enter on the main div
+    if (e.currentTarget === nodeRef.current) {
+      isDragTargetRef.current = true;
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     if (!draggedNode || draggedNode === node.addr || !node.addr) {
+      return;
+    }
+
+    // Only handle if this is the current target (not bubbled from child)
+    if (e.currentTarget !== nodeRef.current) {
       return;
     }
 
     e.preventDefault();
     e.stopPropagation();
 
+    // Only update drop zone if we're the active target
+    if (!isDragTargetRef.current) {
+      return;
+    }
+
     // Determine drop zone based on cursor position
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = nodeRef.current!.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const height = rect.height;
 
@@ -120,19 +151,34 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
       e.dataTransfer.dropEffect = 'copy';
     }
 
-    setDropZone(newDropZone);
+    // Only update state if actually changed
+    if (dropZone !== newDropZone) {
+      setDropZone(newDropZone);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    // Only clear if we're actually leaving the node (not entering a child)
-    if (e.currentTarget === e.target) {
-      setDropZone(null);
+    if (!draggedNode || draggedNode === node.addr || !node.addr) {
+      return;
+    }
+
+    // Only handle if leaving the main div (not entering a child)
+    if (e.currentTarget === nodeRef.current) {
+      // Check if we're leaving to another node (not a child of this node)
+      const relatedTarget = e.relatedTarget as HTMLElement;
+      if (!nodeRef.current?.contains(relatedTarget)) {
+        isDragTargetRef.current = false;
+        setDropZone(null);
+      }
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Reset state
+    isDragTargetRef.current = false;
 
     if (!draggedNode || !node.addr || draggedNode === node.addr) {
       setDropZone(null);
@@ -142,37 +188,48 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
     const currentDropZone = dropZone;
     setDropZone(null);
 
-    // Execute the appropriate action based on drop zone
-    if (currentDropZone === 'inside') {
-      // Make dragged node a child of this node
-      onMove(draggedNode, node.addr, 0);
-    } else if (currentDropZone === 'before') {
-      // Insert dragged node before this node (as sibling)
-      // This requires getting the parent and position
-      const parts = node.addr.split('.');
-      if (parts.length === 1) {
-        // Root level - move to root before this node
-        const position = parseInt(parts[0]) - 1;
-        onMove(draggedNode, 'root', position);
-      } else {
-        // Nested - move to same parent before this node
-        const parentAddr = parts.slice(0, -1).join('.');
-        const position = parseInt(parts[parts.length - 1]) - 1;
-        onMove(draggedNode, parentAddr, position);
+    // Don't execute if no drop zone was set
+    if (!currentDropZone) {
+      console.warn('⚠️ Drop attempted without drop zone');
+      return;
+    }
+
+    console.log(`🎯 Dropping node ${draggedNode} ${currentDropZone} node ${node.addr}`);
+
+    try {
+      // Execute the appropriate action based on drop zone
+      if (currentDropZone === 'inside') {
+        // Make dragged node a child of this node
+        onMove(draggedNode, node.addr, 0);
+      } else if (currentDropZone === 'before') {
+        // Insert dragged node before this node (as sibling)
+        const parts = node.addr.split('.');
+        if (parts.length === 1) {
+          // Root level - move to root before this node
+          const position = parseInt(parts[0]) - 1;
+          onMove(draggedNode, 'root', position);
+        } else {
+          // Nested - move to same parent before this node
+          const parentAddr = parts.slice(0, -1).join('.');
+          const position = parseInt(parts[parts.length - 1]) - 1;
+          onMove(draggedNode, parentAddr, position);
+        }
+      } else if (currentDropZone === 'after') {
+        // Insert dragged node after this node (as sibling)
+        const parts = node.addr.split('.');
+        if (parts.length === 1) {
+          // Root level - move to root after this node
+          const position = parseInt(parts[0]);
+          onMove(draggedNode, 'root', position);
+        } else {
+          // Nested - move to same parent after this node
+          const parentAddr = parts.slice(0, -1).join('.');
+          const position = parseInt(parts[parts.length - 1]);
+          onMove(draggedNode, parentAddr, position);
+        }
       }
-    } else if (currentDropZone === 'after') {
-      // Insert dragged node after this node (as sibling)
-      const parts = node.addr.split('.');
-      if (parts.length === 1) {
-        // Root level - move to root after this node
-        const position = parseInt(parts[0]);
-        onMove(draggedNode, 'root', position);
-      } else {
-        // Nested - move to same parent after this node
-        const parentAddr = parts.slice(0, -1).join('.');
-        const position = parseInt(parts[parts.length - 1]);
-        onMove(draggedNode, parentAddr, position);
-      }
+    } catch (error) {
+      console.error('❌ Drop failed:', error);
     }
 
     setDraggedNode(null);
@@ -204,33 +261,38 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   };
 
   const getNodeStyle = () => {
-    let baseClasses = "group relative rounded-lg transition-all duration-200";
+    let baseClasses = "group relative rounded-lg transition-shadow duration-200";
 
     // Different styles based on layout
     if (node.layout === 'heading') {
       baseClasses += " bg-gradient-to-r from-blue-50 to-indigo-50 border-2";
       if (isSelected) {
-        baseClasses += " border-blue-500 shadow-lg ring-2 ring-blue-200";
+        baseClasses += " border-green-500 shadow-xl ring-4 ring-green-200";
       } else {
         baseClasses += " border-blue-200 hover:border-blue-400 hover:shadow-md";
       }
     } else if (node.layout === 'list-item') {
       baseClasses += " bg-white border-l-4 border-gray-200 hover:border-green-400";
       if (isSelected) {
-        baseClasses += " border-green-500 shadow-md ring-2 ring-green-100";
+        baseClasses += " border-green-500 shadow-xl ring-4 ring-green-100";
       }
     } else {
       baseClasses += " bg-white border";
       if (isSelected) {
-        baseClasses += " border-purple-500 shadow-lg ring-2 ring-purple-100";
+        baseClasses += " border-green-500 shadow-xl ring-4 ring-green-100";
       } else {
         baseClasses += " border-gray-200 hover:border-purple-300 hover:shadow-md";
       }
     }
 
-    // Dragging state
+    // Drop zone: inside - increase shadow only (no scale/layout change)
+    if (dropZone === 'inside') {
+      baseClasses += " shadow-2xl ring-2 ring-blue-400";
+    }
+
+    // Dragging state - only opacity, no scale
     if (isDragging) {
-      baseClasses += " opacity-40 scale-95";
+      baseClasses += " opacity-40";
     }
 
     return baseClasses;
@@ -246,29 +308,70 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
     }
   };
 
+  // Detect text direction for the current node content
+  const getTextDir = () => {
+    const content = node.text || node.title || '';
+    return detectTextDirection(content);
+  };
+
   const getDropZoneIndicator = () => {
     if (!dropZone) return null;
 
-    const indicatorStyles = {
-      before: "absolute -top-1 left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-lg",
-      after: "absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-500 rounded-full shadow-lg",
-      inside: "absolute inset-0 bg-blue-100 border-2 border-dashed border-blue-500 rounded-lg opacity-50 pointer-events-none"
-    };
+    if (dropZone === 'inside') {
+      return (
+        <div className="absolute inset-0 bg-blue-100 border-2 border-dashed border-blue-500 rounded-lg opacity-50 pointer-events-none animate-pulse z-10">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+              Drop inside as child
+            </div>
+          </div>
+        </div>
+      );
+    }
 
-    return <div className={indicatorStyles[dropZone]} />;
+    // For before/after, show indicator WITHOUT affecting layout
+    const isBeforeZone = dropZone === 'before';
+    return (
+      <div
+        className={`absolute left-0 right-0 pointer-events-none z-20 ${
+          isBeforeZone ? '-top-6' : '-bottom-6'
+        }`}
+        style={{ height: '48px' }}
+      >
+        {/* Expanding background to show space will open */}
+        <div className={`absolute inset-x-0 ${isBeforeZone ? 'top-0' : 'bottom-0'} h-12 bg-gradient-to-b ${
+          isBeforeZone
+            ? 'from-blue-100/50 to-transparent'
+            : 'from-transparent to-blue-100/50'
+        } animate-pulse`} />
+
+        {/* Insertion line */}
+        <div className="absolute inset-0 flex items-center px-2">
+          <div className="w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent rounded-full shadow-lg" />
+        </div>
+
+        {/* Label */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+            {isBeforeZone ? '↑ Drop above' : '↓ Drop below'}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="relative">
-      {/* Drop zone indicator */}
+    <div className="relative mb-3">
+      {/* Drop zone indicator - absolutely positioned to not affect layout */}
       {getDropZoneIndicator()}
 
       <div
         ref={nodeRef}
-        className={`${getNodeStyle()} p-4 mb-3`}
+        className={`${getNodeStyle()} p-4 transition-all duration-200`}
         draggable={!isEditing}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -304,6 +407,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                 onBlur={handleSave}
                 onKeyDown={handleKeyDown}
                 onClick={(e) => e.stopPropagation()}
+                dir={detectTextDirection(editText)}
                 className="w-full p-3 border-2 border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white shadow-inner"
                 rows={Math.max(2, editText.split('\n').length)}
               />
@@ -313,6 +417,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                   e.stopPropagation();
                   setIsEditing(true);
                 }}
+                dir={getTextDir()}
                 className={`${getTextStyle()} cursor-text hover:bg-white/50 p-3 rounded-lg min-h-[3rem] whitespace-pre-wrap transition-colors`}
               >
                 {node.text || node.title || (
@@ -324,12 +429,14 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-1 flex-shrink-0">
-            {/* Selection Indicator */}
+            {/* Citation Indicator */}
             {isSelected && (
-              <div className="p-1.5 bg-blue-600 text-white rounded-full shadow-lg animate-pulse" title="Selected for chat">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              <div className="flex items-center space-x-1 px-2 py-1 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full shadow-lg" title="Cited for AI chat">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
                 </svg>
+                <span className="text-xs font-bold">Cited</span>
               </div>
             )}
 

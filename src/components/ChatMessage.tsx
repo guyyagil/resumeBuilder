@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ChatMessage as ChatMessageType } from '../shared/types';
+import { detectTextDirection } from '../shared/utils/languageDetection';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -10,10 +11,12 @@ interface ChatMessageProps {
  */
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
+  const textDir = detectTextDirection(message.content);
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
+        dir={textDir}
         className={`max-w-[80%] rounded-lg px-4 py-3 ${
           isUser
             ? 'bg-blue-600 text-white'
