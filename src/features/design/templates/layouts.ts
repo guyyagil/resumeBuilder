@@ -16,6 +16,10 @@ export const LAYOUT_STRUCTURES: LayoutStructure[] = [
       headingStyle: 'underline',
       bodySpacing: 'normal',
     },
+    // Backward compatibility
+    singleColumn: true,
+    twoColumn: false,
+    spacing: 'normal',
   },
   {
     type: 'two-column-left',
@@ -34,6 +38,11 @@ export const LAYOUT_STRUCTURES: LayoutStructure[] = [
       headingStyle: 'bold',
       bodySpacing: 'normal',
     },
+    // Backward compatibility
+    singleColumn: false,
+    twoColumn: true,
+    columnsRatio: '1:2',
+    spacing: 'normal',
   },
   {
     type: 'two-column-right',
@@ -52,6 +61,11 @@ export const LAYOUT_STRUCTURES: LayoutStructure[] = [
       headingStyle: 'minimal',
       bodySpacing: 'normal',
     },
+    // Backward compatibility
+    singleColumn: false,
+    twoColumn: true,
+    columnsRatio: '2:1',
+    spacing: 'normal',
   },
   {
     type: 'header-focus',
@@ -68,6 +82,10 @@ export const LAYOUT_STRUCTURES: LayoutStructure[] = [
       headingStyle: 'bold',
       bodySpacing: 'normal',
     },
+    // Backward compatibility
+    singleColumn: true,
+    twoColumn: false,
+    spacing: 'normal',
   },
   {
     type: 'modern-split',
@@ -83,5 +101,9 @@ export const LAYOUT_STRUCTURES: LayoutStructure[] = [
       headingStyle: 'background',
       bodySpacing: 'spacious',
     },
+    // Backward compatibility
+    singleColumn: true,
+    twoColumn: false,
+    spacing: 'spacious',
   },
 ];

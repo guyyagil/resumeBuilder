@@ -29,6 +29,12 @@ export interface LayoutStructure {
     headingStyle: 'bold' | 'underline' | 'background' | 'minimal';
     bodySpacing: 'compact' | 'normal' | 'spacious';
   };
+
+  // Backward compatibility properties
+  singleColumn: boolean;
+  twoColumn: boolean;
+  columnsRatio?: string;
+  spacing: 'compact' | 'normal' | 'spacious';
 }
 
 export interface ColorScheme {
@@ -59,6 +65,20 @@ export interface DesignTemplate {
 
   // Preview image
   previewUrl?: string;
+
+  // Backward compatibility - expose nested properties at top level
+  name: string;
+  style: string;
+  description: string;
+  colors: {
+    primary: string;
+    secondary: string;
+    text: string;
+    textLight: string;
+    background: string;
+    accent: string;
+    sidebarBg?: string;
+  };
 }
 
 export interface GeneratedResumeDesign {
@@ -77,6 +97,6 @@ export interface GeneratedResumeDesign {
 export interface DesignCustomization {
   colors?: Partial<DesignTemplate['colors']>;
   fonts?: Partial<DesignTemplate['fonts']>;
-  spacing?: DesignTemplate['layout']['spacing'];
+  spacing?: LayoutStructure['spacing'];
   customCss?: string;
 }

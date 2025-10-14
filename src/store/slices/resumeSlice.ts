@@ -474,6 +474,11 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
           heading: 'Inter, system-ui, sans-serif',
           body: 'Inter, system-ui, sans-serif',
         },
+        // Backward compatibility
+        name: state.selectedLayout.name,
+        style: 'Custom',
+        description: state.selectedLayout.description,
+        colors: state.selectedColorScheme.colors,
       };
 
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';

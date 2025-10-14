@@ -75,7 +75,7 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
           if (node.layout === 'heading') {
             hasHeadingsWithContent = true;
           }
-          node.children.forEach((child, childIndex) => {
+          node.children.forEach((child) => {
             const childContent = child.text || child.title || '';
             if (childContent.trim() && child.addr) {
               selectedContent += `   - Child ADDRESS: "${child.addr}" | LAYOUT: [${child.layout}] | CONTENT: ${childContent}\n`;
