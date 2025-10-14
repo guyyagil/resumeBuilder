@@ -140,13 +140,12 @@ USER REQUEST: ${userMessage}
 CRITICAL INSTRUCTIONS FOR TARGETING THE CORRECT BLOCKS:
 1. The user has selected specific blocks with their ADDRESSES shown above in the "SELECTED BLOCKS FOR REFERENCE" section
 2. Each block has an ADDRESS (e.g., "1.1", "2.3.1") - this is the EXACT identifier you MUST use in the "id" field
-3. Look at the LAYOUT type to understand what field to modify:
-   - If LAYOUT is "heading": modify the "title" field (NOT text)
-   - If LAYOUT is "container": modify the "text" field
-   - If LAYOUT is "list-item": modify the "text" field
-   - If LAYOUT is "paragraph": modify the "text" field
-4. NEVER guess the address - use the EXACT address shown in the selected blocks
-5. If the user wants to modify content inside a parent, look at the CHILDREN addresses and target those
+3. Look at the CONTENT field in the selected blocks to see what content to modify
+4. IMPORTANT: Always modify the "text" field for content changes, regardless of layout type
+   - Headings, containers, list-items, paragraphs all use the "text" field
+   - Example: {"action": "update", "id": "1.1", "patch": {"text": "new content"}}
+5. NEVER guess the address - use the EXACT address shown in the selected blocks
+6. If the user wants to modify content inside a parent, look at the CHILDREN addresses and target those
 
 AVAILABLE ACTIONS:
 1. UPDATE - Modify the content of a block:
@@ -245,21 +244,6 @@ Remember:
             if (!node) {
               console.warn(`⚠️ AI tried to target non-existent address: ${targetAddr}`);
               return false;
-            }
-
-            // Check if the action is modifying the correct field for the layout type
-            const patch = action.patch || {};
-            const hasTitle = 'title' in patch;
-            const hasText = 'text' in patch;
-
-            if (node.layout === 'heading' && hasText && !hasTitle) {
-              console.warn(`⚠️ AI tried to modify 'text' field on heading node ${targetAddr}, should modify 'title' instead`);
-              // Auto-fix: convert text to title for headings
-              if (hasText) {
-                action.patch.title = action.patch.text;
-                delete action.patch.text;
-                console.log(`✅ Auto-fixed: moved 'text' to 'title' for heading node ${targetAddr}`);
-              }
             }
 
             return true;

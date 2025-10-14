@@ -11,14 +11,20 @@ interface PhaseStep {
 const PHASE_STEPS: PhaseStep[] = [
   { id: 'welcome', label: 'Upload', order: 1 },
   { id: 'editing', label: 'Edit', order: 2 },
-  { id: 'active', label: 'Design', order: 3 },
+  { id: 'layout-selection', label: 'Layout', order: 3 },
+  { id: 'color-selection', label: 'Colors', order: 4 },
+  { id: 'active', label: 'Design', order: 5 },
 ];
 
 export const Header: React.FC = () => {
-  const { phase, reset } = useAppStore();
+  const { phase, reset, selectedLayout, selectedColorScheme } = useAppStore();
 
   const handleBack = () => {
     if (phase === 'active' || phase === 'designing') {
+      useAppStore.setState({ phase: 'color-selection' });
+    } else if (phase === 'color-selection') {
+      useAppStore.setState({ phase: 'layout-selection' });
+    } else if (phase === 'layout-selection') {
       useAppStore.setState({ phase: 'editing' });
     } else if (phase === 'editing') {
       if (window.confirm('Go back to upload? Current progress will be lost.')) {
@@ -29,6 +35,13 @@ export const Header: React.FC = () => {
 
   const handleNext = () => {
     if (phase === 'editing') {
+      // Go to layout selection
+      useAppStore.setState({ phase: 'layout-selection' });
+    } else if (phase === 'layout-selection') {
+      // Go to color selection
+      useAppStore.setState({ phase: 'color-selection' });
+    } else if (phase === 'color-selection') {
+      // Start design generation
       const { startDesignPhase } = useAppStore.getState();
       startDesignPhase().catch(error => {
         console.error('Failed to start design phase:', error);
@@ -41,13 +54,18 @@ export const Header: React.FC = () => {
   const getCurrentStep = (): number => {
     if (phase === 'welcome') return 1;
     if (phase === 'processing' || phase === 'editing') return 2;
-    if (phase === 'designing' || phase === 'active') return 3;
+    if (phase === 'layout-selection') return 3;
+    if (phase === 'color-selection') return 4;
+    if (phase === 'designing' || phase === 'active') return 5;
     return 1;
   };
 
   const currentStep = getCurrentStep();
-  const canGoBack = phase !== 'welcome' && phase !== 'processing';
-  const canGoNext = phase === 'editing';
+  const canGoBack = phase !== 'welcome' && phase !== 'processing' && phase !== 'designing';
+  const canGoNext =
+    phase === 'editing' ||
+    (phase === 'layout-selection' && selectedLayout !== null) ||
+    (phase === 'color-selection' && selectedColorScheme !== null);
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">

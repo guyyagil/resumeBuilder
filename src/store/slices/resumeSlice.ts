@@ -1,15 +1,15 @@
 // Resume data slice
 import type { StateCreator } from 'zustand';
-import type { 
-  ResumeNode, 
-  Numbering, 
-  HistoryEntry, 
+import type {
+  ResumeNode,
+  Numbering,
+  HistoryEntry,
   AgentAction,
   AppPhase,
   ProcessingStage,
   TextDirection
 } from '../../shared/types';
-import type { GeneratedResumeDesign } from '../../features/design/types/design.types';
+import type { GeneratedResumeDesign, DesignTemplate, LayoutStructure, ColorScheme } from '../../features/design/types/design.types';
 import { AddressMap } from '../../shared/utils/tree/addressMap';
 import { computeNumbering } from '../../shared/utils/tree/numbering';
 import { cloneTree } from '../../shared/utils/tree/treeUtils';
@@ -23,7 +23,7 @@ export interface ResumeSlice {
   // Phase management
   phase: AppPhase;
   processingStage: ProcessingStage;
-  
+
   // Core resume data
   resumeTree: ResumeNode[];
   resumeTitle: string;
@@ -31,23 +31,26 @@ export interface ResumeSlice {
   jobDescription: string;
   textDirection: TextDirection;
   language: string;
-  
+
   // Design
   resumeDesign: GeneratedResumeDesign | null;
   isRegeneratingDesign: boolean;
-  
+  selectedTemplate: DesignTemplate | null;
+  selectedLayout: LayoutStructure | null;
+  selectedColorScheme: ColorScheme | null;
+
   // Fast lookups
   addressMap: AddressMap | null;
-  
+
   // History for undo/redo
   history: HistoryEntry[];
   historyIndex: number;
   maxHistorySize: number;
-  
+
   // Initialization state
   isInitializing: boolean;
   initializationError: string | null;
-  
+
   // Actions
   setPhase: (phase: AppPhase) => void;
   setProcessingStage: (stage: ProcessingStage) => void;
@@ -58,6 +61,9 @@ export interface ResumeSlice {
   setLanguage: (language: string) => void;
   setResumeDesign: (design: GeneratedResumeDesign | null) => void;
   setRegeneratingDesign: (regenerating: boolean) => void;
+  setSelectedTemplate: (template: DesignTemplate | null) => void;
+  setSelectedLayout: (layout: LayoutStructure | null) => void;
+  setSelectedColorScheme: (scheme: ColorScheme | null) => void;
   
   // Tree operations
   applyAction: (action: AgentAction, description: string) => void;
@@ -119,6 +125,9 @@ const initialResumeState = {
   language: 'en',
   resumeDesign: null as GeneratedResumeDesign | null,
   isRegeneratingDesign: false,
+  selectedTemplate: null as DesignTemplate | null,
+  selectedLayout: null as LayoutStructure | null,
+  selectedColorScheme: null as ColorScheme | null,
   addressMap: null as AddressMap | null,
   history: [],
   historyIndex: -1,
@@ -174,6 +183,18 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
 
   setRegeneratingDesign: (regenerating) => set((state) => {
     state.isRegeneratingDesign = regenerating;
+  }),
+
+  setSelectedTemplate: (template) => set((state) => {
+    state.selectedTemplate = template;
+  }),
+
+  setSelectedLayout: (layout) => set((state) => {
+    state.selectedLayout = layout;
+  }),
+
+  setSelectedColorScheme: (scheme) => set((state) => {
+    state.selectedColorScheme = scheme;
   }),
 
   applyAction: (action, description) => {
@@ -426,15 +447,34 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
 
   startDesignPhase: async () => {
     const state = get();
-    
+
+    // Check if layout and color scheme are selected
+    if (!state.selectedLayout) {
+      throw new Error('No layout selected. Please select a layout first.');
+    }
+    if (!state.selectedColorScheme) {
+      throw new Error('No color scheme selected. Please select a color scheme first.');
+    }
+
     // Transition to designing phase
-    set((draft) => { 
+    set((draft) => {
       draft.phase = 'designing';
       draft.isRegeneratingDesign = true;
     });
 
     try {
-      console.log('🎨 Starting design phase...');
+      console.log('🎨 Starting design phase with layout:', state.selectedLayout.name, 'and colors:', state.selectedColorScheme.name);
+
+      // Combine layout and color scheme into a template
+      const combinedTemplate: DesignTemplate = {
+        id: `${state.selectedLayout.type}_${state.selectedColorScheme.id}`,
+        layout: state.selectedLayout,
+        colorScheme: state.selectedColorScheme,
+        fonts: {
+          heading: 'Inter, system-ui, sans-serif',
+          body: 'Inter, system-ui, sans-serif',
+        },
+      };
 
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) {
@@ -442,34 +482,29 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       }
 
       const { DesignAgent } = await import('../../features/design/services/DesignAgent');
-      const { selectDesignTemplate } = await import('../../features/design/templates');
-
       const designAgent = new DesignAgent(apiKey);
-      const resumeText = JSON.stringify(state.resumeTree);
-      const selectedTemplate = selectDesignTemplate(resumeText, state.jobDescription);
-      
-      console.log('🎨 Selected template:', selectedTemplate.name);
-      
+
       const design = await designAgent.generateResumeHTML(
         state.resumeTree,
         state.resumeTitle,
-        selectedTemplate,
+        combinedTemplate,
         state.jobDescription
       );
-      
+
       console.log('🎨 Design generation completed');
 
       set((draft) => {
         draft.resumeDesign = design;
+        draft.selectedTemplate = combinedTemplate;
         draft.isRegeneratingDesign = false;
         draft.phase = 'active'; // Move to final active phase
       });
 
     } catch (error) {
       console.error('❌ Failed to generate design:', error);
-      set((draft) => { 
+      set((draft) => {
         draft.isRegeneratingDesign = false;
-        draft.phase = 'editing'; // Go back to editing on error
+        draft.phase = 'color-selection'; // Go back to color selection on error
       });
       throw error;
     }

@@ -39,6 +39,13 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   const isSelected = node.addr ? selectedBlocks.includes(node.addr) : false;
   const isDragging = draggedNode === node.addr;
 
+  // Sync editText with node changes from external updates (like AI edits)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditText(node.text || node.title || '');
+    }
+  }, [node.text, node.title, isEditing]);
+
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();

@@ -39,17 +39,13 @@ export const ResumePreview: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col items-center p-8 overflow-auto">
-      {/* A4 Paper Container - better proportions */}
+      {/* A4 Paper Container - adapts to content */}
       <div
         className="w-full max-w-[210mm] bg-white shadow-2xl my-auto rounded-lg"
-        style={{
-          minHeight: '297mm',
-          aspectRatio: '210/297'
-        }}
       >
         {/* AI-Generated Resume HTML */}
         <div
-          className="w-full h-full p-12"
+          className="w-full p-12"
           dangerouslySetInnerHTML={{ __html: resumeDesign.html }}
         />
       </div>

@@ -1,19 +1,39 @@
 // Resume design system types
 
-export type ResumeDesignStyle =
-  | 'modern'      // Clean, minimal, lots of white space
-  | 'professional' // Traditional, conservative
-  | 'creative'    // Bold, colorful, unique layouts
-  | 'technical'   // Code-focused, monospace accents
-  | 'executive';  // Elegant, sophisticated
+export type ResumeLayoutType =
+  | 'single-column'      // Traditional single column (like John Smith example)
+  | 'two-column-left'    // Sidebar on left (like Catherine Barnett example)
+  | 'two-column-right'   // Sidebar on right
+  | 'header-focus'       // Large header with content below (like Kaida Kim example)
+  | 'modern-split';      // Modern split design (like Olivia Wilson example)
 
-export interface DesignTemplate {
-  id: string;
+export interface LayoutStructure {
+  type: ResumeLayoutType;
   name: string;
-  style: ResumeDesignStyle;
   description: string;
 
-  // Color scheme
+  // Structure definition
+  structure: {
+    hasLargeName: boolean;         // Large name at top
+    hasSidebar: boolean;           // Has a sidebar
+    sidebarPosition?: 'left' | 'right';
+    sidebarWidth?: string;         // e.g., "30%", "35%"
+    mainContentWidth?: string;     // e.g., "70%", "65%"
+    headerHeight?: string;         // For header-focused layouts
+    sectionArrangement: 'vertical' | 'grid' | 'mixed';
+  };
+
+  // Typography preferences for this layout
+  typography: {
+    nameSize: 'large' | 'xlarge' | 'xxlarge';
+    headingStyle: 'bold' | 'underline' | 'background' | 'minimal';
+    bodySpacing: 'compact' | 'normal' | 'spacious';
+  };
+}
+
+export interface ColorScheme {
+  id: string;
+  name: string;
   colors: {
     primary: string;
     secondary: string;
@@ -21,21 +41,20 @@ export interface DesignTemplate {
     textLight: string;
     background: string;
     accent: string;
+    sidebarBg?: string;  // For layouts with sidebars
   };
+}
 
-  // Typography
+export interface DesignTemplate {
+  id: string;
+  layout: LayoutStructure;
+  colorScheme: ColorScheme;
+
+  // Typography (moved from layout, applied after color selection)
   fonts: {
     heading: string;
     body: string;
     accent?: string;
-  };
-
-  // Layout preferences
-  layout: {
-    singleColumn: boolean;
-    twoColumn: boolean;
-    columnsRatio?: string; // e.g., "1:2" for left-right split
-    spacing: 'compact' | 'normal' | 'spacious';
   };
 
   // Preview image

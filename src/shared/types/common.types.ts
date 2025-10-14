@@ -1,12 +1,14 @@
 // Common utility types used across the application
 
-export type AppPhase = 
-  | 'welcome'      // Initial state, showing upload form
-  | 'processing'   // Parsing PDF and building tree
-  | 'editing'      // Manual editing with AI chat assistance
-  | 'designing'    // Generating final visual design
-  | 'active'       // Final resume with design preview
-  | 'error';       // Error state with retry option
+export type AppPhase =
+  | 'welcome'              // Initial state, showing upload form
+  | 'processing'           // Parsing PDF and building tree
+  | 'editing'              // Manual editing with AI chat assistance
+  | 'layout-selection'     // Choosing layout structure
+  | 'color-selection'      // Choosing color scheme
+  | 'designing'            // Generating final visual design
+  | 'active'               // Final resume with design preview
+  | 'error';               // Error state with retry option
 
 export type ProcessingStage = 
   | 'extracting'   // Extracting text from PDF

@@ -4,6 +4,8 @@ import { Header } from './Header';
 import { WelcomePhase } from './phases/WelcomePhase';
 import { ProcessingPhase } from './phases/ProcessingPhase';
 import { EditingPhase } from './phases/EditingPhase';
+import { LayoutSelectionPhase } from './phases/LayoutSelectionPhase';
+import { ColorSchemeSelectionPhase } from './phases/ColorSchemeSelectionPhase';
 import { DesignPhase } from './phases/DesignPhase';
 
 export const AppLayout: React.FC = () => {
@@ -19,6 +21,8 @@ export const AppLayout: React.FC = () => {
         {phase === 'welcome' && <WelcomePhase />}
         {phase === 'processing' && <ProcessingPhase />}
         {phase === 'editing' && <EditingPhase />}
+        {phase === 'layout-selection' && <LayoutSelectionPhase />}
+        {phase === 'color-selection' && <ColorSchemeSelectionPhase />}
         {(phase === 'designing' || phase === 'active') && <DesignPhase />}
       </main>
     </div>

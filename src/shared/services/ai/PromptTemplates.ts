@@ -152,16 +152,43 @@ export class PromptBuilder {
     const hasHebrew = /[\u0590-\u05FF]/.test(resumeText + title);
     const isRTL = hasHebrew;
 
+    // Extract layout and color scheme from new template structure
+    const layout = template.layout;
+    const colorScheme = template.colorScheme;
+    const colors = colorScheme.colors;
+
+    // Build layout description
+    let layoutDescription = `${layout.name}: ${layout.description}\n`;
+
+    if (layout.structure.hasSidebar) {
+      layoutDescription += `- Layout: Two-column with ${layout.structure.sidebarPosition} sidebar\n`;
+      layoutDescription += `- Sidebar width: ${layout.structure.sidebarWidth}, Main content: ${layout.structure.mainContentWidth}\n`;
+      layoutDescription += `- Use sidebar background color: ${colors.sidebarBg}\n`;
+      layoutDescription += `- Place skills, education, and contact info in the sidebar\n`;
+      layoutDescription += `- Place work experience and summary in main content area\n`;
+    } else if (layout.structure.headerHeight) {
+      layoutDescription += `- Layout: Large header (${layout.structure.headerHeight}) with content below\n`;
+      layoutDescription += `- Header should be prominent with background color\n`;
+    } else {
+      layoutDescription += `- Layout: Single column, clean and traditional\n`;
+    }
+
+    layoutDescription += `- Name size: ${layout.typography.nameSize}\n`;
+    layoutDescription += `- Heading style: ${layout.typography.headingStyle}\n`;
+    layoutDescription += `- Body spacing: ${layout.typography.bodySpacing}\n`;
+
     let designPrompt = [
       CORE_PROMPTS.RESUME_DESIGNER,
       `# RESUME CONTENT\nTitle: ${title}\n${resumeText}`,
       jobDescription ? `# JOB DESCRIPTION\n${jobDescription}` : '',
-      `# DESIGN STYLE: ${template.name}\n${template.description}`,
-      `## Style Guidelines (as inspiration only - use your creativity)\n- Style: ${template.style}\n- Layout: ${template.layout.singleColumn ? 'Single column' : 'Two column'}\n- Choose professional, subtle colors that complement the content\n- Use clean, modern typography\n- Ensure excellent readability and ATS compatibility`,
+      `# LAYOUT STRUCTURE\n${layoutDescription}`,
+      `# COLOR SCHEME: ${colorScheme.name}\nYou MUST use these exact colors:\n- Primary (headings, name): ${colors.primary}\n- Secondary: ${colors.secondary}\n- Text color: ${colors.text}\n- Light text (meta info, dates): ${colors.textLight}\n- Background: ${colors.background}\n- Accent (borders, highlights): ${colors.accent}${colors.sidebarBg ? `\n- Sidebar background: ${colors.sidebarBg}` : ''}`,
+      `# TYPOGRAPHY\n- Heading font: ${template.fonts.heading}\n- Body font: ${template.fonts.body}${template.fonts.accent ? `\n- Accent font: ${template.fonts.accent}` : ''}`,
+      `## Critical Requirements:\n- Follow the EXACT layout structure described above\n- Use the EXACT colors specified - do not change them\n- Ensure the layout matches the selected template (sidebar position, header style, etc.)\n- Maintain excellent readability and ATS compatibility`,
       TASK_PROMPTS.DESIGN_GENERATION
-        .replace('{FONT_FAMILY}', 'system-ui, -apple-system, sans-serif')
-        .replace('{TEXT_COLOR}', '#1a1a1a')
-        .replace('{BACKGROUND_COLOR}', '#ffffff')
+        .replace('{FONT_FAMILY}', template.fonts.body)
+        .replace('{TEXT_COLOR}', colors.text)
+        .replace('{BACKGROUND_COLOR}', colors.background)
         .replace('{RTL_STYLES}', isRTL ? '\n        direction: rtl;\n        text-align: right;' : '')
     ].filter(Boolean).join('\n\n');
 
