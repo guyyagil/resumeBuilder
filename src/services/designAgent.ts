@@ -9,7 +9,7 @@ export class DesignAgent {
   constructor(apiKey: string) {
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-pro',
       generationConfig: {
         temperature: 0.7,
         topP: 0.95,

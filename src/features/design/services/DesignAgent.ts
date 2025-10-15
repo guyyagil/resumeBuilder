@@ -23,7 +23,7 @@ export class DesignAgent {
 
     try {
       const designModel = this.genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-pro',
         generationConfig: {
           temperature: 0.7,
           topP: 0.95,

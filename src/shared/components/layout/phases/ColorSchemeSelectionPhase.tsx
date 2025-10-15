@@ -37,7 +37,7 @@ export const ColorSchemeSelectionPhase: React.FC = () => {
 
   if (!selectedLayout) {
     return (
-      <div className="h-full flex items-center justify-center bg-gray-50">
+      <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-white">
         <div className="text-center">
           <p className="text-xl text-gray-600">Please select a layout first</p>
         </div>
@@ -46,13 +46,13 @@ export const ColorSchemeSelectionPhase: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-white">
       {/* Header */}
       <div className="p-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Color Scheme</h1>
-        <p className="text-gray-600">Select colors that match your style and industry</p>
-        <p className="text-sm text-gray-500 mt-2">
-          Layout: <span className="font-semibold text-blue-600">{selectedLayout.name}</span>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">Choose Your Color Scheme</h1>
+        <p className="text-gray-600 text-lg">Select colors that match your style and industry</p>
+        <p className="text-sm text-blue-600 font-medium mt-2">
+          Layout: <span className="font-bold">{selectedLayout.name}</span>
         </p>
       </div>
 
@@ -66,13 +66,13 @@ export const ColorSchemeSelectionPhase: React.FC = () => {
             return (
               <div
                 key={scheme.id}
-                className={`group relative bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden ${
-                  isSelected ? 'ring-4 ring-blue-500 shadow-2xl scale-105' : ''
+                className={`group relative bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden border ${
+                  isSelected ? 'ring-4 ring-blue-400 shadow-2xl scale-105 border-blue-200' : 'border-blue-100'
                 }`}
                 onClick={() => handleSelectScheme(scheme.id)}
               >
                 {/* Preview Thumbnail */}
-                <div className="aspect-[210/297] bg-gray-100 overflow-hidden relative">
+                <div className="aspect-[210/297] bg-gradient-to-br from-gray-50 to-blue-50 overflow-hidden relative">
                   <iframe
                     srcDoc={coloredPreview}
                     className="w-full h-full pointer-events-none transform scale-50 origin-top-left"
@@ -98,7 +98,7 @@ export const ColorSchemeSelectionPhase: React.FC = () => {
 
                   {/* Selection Badge */}
                   {isSelected && (
-                    <div className="absolute top-3 right-3 bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg flex items-center space-x-1">
+                    <div className="absolute top-3 right-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-2 py-1 rounded-full text-xs font-bold shadow-xl flex items-center space-x-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>

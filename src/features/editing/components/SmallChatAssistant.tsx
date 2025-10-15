@@ -388,19 +388,19 @@ Remember:
   ];
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="p-5 border-b-2 border-gray-300 bg-gradient-to-r from-slate-600 to-gray-700">
+      <div className="p-5 border-b-2 border-blue-200 bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xl">
+              <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <div>
-              <h3 className="font-bold text-white text-lg">AI Assistant</h3>
-              <p className="text-xs text-gray-200">
+              <h3 className="font-bold text-white text-lg drop-shadow">AI Assistant</h3>
+              <p className="text-xs text-blue-100">
                 {selectedBlocks.length > 0
                   ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} cited`
                   : 'Click blocks to cite them'
@@ -410,7 +410,7 @@ Remember:
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+            className="p-2 text-white hover:bg-white/20 rounded-lg transition-all"
             title="Close chat"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -418,13 +418,13 @@ Remember:
             </svg>
           </button>
         </div>
-        
+
         {/* Selected Blocks Indicator */}
         {selectedBlocks.length > 0 && (
-          <div className="mt-3 p-3 bg-white/90 backdrop-blur rounded-xl shadow-lg border border-gray-300">
+          <div className="mt-3 p-3 bg-white rounded-xl shadow-lg border border-emerald-200">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-2">
-                <div className="p-1 bg-green-500 rounded-full">
+                <div className="p-1 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full shadow-md">
                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
@@ -435,7 +435,7 @@ Remember:
               </div>
               <button
                 onClick={clearBlockSelection}
-                className="text-xs text-slate-600 hover:text-slate-800 font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
               >
                 Clear
               </button>
@@ -458,10 +458,10 @@ Remember:
             >
               <div
                 dir={textDir}
-                className={`max-w-[85%] p-3 rounded-xl text-sm shadow-md ${
+                className={`max-w-[85%] p-3 rounded-xl text-sm shadow-lg ${
                   message.role === 'user'
-                    ? 'bg-gradient-to-r from-slate-600 to-gray-700 text-white'
-                    : 'bg-white text-gray-900 border border-gray-200'
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                    : 'bg-white text-gray-900 border border-blue-100'
                 }`}
               >
                 <div className="whitespace-pre-wrap">{message.content}</div>
@@ -472,10 +472,10 @@ Remember:
         
         {isProcessing && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 p-3 rounded-lg">
+            <div className="bg-gradient-to-r from-blue-100 to-indigo-100 p-3 rounded-xl border border-blue-200 shadow-md">
               <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600"></div>
-                <span className="text-sm text-gray-600">Thinking...</span>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-300 border-t-blue-600"></div>
+                <span className="text-sm text-blue-700 font-medium">Thinking...</span>
               </div>
             </div>
           </div>
@@ -486,17 +486,17 @@ Remember:
 
       {/* Quick Suggestions */}
       {messages.length === 1 && (
-        <div className="p-4 border-t-2 border-gray-200 bg-gradient-to-b from-gray-50 to-white">
-          <p className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">Quick Actions</p>
+        <div className="p-4 border-t-2 border-blue-200 bg-gradient-to-b from-blue-50 to-white">
+          <p className="text-xs font-semibold text-blue-700 mb-3 uppercase tracking-wide">Quick Actions</p>
           <div className="space-y-2">
             {quickSuggestions.map((suggestion, index) => (
               <button
                 key={index}
                 onClick={() => setInputMessage(suggestion)}
-                className="w-full text-left text-xs p-3 bg-white hover:bg-gray-100 border border-gray-200 hover:border-gray-400 rounded-lg text-gray-700 transition-all shadow-sm hover:shadow-md"
+                className="w-full text-left text-xs p-3 bg-white hover:bg-blue-50 border border-blue-200 hover:border-blue-400 rounded-lg text-gray-700 transition-all shadow-sm hover:shadow-md"
               >
                 <div className="flex items-center space-x-2">
-                  <span className="text-slate-600">→</span>
+                  <span className="text-blue-600">→</span>
                   <span>{suggestion}</span>
                 </div>
               </button>
@@ -506,7 +506,7 @@ Remember:
       )}
 
       {/* Input */}
-      <div className="p-4 border-t-2 border-gray-200 bg-white">
+      <div className="p-4 border-t-2 border-blue-200 bg-white">
         <div className="flex flex-col space-y-2">
           <textarea
             value={inputMessage}
@@ -516,7 +516,7 @@ Remember:
             placeholder={selectedBlocks.length > 0
               ? "Ask me to improve the cited blocks..."
               : "Ask for writing help or guidance..."}
-            className="w-full px-4 py-3 text-sm border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none bg-gray-50 focus:bg-white transition-colors"
+            className="w-full px-4 py-3 text-sm border-2 border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none bg-blue-50 focus:bg-white transition-colors"
             rows={3}
             disabled={isProcessing}
           />
@@ -529,7 +529,7 @@ Remember:
             <button
               onClick={handleSend}
               disabled={!inputMessage.trim() || isProcessing}
-              className="px-5 py-2.5 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-sm font-semibold rounded-lg hover:from-slate-700 hover:to-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
             >
               <span>Send</span>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

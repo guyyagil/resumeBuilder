@@ -199,13 +199,13 @@ export const ManualEditor: React.FC = () => {
       {!showChat && (
         <button
           onClick={() => setShowChat(true)}
-          className="fixed right-6 bottom-6 p-4 bg-blue-600 text-white rounded-full shadow-2xl hover:bg-blue-700 transition-all z-50 group hover:scale-110"
+          className="fixed right-6 bottom-6 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-2xl hover:from-blue-600 hover:to-indigo-700 transition-all z-50 group hover:scale-110"
           title="Open AI Assistant"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
             AI Assistant
           </span>
         </button>
@@ -218,10 +218,10 @@ export const ManualEditor: React.FC = () => {
             
             {/* Selected Blocks Indicator */}
             {selectedBlocks.length > 0 && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-400 rounded-xl p-5 mb-6 shadow-lg">
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-400 rounded-2xl p-5 mb-6 shadow-xl">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-md">
+                    <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
                       <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                         <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
@@ -229,14 +229,14 @@ export const ManualEditor: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-green-900 font-bold text-xl">
+                        <span className="text-emerald-900 font-bold text-xl">
                           {selectedBlocks.length} block{selectedBlocks.length > 1 ? 's' : ''} cited
                         </span>
-                        <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-bold rounded-full">
+                        <span className="px-2 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-full shadow-md">
                           AI Ready
                         </span>
                       </div>
-                      <p className="text-green-700 text-sm mt-1 flex items-center space-x-1">
+                      <p className="text-emerald-700 text-sm mt-1 flex items-center space-x-1">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
@@ -248,7 +248,7 @@ export const ManualEditor: React.FC = () => {
                     {!showChat && (
                       <button
                         onClick={() => setShowChat(true)}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl flex items-center space-x-2"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -258,7 +258,7 @@ export const ManualEditor: React.FC = () => {
                     )}
                     <button
                       onClick={clearBlockSelection}
-                      className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+                      className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-md"
                     >
                       Clear
                     </button>
@@ -333,7 +333,7 @@ export const ManualEditor: React.FC = () => {
 
       {/* AI Chat Assistant Panel */}
       {showChat && (
-        <div className="w-96 border-l-2 border-gray-300 bg-white shadow-2xl flex flex-col">
+        <div className="w-96 border-l-2 border-blue-200 bg-white shadow-2xl flex flex-col">
           <SmallChatAssistant onClose={() => setShowChat(false)} />
         </div>
       )}

@@ -34,12 +34,12 @@ export const LayoutSelectionPhase: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-indigo-50 to-white">
       {/* Header */}
       <div className="p-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Resume Layout</h1>
-        <p className="text-gray-600">Select a layout structure that best showcases your content</p>
-        <p className="text-sm text-gray-500 mt-2">You'll choose colors in the next step</p>
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">Choose Your Resume Layout</h1>
+        <p className="text-gray-600 text-lg">Select a layout structure that best showcases your content</p>
+        <p className="text-sm text-blue-600 font-medium mt-2">You'll choose colors in the next step</p>
       </div>
 
       {/* Layout Grid */}
@@ -51,13 +51,13 @@ export const LayoutSelectionPhase: React.FC = () => {
             return (
               <div
                 key={layout.type}
-                className={`group relative bg-white rounded-xl shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden ${
-                  isSelected ? 'ring-4 ring-blue-500 shadow-2xl scale-105' : ''
+                className={`group relative bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden border ${
+                  isSelected ? 'ring-4 ring-blue-400 shadow-2xl scale-105 border-blue-200' : 'border-blue-100'
                 }`}
                 onClick={() => handleSelectLayout(layout.type)}
               >
                 {/* Preview Thumbnail */}
-                <div className="aspect-[210/297] bg-gray-100 overflow-hidden relative border-b-4 border-gray-200">
+                <div className="aspect-[210/297] bg-gradient-to-br from-gray-50 to-blue-50 overflow-hidden relative border-b-4 border-blue-100">
                   <iframe
                     srcDoc={previews.get(layout.type)}
                     className="w-full h-full pointer-events-none transform scale-50 origin-top-left"
@@ -83,7 +83,7 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                   {/* Selection Badge */}
                   {isSelected && (
-                    <div className="absolute top-4 right-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center space-x-1">
+                    <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-xl flex items-center space-x-1">
                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>

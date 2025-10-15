@@ -69,15 +69,20 @@ export const Header: React.FC = () => {
     (phase === 'color-selection' && selectedColorScheme !== null);
 
   return (
-    <header className="bg-gradient-to-b from-gray-200 to-gray-100 shadow-xl relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-gray-300 after:to-transparent">
-      <div className="max-w-[1920px] mx-auto px-8 py-4">
+    <header className="bg-gradient-to-r from-blue-600 via-blue-500 to-white shadow-2xl relative overflow-hidden">
+      {/* Animated background pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+      </div>
+
+      <div className="max-w-[1920px] mx-auto px-8 py-4 relative z-10">
         <div className="flex items-center justify-between">
           {/* Left: Back Button */}
           <div className="w-32">
             {canGoBack && (
               <button
                 onClick={handleBack}
-                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all"
+                className="flex items-center space-x-2 px-4 py-2 text-white/90 hover:text-white hover:bg-white/20 rounded-lg transition-all backdrop-blur-sm"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -93,7 +98,7 @@ export const Header: React.FC = () => {
             <img
               src={logoImage}
               alt="ResumeLab"
-              className="h-20 w-auto"
+              className="h-20 w-auto drop-shadow-xl"
             />
             {/* Progress Indicator */}
             {phase !== 'error' && (
@@ -105,10 +110,10 @@ export const Header: React.FC = () => {
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
                           step.order < currentStep
-                            ? 'bg-gradient-to-r from-slate-600 to-gray-700 text-white'
+                            ? 'bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg'
                             : step.order === currentStep
-                            ? 'bg-gradient-to-r from-slate-600 to-gray-700 text-white ring-4 ring-slate-200'
-                            : 'bg-gray-300 text-gray-500'
+                            ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-white ring-4 ring-white/50 shadow-xl scale-110'
+                            : 'bg-white/30 text-white/70 backdrop-blur-sm'
                         }`}
                       >
                         {step.order < currentStep ? (
@@ -120,7 +125,7 @@ export const Header: React.FC = () => {
                         )}
                       </div>
                       <span className={`text-xs mt-1 font-medium ${
-                        step.order <= currentStep ? 'text-gray-700' : 'text-gray-400'
+                        step.order <= currentStep ? 'text-white drop-shadow' : 'text-white/60'
                       }`}>
                         {step.label}
                       </span>
@@ -129,10 +134,10 @@ export const Header: React.FC = () => {
                     {/* Connector Line */}
                     {index < PHASE_STEPS.length - 1 && (
                       <div
-                        className={`h-0.5 w-16 transition-all ${
+                        className={`h-0.5 w-16 transition-all rounded-full ${
                           step.order < currentStep
-                            ? 'bg-gradient-to-r from-slate-600 to-gray-700'
-                            : 'bg-gray-300'
+                            ? 'bg-gradient-to-r from-emerald-400 to-teal-400 shadow-md'
+                            : 'bg-white/30'
                         }`}
                       />
                     )}
@@ -147,7 +152,7 @@ export const Header: React.FC = () => {
             {canGoNext && (
               <button
                 onClick={handleNext}
-                className="flex items-center space-x-2 px-4 py-2 text-white bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-700 hover:to-gray-800 rounded-lg transition-all shadow-md"
+                className="flex items-center space-x-2 px-4 py-2 text-blue-600 bg-white hover:bg-blue-50 rounded-lg transition-all shadow-lg hover:shadow-xl font-medium"
               >
                 <span className="font-medium">Next</span>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -162,7 +167,7 @@ export const Header: React.FC = () => {
                     reset();
                   }
                 }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all font-medium"
+                className="px-4 py-2 text-white/90 hover:text-white hover:bg-white/20 rounded-lg transition-all font-medium backdrop-blur-sm"
               >
                 New
               </button>

@@ -17,10 +17,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         dir={textDir}
-        className={`max-w-[80%] rounded-lg px-4 py-3 ${
+        className={`max-w-[80%] rounded-xl px-4 py-3 shadow-lg ${
           isUser
-            ? 'bg-blue-600 text-white'
-            : 'bg-white text-gray-900 shadow-sm'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+            : 'bg-white text-gray-900 border border-blue-100'
         }`}
       >
         <div className="text-xs font-medium mb-1 opacity-75">
