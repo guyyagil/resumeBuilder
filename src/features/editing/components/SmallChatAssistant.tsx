@@ -14,7 +14,7 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: '👋 Hi! I\'m your AI resume assistant. I can:\n\n• Modify and improve your resume blocks\n• Suggest better wording and phrasing\n• Help with formatting and structure\n• Provide professional writing guidance\n\n💡 Tip: Click on blocks in your resume to cite them as references, then ask me to improve them!'
+      content: '👋 Hi! I\'m your AI resume assistant. I can:\n\n• Modify and improve your resume blocks\n• Add new sections or bullet points\n• Delete sections you don\'t need\n• Reorder sections\n• Suggest better wording and phrasing\n• Help with formatting and structure\n\n💡 Tip: Click on blocks in your resume to cite them as references, then ask me to improve, delete, or add content to them!'
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -149,9 +149,18 @@ CRITICAL INSTRUCTIONS FOR TARGETING THE CORRECT BLOCKS:
 
 AVAILABLE ACTIONS:
 1. UPDATE - Modify the content of a block:
-   {"action": "update", "id": "ADDRESS", "patch": {"text": "new content"}}
+   {"action": "update", "id": "ADDRESS", "patch": {"text": "new content", "title": "new title"}}
 
-2. REORDER - Change the order of root-level sections (use ONLY for root blocks like "1", "2", "3", NOT nested like "1.1"):
+2. REMOVE - Delete a block/section:
+   {"action": "remove", "id": "ADDRESS"}
+
+3. APPEND CHILD - Add a new child to a block (or to root with parent: "root"):
+   {"action": "appendChild", "parent": "parent_ADDRESS_or_root", "node": {"layout": "paragraph", "text": "content"}}
+
+4. INSERT SIBLING - Add a new block after another block:
+   {"action": "insertSibling", "after": "reference_ADDRESS", "node": {"layout": "paragraph", "text": "content"}}
+
+5. REORDER - Change the order of root-level sections (use ONLY for root blocks like "1", "2", "3", NOT nested like "1.1"):
    {"action": "reorder", "id": "", "order": ["new", "order", "of", "addresses"]}
 
    IMPORTANT FOR REORDER:
@@ -172,7 +181,19 @@ EXAMPLE 1 - UPDATE content:
 If selected block shows: "1. ADDRESS: "1.1" | LAYOUT: [container] | CONTENT: Some text"
 Action: [{"action": "update", "id": "1.1", "patch": {"text": "Improved text"}}]
 
-EXAMPLE 2 - REORDER sections:
+EXAMPLE 2 - DELETE a section:
+If user wants to delete address "3":
+Action: [{"action": "remove", "id": "3"}]
+
+EXAMPLE 3 - ADD a new section to root:
+If user wants to add a Certifications section:
+Action: [{"action": "appendChild", "parent": "root", "node": {"layout": "heading", "title": "Certifications", "style": {"level": 1, "weight": "bold"}}}]
+
+EXAMPLE 4 - ADD a bullet point to an existing section:
+If user wants to add a bullet to address "2.1":
+Action: [{"action": "appendChild", "parent": "2.1", "node": {"layout": "list-item", "text": "New achievement detail", "style": {"listMarker": "bullet"}}}]
+
+EXAMPLE 5 - REORDER sections:
 If user wants to move "פרטי קשר" (address "6") to be first, and root structure shows ["1", "2", "3", "4", "5", "6"]:
 Action: [{"action": "reorder", "id": "", "order": ["6", "1", "2", "3", "4", "5"]}]
 
@@ -180,6 +201,7 @@ Remember:
 - Use EXACT addresses from the sections above
 - Match field name to layout type (title for headings, text for everything else)
 - For reordering, include ALL root addresses in the new order
+- For adding to root, use parent: "root"
 - Keep the same language (Hebrew/English) as the original
 - Only generate actions if the user is asking for specific changes
 ` : guidancePrompt;
@@ -237,7 +259,58 @@ Remember:
               return true;
             }
 
-            // Handle update/other actions
+            // Handle appendChild action
+            if (action.action === 'appendChild') {
+              const parent = action.parent;
+              if (parent === 'root' || parent === '') {
+                console.log(`✅ AppendChild to root validated`);
+                return true;
+              }
+
+              const parentNode = getNodeByAddress(parent);
+              if (!parentNode) {
+                console.warn(`⚠️ AppendChild parent not found: ${parent}`);
+                return false;
+              }
+
+              console.log(`✅ AppendChild to ${parent} validated`);
+              return true;
+            }
+
+            // Handle insertSibling action
+            if (action.action === 'insertSibling') {
+              const refNode = getNodeByAddress(action.after);
+              if (!refNode) {
+                console.warn(`⚠️ InsertSibling reference not found: ${action.after}`);
+                return false;
+              }
+
+              console.log(`✅ InsertSibling after ${action.after} validated`);
+              return true;
+            }
+
+            // Handle move action
+            if (action.action === 'move') {
+              const node = getNodeByAddress(action.id);
+              if (!node) {
+                console.warn(`⚠️ Move source not found: ${action.id}`);
+                return false;
+              }
+
+              const newParent = action.newParent;
+              if (newParent !== 'root' && newParent !== '') {
+                const parentNode = getNodeByAddress(newParent);
+                if (!parentNode) {
+                  console.warn(`⚠️ Move target parent not found: ${newParent}`);
+                  return false;
+                }
+              }
+
+              console.log(`✅ Move ${action.id} to ${action.newParent} validated`);
+              return true;
+            }
+
+            // Handle update/remove/replaceText actions that need an existing target
             const targetAddr = action.id;
             const node = getNodeByAddress(targetAddr);
 
@@ -246,6 +319,7 @@ Remember:
               return false;
             }
 
+            console.log(`✅ Action ${action.action} on ${targetAddr} validated`);
             return true;
           });
 
@@ -303,30 +377,30 @@ Remember:
 
   const quickSuggestions = selectedBlocks.length > 0 ? [
     "Improve the selected content",
-    "Make this more impactful and professional",
-    "Add quantifiable metrics to this",
+    "Delete this section",
+    "Add a bullet point under this section",
     "Rewrite with stronger action verbs"
   ] : [
-    "How can I make my resume stronger?",
-    "What are best practices for resume writing?",
-    "Help me with formatting tips",
-    "Suggest improvements for my content"
+    "Add a new Certifications section",
+    "Add more details to my experience",
+    "Delete empty or weak sections",
+    "Reorder my sections to highlight strengths"
   ];
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="p-5 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-indigo-600">
+      <div className="p-5 border-b-2 border-gray-300 bg-gradient-to-r from-slate-600 to-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-6 h-6 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <div>
               <h3 className="font-bold text-white text-lg">AI Assistant</h3>
-              <p className="text-xs text-blue-100">
+              <p className="text-xs text-gray-200">
                 {selectedBlocks.length > 0
                   ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} cited`
                   : 'Click blocks to cite them'
@@ -347,7 +421,7 @@ Remember:
         
         {/* Selected Blocks Indicator */}
         {selectedBlocks.length > 0 && (
-          <div className="mt-3 p-3 bg-white/90 backdrop-blur rounded-xl shadow-lg border border-blue-200">
+          <div className="mt-3 p-3 bg-white/90 backdrop-blur rounded-xl shadow-lg border border-gray-300">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-2">
                 <div className="p-1 bg-green-500 rounded-full">
@@ -361,7 +435,7 @@ Remember:
               </div>
               <button
                 onClick={clearBlockSelection}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                className="text-xs text-slate-600 hover:text-slate-800 font-medium px-2 py-1 rounded hover:bg-gray-100 transition-colors"
               >
                 Clear
               </button>
@@ -386,7 +460,7 @@ Remember:
                 dir={textDir}
                 className={`max-w-[85%] p-3 rounded-xl text-sm shadow-md ${
                   message.role === 'user'
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
+                    ? 'bg-gradient-to-r from-slate-600 to-gray-700 text-white'
                     : 'bg-white text-gray-900 border border-gray-200'
                 }`}
               >
@@ -419,10 +493,10 @@ Remember:
               <button
                 key={index}
                 onClick={() => setInputMessage(suggestion)}
-                className="w-full text-left text-xs p-3 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg text-gray-700 transition-all shadow-sm hover:shadow-md"
+                className="w-full text-left text-xs p-3 bg-white hover:bg-gray-100 border border-gray-200 hover:border-gray-400 rounded-lg text-gray-700 transition-all shadow-sm hover:shadow-md"
               >
                 <div className="flex items-center space-x-2">
-                  <span className="text-blue-600">→</span>
+                  <span className="text-slate-600">→</span>
                   <span>{suggestion}</span>
                 </div>
               </button>
@@ -442,7 +516,7 @@ Remember:
             placeholder={selectedBlocks.length > 0
               ? "Ask me to improve the cited blocks..."
               : "Ask for writing help or guidance..."}
-            className="w-full px-4 py-3 text-sm border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-gray-50 focus:bg-white transition-colors"
+            className="w-full px-4 py-3 text-sm border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 resize-none bg-gray-50 focus:bg-white transition-colors"
             rows={3}
             disabled={isProcessing}
           />
@@ -455,7 +529,7 @@ Remember:
             <button
               onClick={handleSend}
               disabled={!inputMessage.trim() || isProcessing}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+              className="px-5 py-2.5 bg-gradient-to-r from-slate-600 to-gray-700 text-white text-sm font-semibold rounded-lg hover:from-slate-700 hover:to-gray-800 focus:outline-none focus:ring-2 focus:ring-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
             >
               <span>Send</span>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

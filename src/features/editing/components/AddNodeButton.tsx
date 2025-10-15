@@ -33,9 +33,9 @@ export const AddNodeButton: React.FC<AddNodeButtonProps> = ({ onAdd, label, icon
   return (
     <button
       onClick={onAdd}
-      className="group w-full p-5 border-2 border-dashed border-gray-300 hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 rounded-xl transition-all duration-300 flex items-center justify-center space-x-3 text-gray-600 hover:text-blue-700 shadow-sm hover:shadow-md"
+      className="group w-full p-5 border-2 border-dashed border-gray-300 hover:border-slate-500 hover:bg-gray-100 rounded-xl transition-all duration-300 flex items-center justify-center space-x-3 text-gray-600 hover:text-slate-700 shadow-sm hover:shadow-md"
     >
-      <div className="p-2 bg-white group-hover:bg-blue-600 rounded-lg transition-all duration-300 shadow-sm">
+      <div className="p-2 bg-white group-hover:bg-slate-600 rounded-lg transition-all duration-300 shadow-sm">
         <div className="group-hover:text-white transition-colors">
           {getIcon()}
         </div>

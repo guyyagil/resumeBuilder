@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../../store';
 import type { AppPhase } from '../../../shared/types';
+import logoImage from '../../../assets/logo.png';
 
 interface PhaseStep {
   id: AppPhase;
@@ -68,7 +69,7 @@ export const Header: React.FC = () => {
     (phase === 'color-selection' && selectedColorScheme !== null);
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
+    <header className="bg-gradient-to-b from-gray-200 to-gray-100 shadow-xl relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-gray-300 after:to-transparent">
       <div className="max-w-[1920px] mx-auto px-8 py-4">
         <div className="flex items-center justify-between">
           {/* Left: Back Button */}
@@ -86,12 +87,14 @@ export const Header: React.FC = () => {
             )}
           </div>
 
-          {/* Center: Brand + Progress */}
+          {/* Center: Logo + Progress */}
           <div className="flex-1 flex flex-col items-center space-y-3">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              ResumeLab
-            </h1>
-
+            {/* Logo */}
+            <img
+              src={logoImage}
+              alt="ResumeLab"
+              className="h-20 w-auto"
+            />
             {/* Progress Indicator */}
             {phase !== 'error' && (
               <div className="flex items-center space-x-2">
@@ -102,10 +105,10 @@ export const Header: React.FC = () => {
                       <div
                         className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
                           step.order < currentStep
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                            ? 'bg-gradient-to-r from-slate-600 to-gray-700 text-white'
                             : step.order === currentStep
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white ring-4 ring-blue-100'
-                            : 'bg-gray-200 text-gray-500'
+                            ? 'bg-gradient-to-r from-slate-600 to-gray-700 text-white ring-4 ring-slate-200'
+                            : 'bg-gray-300 text-gray-500'
                         }`}
                       >
                         {step.order < currentStep ? (
@@ -128,8 +131,8 @@ export const Header: React.FC = () => {
                       <div
                         className={`h-0.5 w-16 transition-all ${
                           step.order < currentStep
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600'
-                            : 'bg-gray-200'
+                            ? 'bg-gradient-to-r from-slate-600 to-gray-700'
+                            : 'bg-gray-300'
                         }`}
                       />
                     )}
@@ -144,7 +147,7 @@ export const Header: React.FC = () => {
             {canGoNext && (
               <button
                 onClick={handleNext}
-                className="flex items-center space-x-2 px-4 py-2 text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg transition-all shadow-md"
+                className="flex items-center space-x-2 px-4 py-2 text-white bg-gradient-to-r from-slate-600 to-gray-700 hover:from-slate-700 hover:to-gray-800 rounded-lg transition-all shadow-md"
               >
                 <span className="font-medium">Next</span>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

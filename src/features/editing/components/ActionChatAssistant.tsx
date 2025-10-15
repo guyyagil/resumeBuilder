@@ -108,26 +108,114 @@ INSTRUCTIONS:
 2. If no blocks are selected, provide general guidance
 3. For modifications, respond with both explanation AND actions
 
+AVAILABLE ACTIONS:
+You can perform the following operations on the resume:
+
+1. UPDATE - Modify existing content
+{
+  "action": "update",
+  "id": "block_address",
+  "patch": {
+    "text": "new text",
+    "title": "new title",
+    "layout": "paragraph|heading|list-item|container|grid|key-value",
+    "style": { "weight": "bold", "fontSize": "16px" },
+    "meta": { "company": "...", "dateRange": "..." }
+  }
+}
+
+2. REMOVE - Delete a block/section
+{
+  "action": "remove",
+  "id": "block_address"
+}
+
+3. APPEND CHILD - Add a new child to a block (or to root with parent: "root")
+{
+  "action": "appendChild",
+  "parent": "parent_address_or_root",
+  "node": {
+    "layout": "paragraph|heading|list-item|container",
+    "text": "content",
+    "title": "title",
+    "style": { "weight": "bold" }
+  }
+}
+
+4. INSERT SIBLING - Add a new block after another block
+{
+  "action": "insertSibling",
+  "after": "reference_block_address",
+  "node": {
+    "layout": "paragraph|heading|list-item",
+    "text": "content"
+  }
+}
+
+5. REPLACE TEXT - Quick text replacement
+{
+  "action": "replaceText",
+  "id": "block_address",
+  "text": "new text"
+}
+
+6. MOVE - Move a block to a different parent
+{
+  "action": "move",
+  "id": "block_address",
+  "newParent": "new_parent_address_or_root",
+  "position": 0
+}
+
 RESPONSE FORMAT:
 If making changes, use this format:
 EXPLANATION: [Your explanation of the changes]
 
 ACTIONS:
-[JSON array of actions, each action should be:]
-{
-  "action": "update",
-  "id": "block_address",
-  "patch": {
-    "text": "new improved text"
-  }
-}
+[JSON array of actions]
 
 If just providing guidance, respond normally without the ACTIONS section.
 
-EXAMPLE ACTIONS:
+EXAMPLE USE CASES:
+
+1. Add a new section to the resume:
 [
   {
-    "action": "update", 
+    "action": "appendChild",
+    "parent": "root",
+    "node": {
+      "layout": "heading",
+      "title": "Certifications",
+      "style": { "level": 1, "weight": "bold" }
+    }
+  }
+]
+
+2. Add a bullet point to an experience:
+[
+  {
+    "action": "appendChild",
+    "parent": "2.1",
+    "node": {
+      "layout": "list-item",
+      "text": "Developed new feature that increased user engagement by 40%",
+      "style": { "listMarker": "bullet" }
+    }
+  }
+]
+
+3. Delete a section:
+[
+  {
+    "action": "remove",
+    "id": "3"
+  }
+]
+
+4. Improve existing text:
+[
+  {
+    "action": "update",
     "id": "1.1",
     "patch": {
       "text": "Led cross-functional team of 15+ employees, implementing strategic task allocation and quality assurance protocols that improved productivity by 25%"
@@ -136,10 +224,12 @@ EXAMPLE ACTIONS:
 ]
 
 Remember:
-- Use the exact address from the selected blocks
+- Use the exact address from the selected blocks or resume content
 - Keep the same language (Hebrew/English) as the original
 - Make improvements that are professional and impactful
 - Only generate actions if the user is asking for specific changes
+- When adding sections, use parent: "root" to add at the top level
+- When adding children, use the parent block's address
 `;
 
       const result = await geminiService.processUserMessage(
@@ -200,13 +290,13 @@ Remember:
   const quickSuggestions = selectedBlocks.length > 0 ? [
     "Make this more professional and impactful",
     "Add quantifiable achievements to this",
-    "Improve the wording and action verbs",
-    "Make this more concise and powerful"
+    "Delete this section",
+    "Add a bullet point under this section"
   ] : [
+    "Add a new Certifications section",
+    "Add bullet points to my experience",
     "Help me improve my work experience section",
-    "Suggest better action verbs throughout",
-    "How can I quantify my achievements?",
-    "Review my resume for improvements"
+    "Delete empty or irrelevant sections"
   ];
 
   return (

@@ -12,7 +12,7 @@ import type {
 import type { GeneratedResumeDesign, DesignTemplate, LayoutStructure, ColorScheme } from '../../features/design/types/design.types';
 import { AddressMap } from '../../shared/utils/tree/addressMap';
 import { computeNumbering } from '../../shared/utils/tree/numbering';
-import { cloneTree } from '../../shared/utils/tree/treeUtils';
+import { cloneTree, generateUid } from '../../shared/utils/tree/treeUtils';
 import { validateTreeWithConstraints } from '../../shared/utils/validation/resumeValidator';
 import { ActionHandler } from '../../services/actionHandler';
 
@@ -80,7 +80,8 @@ export interface ResumeSlice {
   
   // Initialization
   initializeFromPDF: (file: File, jobDesc: string) => Promise<void>;
-  
+  initializeBlankResume: () => void;
+
   // Phase transitions
   startDesignPhase: () => Promise<void>;
   
@@ -402,6 +403,85 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       });
       throw error;
     }
+  },
+
+  initializeBlankResume: () => {
+    // Create a minimal blank resume structure
+    const blankTree: ResumeNode[] = [
+      {
+        uid: generateUid(),
+        layout: 'heading',
+        title: 'Personal Information',
+        style: { level: 1, weight: 'bold' },
+        children: [
+          {
+            uid: generateUid(),
+            layout: 'paragraph',
+            text: 'Your Name',
+            style: { weight: 'bold', fontSize: '20px' }
+          },
+          {
+            uid: generateUid(),
+            layout: 'paragraph',
+            text: 'Email | Phone | Location',
+            style: { fontSize: '14px' }
+          }
+        ]
+      },
+      {
+        uid: generateUid(),
+        layout: 'heading',
+        title: 'Summary',
+        style: { level: 1, weight: 'bold' },
+        children: [
+          {
+            uid: generateUid(),
+            layout: 'paragraph',
+            text: 'Professional summary or objective statement'
+          }
+        ]
+      },
+      {
+        uid: generateUid(),
+        layout: 'heading',
+        title: 'Experience',
+        style: { level: 1, weight: 'bold' },
+        children: []
+      },
+      {
+        uid: generateUid(),
+        layout: 'heading',
+        title: 'Education',
+        style: { level: 1, weight: 'bold' },
+        children: []
+      },
+      {
+        uid: generateUid(),
+        layout: 'heading',
+        title: 'Skills',
+        style: { level: 1, weight: 'bold' },
+        children: []
+      }
+    ];
+
+    set((state) => {
+      state.resumeTree = blankTree;
+      state.resumeTitle = 'New Resume';
+      state.textDirection = 'ltr';
+      state.language = 'en';
+      state.resumeDesign = null;
+      state.numbering = computeNumbering(blankTree);
+      state.addressMap = new AddressMap(blankTree);
+      state.isInitializing = false;
+      state.initializationError = null;
+      state.processingStage = null;
+      state.phase = 'editing';
+
+      // Initialize history
+      const entry = createHistoryEntry(blankTree, state.numbering, 'Blank resume created');
+      state.history = [entry];
+      state.historyIndex = 0;
+    });
   },
 
   regenerateDesign: async () => {

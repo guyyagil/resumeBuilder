@@ -34,7 +34,7 @@ export const LayoutSelectionPhase: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
       <div className="p-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Resume Layout</h1>

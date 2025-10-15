@@ -98,14 +98,14 @@ export const DesignPhase: React.FC = () => {
   const showButtons = phase === 'active' && resumeDesign;
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative">
+    <div className="h-full flex flex-col bg-gray-50 relative">
       {/* Floating action buttons - only show when design is ready */}
       {showButtons && (
         <div className="absolute top-6 right-8 z-10 flex flex-col space-y-3">
           {/* Regenerate Design */}
           <button
             onClick={handleRegenerateDesign}
-            className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl font-medium flex items-center space-x-2"
+            className="px-4 py-3 bg-gradient-to-r from-slate-600 to-gray-700 text-white rounded-xl hover:from-slate-700 hover:to-gray-800 transition-all shadow-lg hover:shadow-xl font-medium flex items-center space-x-2"
             title="Regenerate Design"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

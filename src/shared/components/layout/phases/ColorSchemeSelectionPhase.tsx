@@ -37,7 +37,7 @@ export const ColorSchemeSelectionPhase: React.FC = () => {
 
   if (!selectedLayout) {
     return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="h-full flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <p className="text-xl text-gray-600">Please select a layout first</p>
         </div>
@@ -46,7 +46,7 @@ export const ColorSchemeSelectionPhase: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
       <div className="p-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Color Scheme</h1>
