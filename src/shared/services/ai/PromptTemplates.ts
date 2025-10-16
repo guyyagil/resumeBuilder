@@ -229,10 +229,34 @@ export class PromptBuilder {
       .map((inst, index) => `${index + 1}. [${inst.id}] ${inst.content}`)
       .join('\n');
 
+    const jobTailoringSection = jobDescription ? `
+# JOB TAILORING MODE - TARGET POSITION
+
+${jobDescription}
+
+## Your Enhanced Objectives:
+When processing edits, actively tailor the resume to this job by:
+
+1. **Keyword Optimization**: Identify key terms, technologies, and skills from the job description and ensure they appear naturally in the resume
+2. **Experience Prioritization**: Highlight and reorder experiences that most closely match the job requirements
+3. **Skills Alignment**: Emphasize technical and soft skills that directly relate to the position
+4. **Achievement Relevance**: Focus on accomplishments that demonstrate capabilities needed for this specific role
+5. **Language Matching**: Use similar terminology and phrasing as found in the job description
+
+## Tailoring Strategies:
+- **Reorder sections** to put most relevant content first
+- **Strengthen bullet points** that align with job requirements
+- **Add missing keywords** naturally into existing content
+- **Quantify achievements** that demonstrate required competencies
+- **Adjust emphasis** to highlight relevant experience over less relevant items
+
+Always explain how your suggested changes improve alignment with the target position.
+` : '';
+
     return [
       CORE_PROMPTS.EDITING_AGENT,
       `# CURRENT RESUME CONTEXT\n${resumeContext}`,
-      jobDescription ? `# TARGET JOB DESCRIPTION\n${jobDescription}\n\nPlease tailor the edits to align with this job description.` : '',
+      jobTailoringSection,
       `# EDITING INSTRUCTIONS TO PROCESS\n${instructionsText}`,
       `# TASK\nProcess these editing instructions and generate the appropriate actions to modify the resume.\nReturn the JSON response with the actions and summary.`
     ].filter(Boolean).join('\n\n');

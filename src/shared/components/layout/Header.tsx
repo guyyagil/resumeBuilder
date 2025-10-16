@@ -69,7 +69,7 @@ export const Header: React.FC = () => {
     (phase === 'color-selection' && selectedColorScheme !== null);
 
   return (
-    <header className="bg-gradient-to-r from-blue-600 via-blue-500 to-white shadow-2xl relative overflow-hidden">
+    <header className="bg-gradient-to-r from-blue-600 via-blue-400 via-30% to-blue-100 shadow-2xl relative overflow-hidden">
       {/* Animated background pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>

@@ -3,6 +3,7 @@ import { useAppStore } from '../../../store';
 import { EditableNode } from './EditableNode';
 import { AddNodeButton } from './AddNodeButton';
 import { SmallChatAssistant } from './SmallChatAssistant';
+import { JobDescriptionInput } from '../../../components/JobDescriptionInput';
 import type { ResumeNode } from '../../../shared/types';
 
 export const ManualEditor: React.FC = () => {
@@ -194,18 +195,18 @@ export const ManualEditor: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="h-full flex bg-gradient-to-br from-blue-50 via-white to-blue-100">
       {/* Chat Toggle Button - Fixed position */}
       {!showChat && (
         <button
           onClick={() => setShowChat(true)}
-          className="fixed right-6 bottom-6 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-2xl hover:from-blue-600 hover:to-indigo-700 transition-all z-50 group hover:scale-110"
+          className="fixed right-6 bottom-6 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-2xl hover:from-blue-600 hover:to-indigo-700 transition-all z-50 group hover:scale-110 border-2 border-white"
           title="Open AI Assistant"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-gray-800 to-gray-900 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl">
+          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl border border-blue-500">
             AI Assistant
           </span>
         </button>
@@ -215,7 +216,9 @@ export const ManualEditor: React.FC = () => {
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
           <div className="mb-6">
-            
+            {/* Job Description Input */}
+            <JobDescriptionInput className="mb-4" />
+
             {/* Selected Blocks Indicator */}
             {selectedBlocks.length > 0 && (
               <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-400 rounded-2xl p-5 mb-6 shadow-xl">
@@ -271,19 +274,19 @@ export const ManualEditor: React.FC = () => {
           {/* Resume Content Editor */}
           <div className="space-y-4">
             {resumeTree.length === 0 ? (
-              <div className="text-center py-20 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200">
+              <div className="text-center py-20 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-blue-200">
                 <div className="mb-6">
-                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
-                    <svg className="w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center shadow-xl">
+                    <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  <h3 className="text-2xl font-bold text-blue-900 mb-2">
                     {phase === 'welcome' ? 'Start Building' :
                      phase === 'processing' ? 'Processing...' :
                      'No Content Yet'}
                   </h3>
-                  <p className="text-gray-600 max-w-md mx-auto">
+                  <p className="text-blue-700 max-w-md mx-auto font-medium">
                     {phase === 'welcome' ? 'Upload a PDF or create your resume from scratch' :
                      phase === 'processing' ? 'Analyzing your resume structure...' :
                      'Upload a new resume or add content manually'}
@@ -300,7 +303,7 @@ export const ManualEditor: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 p-6">
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-blue-200 p-6">
                 <div className="space-y-3">
                   {resumeTree.map((node: ResumeNode) => (
                     <EditableNode
@@ -318,7 +321,7 @@ export const ManualEditor: React.FC = () => {
                 </div>
 
                 {/* Add Section Button */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="mt-6 pt-6 border-t-2 border-blue-200">
                   <AddNodeButton
                     onAdd={() => handleAddNode('root', 'section')}
                     label="Add Section"
@@ -333,7 +336,7 @@ export const ManualEditor: React.FC = () => {
 
       {/* AI Chat Assistant Panel */}
       {showChat && (
-        <div className="w-96 border-l-2 border-blue-200 bg-white shadow-2xl flex flex-col">
+        <div className="w-96 border-l-2 border-blue-300 bg-white shadow-2xl flex flex-col">
           <SmallChatAssistant onClose={() => setShowChat(false)} />
         </div>
       )}

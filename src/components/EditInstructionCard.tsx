@@ -18,13 +18,13 @@ export const EditInstructionCard: React.FC<EditInstructionCardProps> = ({
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-lg';
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-gradient-to-r from-blue-400 to-blue-500 text-white border-blue-400 shadow-md';
       case 'low':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gradient-to-r from-blue-200 to-blue-300 text-blue-900 border-blue-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gradient-to-r from-blue-200 to-blue-300 text-blue-900 border-blue-200';
     }
   };
 
@@ -43,7 +43,7 @@ export const EditInstructionCard: React.FC<EditInstructionCardProps> = ({
 
   return (
     <div
-      className={`p-4 rounded-lg border-2 transition-all ${getPriorityColor(
+      className={`p-4 rounded-xl border-2 transition-all ${getPriorityColor(
         instruction.priority
       )}`}
     >
@@ -52,15 +52,21 @@ export const EditInstructionCard: React.FC<EditInstructionCardProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">{getStatusIcon(instruction.status)}</span>
-            <span className="text-xs font-medium uppercase tracking-wide">
+            <span className={`text-xs font-bold uppercase tracking-wide ${
+              instruction.priority === 'low' ? 'text-blue-900' : 'text-white'
+            }`}>
               {instruction.status}
             </span>
           </div>
-          <p className="text-sm leading-relaxed break-words">
+          <p className={`text-sm leading-relaxed break-words font-medium ${
+            instruction.priority === 'low' ? 'text-blue-900' : 'text-white'
+          }`}>
             {instruction.content}
           </p>
           {instruction.targetSection && (
-            <div className="mt-2 text-xs opacity-75">
+            <div className={`mt-2 text-xs ${
+              instruction.priority === 'low' ? 'text-blue-700' : 'text-white/80'
+            }`}>
               Target: {instruction.targetSection}
             </div>
           )}
@@ -79,7 +85,7 @@ export const EditInstructionCard: React.FC<EditInstructionCardProps> = ({
                     e.target.value as 'low' | 'medium' | 'high'
                   )
                 }
-                className="text-xs px-2 py-1 rounded border bg-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-xs px-2 py-1 rounded-lg border-2 border-white bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300 font-semibold text-blue-700"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -89,7 +95,7 @@ export const EditInstructionCard: React.FC<EditInstructionCardProps> = ({
               {/* Remove button */}
               <button
                 onClick={() => onRemove(instruction.id)}
-                className="text-xs px-2 py-1 rounded bg-white/50 hover:bg-red-100 hover:text-red-800 transition-colors"
+                className="text-xs px-2 py-1 rounded-lg bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-900 transition-all font-semibold border-2 border-white"
                 title="Remove instruction"
               >
                 Remove
@@ -100,7 +106,9 @@ export const EditInstructionCard: React.FC<EditInstructionCardProps> = ({
       </div>
 
       {/* Timestamp */}
-      <div className="mt-2 text-xs opacity-50">
+      <div className={`mt-2 text-xs ${
+        instruction.priority === 'low' ? 'text-blue-600' : 'text-white/70'
+      }`}>
         {new Date(instruction.timestamp).toLocaleString()}
       </div>
     </div>

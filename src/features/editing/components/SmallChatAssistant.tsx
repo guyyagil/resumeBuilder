@@ -10,7 +10,7 @@ interface SmallChatAssistantProps {
 }
 
 export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose }) => {
-  const { resumeTree, resumeTitle, selectedBlocks, getNodeByAddress, clearBlockSelection, applyAction } = useAppStore();
+  const { resumeTree, resumeTitle, selectedBlocks, getNodeByAddress, clearBlockSelection, applyAction, jobDescription } = useAppStore();
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
@@ -128,13 +128,37 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
         resumeTitle
       );
 
+      // Build job tailoring section
+      const jobTailoringSection = jobDescription ? `
+
+# JOB TAILORING MODE - TARGET POSITION
+
+${jobDescription}
+
+## Your Enhanced Objectives:
+When making changes, actively tailor the resume to this job by:
+
+1. **Keyword Optimization**: Identify key terms, technologies, and skills from the job description and ensure they appear naturally in the resume
+2. **Experience Prioritization**: Highlight and reorder experiences that most closely match the job requirements
+3. **Skills Alignment**: Emphasize technical and soft skills that directly relate to the position
+4. **Achievement Relevance**: Focus on accomplishments that demonstrate capabilities needed for this specific role
+5. **Language Matching**: Use similar terminology and phrasing as found in the job description
+
+## Tailoring Strategies:
+- Strengthen bullet points that align with job requirements
+- Add missing keywords naturally into existing content
+- Quantify achievements that demonstrate required competencies
+- Adjust emphasis to highlight relevant experience
+
+` : '';
+
       // Build a prompt that can generate actions if user wants modifications
       const actionPrompt = selectedBlocksContent.length > 0 ? `
 You are a resume improvement assistant that can make specific changes to resume content.
 
 CURRENT RESUME CONTENT:
 ${fullResumeContent}
-
+${jobTailoringSection}
 USER REQUEST: ${userMessage}
 
 CRITICAL INSTRUCTIONS FOR TARGETING THE CORRECT BLOCKS:
@@ -399,7 +423,14 @@ Remember:
               </svg>
             </div>
             <div>
-              <h3 className="font-bold text-white text-lg drop-shadow">AI Assistant</h3>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-bold text-white text-lg drop-shadow">AI Assistant</h3>
+                {jobDescription && (
+                  <span className="px-2 py-0.5 bg-purple-500 text-white text-[10px] font-bold rounded-full shadow-md">
+                    Job-Targeted
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-blue-100">
                 {selectedBlocks.length > 0
                   ? `${selectedBlocks.length} block${selectedBlocks.length > 1 ? 's' : ''} cited`
@@ -418,6 +449,20 @@ Remember:
             </svg>
           </button>
         </div>
+
+        {/* Job Context Indicator */}
+        {jobDescription && (
+          <div className="mt-3 p-2 bg-purple-100 rounded-lg shadow-md">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs text-purple-800 font-semibold">
+                Tailoring resume to target job role
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Selected Blocks Indicator */}
         {selectedBlocks.length > 0 && (

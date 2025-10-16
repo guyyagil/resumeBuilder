@@ -248,19 +248,19 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
     switch (node.layout) {
       case 'heading':
         return (
-          <svg className={`${iconClass} text-slate-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className={`${iconClass} text-blue-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         );
       case 'list-item':
         return (
-          <svg className={`${iconClass} text-green-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className={`${iconClass} text-indigo-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         );
       default:
         return (
-          <svg className={`${iconClass} text-purple-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className={`${iconClass} text-blue-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         );
@@ -268,33 +268,33 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   };
 
   const getNodeStyle = () => {
-    let baseClasses = "group relative rounded-lg transition-shadow duration-200";
+    let baseClasses = "group relative rounded-xl transition-shadow duration-200";
 
     // Different styles based on layout
     if (node.layout === 'heading') {
-      baseClasses += " bg-gradient-to-r from-gray-100 to-gray-200 border-2";
+      baseClasses += " bg-gradient-to-r from-blue-100 via-blue-50 to-white border-2";
       if (isSelected) {
-        baseClasses += " border-green-500 shadow-xl ring-4 ring-green-200";
+        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-200";
       } else {
-        baseClasses += " border-gray-300 hover:border-slate-400 hover:shadow-md";
+        baseClasses += " border-blue-300 hover:border-blue-500 hover:shadow-lg";
       }
     } else if (node.layout === 'list-item') {
-      baseClasses += " bg-white border-l-4 border-gray-200 hover:border-green-400";
+      baseClasses += " bg-white border-l-4 border-blue-200 hover:border-indigo-400";
       if (isSelected) {
-        baseClasses += " border-green-500 shadow-xl ring-4 ring-green-100";
+        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
       }
     } else {
-      baseClasses += " bg-white border";
+      baseClasses += " bg-white border-2";
       if (isSelected) {
-        baseClasses += " border-green-500 shadow-xl ring-4 ring-green-100";
+        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
       } else {
-        baseClasses += " border-gray-200 hover:border-purple-300 hover:shadow-md";
+        baseClasses += " border-blue-200 hover:border-blue-400 hover:shadow-lg";
       }
     }
 
     // Drop zone: inside - increase shadow only (no scale/layout change)
     if (dropZone === 'inside') {
-      baseClasses += " shadow-2xl ring-2 ring-slate-400";
+      baseClasses += " shadow-2xl ring-2 ring-blue-400";
     }
 
     // Dragging state - only opacity, no scale
@@ -307,11 +307,11 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
   const getTextStyle = () => {
     if (node.layout === 'heading') {
-      return "text-lg font-bold text-gray-900";
+      return "text-lg font-bold text-blue-900";
     } else if (node.layout === 'list-item') {
-      return "text-sm text-gray-700";
+      return "text-sm text-gray-800";
     } else {
-      return "text-base font-medium text-gray-800";
+      return "text-base font-medium text-gray-900";
     }
   };
 
@@ -326,9 +326,9 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
     if (dropZone === 'inside') {
       return (
-        <div className="absolute inset-0 bg-gray-100 border-2 border-dashed border-slate-500 rounded-lg opacity-50 pointer-events-none animate-pulse z-10">
+        <div className="absolute inset-0 bg-blue-100 border-2 border-dashed border-blue-500 rounded-xl opacity-50 pointer-events-none animate-pulse z-10">
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-slate-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl">
               Drop inside as child
             </div>
           </div>
@@ -348,8 +348,8 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
         {/* Expanding background to show space will open */}
         <div className={`absolute inset-x-0 ${isBeforeZone ? 'top-0' : 'bottom-0'} h-12 bg-gradient-to-b ${
           isBeforeZone
-            ? 'from-gray-100/50 to-transparent'
-            : 'from-transparent to-gray-100/50'
+            ? 'from-blue-100/50 to-transparent'
+            : 'from-transparent to-blue-100/50'
         } animate-pulse`} />
 
         {/* Insertion line */}
@@ -359,7 +359,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
         {/* Label */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="bg-slate-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-xl">
             {isBeforeZone ? '↑ Drop above' : '↓ Drop below'}
           </div>
         </div>
@@ -394,12 +394,12 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
         <div className="flex items-start space-x-3">
           {/* Drag Handle & Icon */}
           <div className="flex items-center space-x-2 flex-shrink-0">
-            <div className="cursor-move opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded">
-              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="cursor-move opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-blue-100 rounded-lg">
+              <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
               </svg>
             </div>
-            <div className="p-1.5 rounded-lg bg-white shadow-sm">
+            <div className="p-1.5 rounded-lg bg-white shadow-md border border-blue-100">
               {getNodeIcon()}
             </div>
           </div>
@@ -415,7 +415,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                 onKeyDown={handleKeyDown}
                 onClick={(e) => e.stopPropagation()}
                 dir={detectTextDirection(editText)}
-                className="w-full p-3 border-2 border-slate-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent resize-none bg-white shadow-inner"
+                className="w-full p-3 border-2 border-blue-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white shadow-lg"
                 rows={Math.max(2, editText.split('\n').length)}
               />
             ) : (
@@ -456,7 +456,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                   e.stopPropagation();
                   setShowAddMenu(!showAddMenu);
                 }}
-                className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all shadow-sm hover:shadow-md"
                 title="Add child"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -473,7 +473,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                     onRemove(node.addr);
                   }
                 }}
-                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-blue-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all shadow-sm hover:shadow-md"
                 title="Delete"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -486,19 +486,19 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
         {/* Add Menu Dropdown */}
         {showAddMenu && (
-          <div className="absolute top-full left-16 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="absolute top-full left-16 mt-2 bg-white border-2 border-blue-200 rounded-xl shadow-2xl z-50 overflow-hidden">
             <div className="py-2">
               <button
                 onClick={() => {
                   if (node.addr) onAddChild(node.addr, 'item');
                   setShowAddMenu(false);
                 }}
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-purple-50 transition-colors flex items-center space-x-3"
+                className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors flex items-center space-x-3"
               >
                 <span className="text-lg">📄</span>
                 <div>
-                  <div className="font-medium text-gray-900">Add Item</div>
-                  <div className="text-xs text-gray-500">Regular content block</div>
+                  <div className="font-semibold text-blue-900">Add Item</div>
+                  <div className="text-xs text-blue-600">Regular content block</div>
                 </div>
               </button>
 
@@ -507,12 +507,12 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                   if (node.addr) onAddChild(node.addr, 'bullet');
                   setShowAddMenu(false);
                 }}
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-green-50 transition-colors flex items-center space-x-3"
+                className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 transition-colors flex items-center space-x-3"
               >
                 <span className="text-lg">•</span>
                 <div>
-                  <div className="font-medium text-gray-900">Add Bullet</div>
-                  <div className="text-xs text-gray-500">List item or point</div>
+                  <div className="font-semibold text-blue-900">Add Bullet</div>
+                  <div className="text-xs text-blue-600">List item or point</div>
                 </div>
               </button>
 
@@ -522,12 +522,12 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                     if (node.addr) onAddChild(node.addr, 'section');
                     setShowAddMenu(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-colors flex items-center space-x-3"
+                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-100 transition-colors flex items-center space-x-3"
                 >
                   <span className="text-lg">📋</span>
                   <div>
-                    <div className="font-medium text-gray-900">Add Section</div>
-                    <div className="text-xs text-gray-500">New heading section</div>
+                    <div className="font-semibold text-blue-900">Add Section</div>
+                    <div className="text-xs text-blue-600">New heading section</div>
                   </div>
                 </button>
               )}
@@ -538,7 +538,7 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
       {/* Render Children with Indentation */}
       {node.children && node.children.length > 0 && (
-        <div className="ml-8 space-y-2 pl-4 border-l-2 border-gray-200">
+        <div className="ml-8 space-y-2 pl-4 border-l-2 border-blue-200">
           {node.children.map((child) => (
             <EditableNode
               key={child.uid}
