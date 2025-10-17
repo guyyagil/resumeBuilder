@@ -9,7 +9,7 @@ interface EditableNodeProps {
   onUpdate: (nodeId: string, updates: any) => void;
   onRemove: (nodeId: string) => void;
   onMove: (nodeId: string, newParent: string, position: number) => void;
-  onAddChild: (parentId: string, nodeType: 'section' | 'item' | 'bullet') => void;
+  onAddChild: (parentId: string) => void;
   draggedNode: string | null;
   setDraggedNode: (nodeId: string | null) => void;
 }
@@ -28,7 +28,6 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(node.text || node.title || '');
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [dropZone, setDropZone] = useState<DropZone>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -212,9 +211,9 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
         // Insert dragged node before this node (as sibling)
         const parts = node.addr.split('.');
         if (parts.length === 1) {
-          // Root level - move to root before this node
+          // Root level - move to root before this node (use '0' for root)
           const position = parseInt(parts[0]) - 1;
-          onMove(draggedNode, 'root', position);
+          onMove(draggedNode, '0', position);
         } else {
           // Nested - move to same parent before this node
           const parentAddr = parts.slice(0, -1).join('.');
@@ -225,9 +224,9 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
         // Insert dragged node after this node (as sibling)
         const parts = node.addr.split('.');
         if (parts.length === 1) {
-          // Root level - move to root after this node
+          // Root level - move to root after this node (use '0' for root)
           const position = parseInt(parts[0]);
-          onMove(draggedNode, 'root', position);
+          onMove(draggedNode, '0', position);
         } else {
           // Nested - move to same parent after this node
           const parentAddr = parts.slice(0, -1).join('.');
@@ -245,50 +244,56 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   const getNodeIcon = () => {
     const iconClass = "w-4 h-4";
 
-    switch (node.layout) {
-      case 'heading':
-        return (
-          <svg className={`${iconClass} text-blue-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        );
-      case 'list-item':
-        return (
-          <svg className={`${iconClass} text-indigo-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className={`${iconClass} text-blue-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        );
+    // Style based on depth (from address like "1", "1.2", "1.2.3")
+    if (depth === 0) {
+      // Top level - use heading icon
+      return (
+        <svg className={`${iconClass} text-blue-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      );
+    } else if (depth === 1) {
+      // Second level - use container icon
+      return (
+        <svg className={`${iconClass} text-blue-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      );
+    } else {
+      // Deeper levels - use bullet icon
+      return (
+        <svg className={`${iconClass} text-indigo-600`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      );
     }
   };
 
   const getNodeStyle = () => {
     let baseClasses = "group relative rounded-xl transition-shadow duration-200";
 
-    // Different styles based on layout
-    if (node.layout === 'heading') {
+    // Different styles based on depth
+    if (depth === 0) {
+      // Top level - prominent heading style
       baseClasses += " bg-gradient-to-r from-blue-100 via-blue-50 to-white border-2";
       if (isSelected) {
         baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-200";
       } else {
         baseClasses += " border-blue-300 hover:border-blue-500 hover:shadow-lg";
       }
-    } else if (node.layout === 'list-item') {
-      baseClasses += " bg-white border-l-4 border-blue-200 hover:border-indigo-400";
-      if (isSelected) {
-        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
-      }
-    } else {
+    } else if (depth === 1) {
+      // Second level - container style
       baseClasses += " bg-white border-2";
       if (isSelected) {
         baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
       } else {
         baseClasses += " border-blue-200 hover:border-blue-400 hover:shadow-lg";
+      }
+    } else {
+      // Deeper levels - bullet/list item style
+      baseClasses += " bg-white border-l-4 border-blue-200 hover:border-indigo-400";
+      if (isSelected) {
+        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
       }
     }
 
@@ -306,12 +311,16 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   };
 
   const getTextStyle = () => {
-    if (node.layout === 'heading') {
+    // Text styling based on depth
+    if (depth === 0) {
+      // Top level - large and bold
       return "text-lg font-bold text-blue-900";
-    } else if (node.layout === 'list-item') {
-      return "text-sm text-gray-800";
-    } else {
+    } else if (depth === 1) {
+      // Second level - medium weight
       return "text-base font-medium text-gray-900";
+    } else {
+      // Deeper levels - smaller text
+      return "text-sm text-gray-800";
     }
   };
 
@@ -454,10 +463,10 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  setShowAddMenu(!showAddMenu);
+                  if (node.addr) onAddChild(node.addr);
                 }}
                 className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all shadow-sm hover:shadow-md"
-                title="Add child"
+                title="Add child block"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -484,56 +493,6 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
           </div>
         </div>
 
-        {/* Add Menu Dropdown */}
-        {showAddMenu && (
-          <div className="absolute top-full left-16 mt-2 bg-white border-2 border-blue-200 rounded-xl shadow-2xl z-50 overflow-hidden">
-            <div className="py-2">
-              <button
-                onClick={() => {
-                  if (node.addr) onAddChild(node.addr, 'item');
-                  setShowAddMenu(false);
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors flex items-center space-x-3"
-              >
-                <span className="text-lg">📄</span>
-                <div>
-                  <div className="font-semibold text-blue-900">Add Item</div>
-                  <div className="text-xs text-blue-600">Regular content block</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => {
-                  if (node.addr) onAddChild(node.addr, 'bullet');
-                  setShowAddMenu(false);
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 transition-colors flex items-center space-x-3"
-              >
-                <span className="text-lg">•</span>
-                <div>
-                  <div className="font-semibold text-blue-900">Add Bullet</div>
-                  <div className="text-xs text-blue-600">List item or point</div>
-                </div>
-              </button>
-
-              {node.layout === 'heading' && (
-                <button
-                  onClick={() => {
-                    if (node.addr) onAddChild(node.addr, 'section');
-                    setShowAddMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-100 transition-colors flex items-center space-x-3"
-                >
-                  <span className="text-lg">📋</span>
-                  <div>
-                    <div className="font-semibold text-blue-900">Add Section</div>
-                    <div className="text-xs text-blue-600">New heading section</div>
-                  </div>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Render Children with Indentation */}

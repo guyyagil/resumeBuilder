@@ -87,8 +87,8 @@ export class ActionHandler {
       children: action.node.children || []
     };
 
-    // Handle root-level additions
-    if (action.parent === '' || action.parent === 'root') {
+    // Handle root-level additions (parent is '0')
+    if (action.parent === '0') {
       tree.push(newNode);
       const content = newNode.title || newNode.text || '(empty)';
       console.log(`✅ Appended child to root: "${content}"`);
@@ -228,7 +228,7 @@ export class ActionHandler {
    */
   private handleMove(tree: ResumeNode[], action: MoveAction): ResumeNode[] {
     const uid = resolveAddress(action.id, this.numbering);
-    const newParentUid = action.newParent === 'root'
+    const newParentUid = action.newParent === '0'
       ? null
       : resolveAddress(action.newParent, this.numbering);
 
@@ -267,6 +267,35 @@ export class ActionHandler {
    */
   private handleReorder(tree: ResumeNode[], action: ReorderAction): ResumeNode[] {
     console.log('🔄 Reorder: Starting reorder action', action);
+
+    // If id is '0', reorder root level
+    if (action.id === '0') {
+      console.log('🔄 Reorder: Reordering root level');
+
+      // Convert order addresses to UIDs
+      const orderUids = action.order.map(addr => {
+        const u = resolveAddress(addr, this.numbering);
+        if (!u) throw new Error(`Invalid order address: ${addr}`);
+        return u;
+      });
+
+      // Build new tree in specified order
+      const newTree: ResumeNode[] = [];
+      orderUids.forEach(orderUid => {
+        const node = tree.find(n => n.uid === orderUid);
+        if (node) newTree.push(node);
+      });
+
+      // Add any remaining nodes not in the order
+      tree.forEach(node => {
+        if (!orderUids.includes(node.uid)) {
+          newTree.push(node);
+        }
+      });
+
+      console.log(`✅ Reordered root level: ${action.order.join(', ')}`);
+      return newTree;
+    }
 
     const uid = resolveAddress(action.id, this.numbering);
     if (!uid) throw new Error(`Invalid address: ${action.id}`);

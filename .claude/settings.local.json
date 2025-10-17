@@ -8,7 +8,8 @@
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
       "Bash(copy:*)",
-      "Bash(npx @svgr/cli:*)"
+      "Bash(npx @svgr/cli:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

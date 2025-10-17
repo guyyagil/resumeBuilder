@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../../../store';
 import { GeminiService } from '../../../shared/services/ai/GeminiClient';
-import { PromptBuilder } from '../../../shared/services/ai/PromptTemplates';
 import type { ResumeNode } from '../../../shared/types';
 import { detectTextDirection } from '../../../shared/utils/languageDetection';
 
@@ -9,12 +8,15 @@ interface SmallChatAssistantProps {
   onClose: () => void;
 }
 
+type AssistantMode = 'ask' | 'edit';
+
 export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose }) => {
-  const { resumeTree, resumeTitle, selectedBlocks, getNodeByAddress, clearBlockSelection, applyAction, jobDescription } = useAppStore();
+  const { resumeTree, selectedBlocks, getNodeByAddress, clearBlockSelection, applyAction, jobDescription } = useAppStore();
+  const [mode, setMode] = useState<AssistantMode>('ask');
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
-      content: '👋 Hi! I\'m your AI resume assistant. I can:\n\n• Modify and improve your resume blocks\n• Add new sections or bullet points\n• Delete sections you don\'t need\n• Reorder sections\n• Suggest better wording and phrasing\n• Help with formatting and structure\n\n💡 Tip: Click on blocks in your resume to cite them as references, then ask me to improve, delete, or add content to them!'
+      content: 'Hi! I\'m your AI resume assistant.\n\nChoose a mode to get started:\n\n📝 **Ask Mode** - Get guidance and advice\n• Ask questions about how to improve your resume\n• Get suggestions for better wording\n• Receive strategic advice on structure and content\n\n✏️ **Edit Mode** - Make direct changes\n• AI will automatically update your resume\n• Add, modify, or delete sections\n• Reorder and restructure content\n\nTip: Click on blocks in your resume to cite them for more targeted help!'
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
@@ -67,10 +69,8 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
       const node = getNodeByAddress(addr);
       if (node) {
         const content = node.text || node.title || '';
-        // CRITICAL: Include the address so AI knows which block to modify
         selectedContent += `${index + 1}. ADDRESS: "${addr}" | LAYOUT: [${node.layout}] | CONTENT: ${content}\n`;
 
-        // Include children if any (but note they have their own addresses)
         if (node.children && node.children.length > 0) {
           if (node.layout === 'heading') {
             hasHeadingsWithContent = true;
@@ -93,6 +93,154 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
     return selectedContent;
   };
 
+  // Generate system prompt based on mode
+  const getSystemPrompt = (currentMode: AssistantMode, userMessage: string): string => {
+    const currentResumeContent = resumeTree.length > 0
+      ? serializeResumeForContext(resumeTree)
+      : '';
+    const rootBlocksStructure = getRootBlocksStructure();
+    const selectedBlocksContent = getSelectedBlocksContent();
+    const fullResumeContent = currentResumeContent + rootBlocksStructure + selectedBlocksContent;
+
+    const jobTailoringSection = jobDescription ? `
+
+# TARGET JOB DESCRIPTION
+
+${jobDescription}
+
+` : '';
+
+    if (currentMode === 'ask') {
+      return `# SYSTEM CONTEXT (The user cannot see this section - this is for your internal guidance)
+
+## Your Role
+You are a professional resume advisor having a conversation with someone seeking advice about their resume.
+
+## Communication Style
+- Respond naturally and conversationally to the user's question
+- Don't repeat back their question mechanically
+- Provide specific, actionable advice
+- Explain the "why" behind your suggestions
+- Be encouraging but honest
+
+## Available Context
+
+### Resume Content
+${fullResumeContent}
+
+### Target Job (if provided)
+${jobTailoringSection}
+${jobDescription ? `IMPORTANT: The user is tailoring their resume for this specific job. Your advice should help them:
+- Align their experience with the job requirements
+- Incorporate relevant keywords naturally
+- Highlight the most relevant qualifications
+- Position themselves as the ideal candidate
+` : 'No target job provided - give general resume best practices advice.'}
+
+### Selected Sections (if any)
+${selectedBlocksContent.length > 0 ? `The user has selected these specific sections of their resume for reference:
+${selectedBlocksContent}
+When they ask about "this" or "these sections," they're referring to the selected content above.
+` : 'No sections selected - the user is asking about their resume generally.'}
+
+## Important Constraints
+- You are in "ASK MODE" - provide guidance and recommendations ONLY
+- DO NOT generate any ACTIONS or JSON modifications
+- Respond to the user's question naturally as a helpful advisor would
+
+---
+
+# USER'S QUESTION
+
+${userMessage}
+
+---
+
+Now respond to the user's question naturally, using the context provided above to give helpful, specific advice.`;
+    } else {
+      return `# SYSTEM CONTEXT (The user cannot see this section - this is for your internal guidance)
+
+## Your Role
+You are a professional resume editor who makes direct changes to resumes based on user requests. You respond conversationally while generating structured modifications behind the scenes.
+
+## Communication Style
+- Respond naturally to the user's request
+- Explain what you're changing and why in plain language
+- Don't expose technical details (addresses, JSON) to the user
+- Be confident and helpful
+
+## Available Context
+
+### Resume Structure
+${fullResumeContent}
+
+### Target Job (if provided)
+${jobTailoringSection}
+${jobDescription ? `CRITICAL: Tailor ALL edits to this specific job by:
+- Using keywords and terminology from the job description
+- Emphasizing relevant qualifications
+- Highlighting matching experiences and skills
+- Positioning the candidate as ideal for this role
+` : 'No target job - apply general resume best practices.'}
+
+### Selected Sections (if any)
+${selectedBlocksContent.length > 0 ? `The user has selected these specific sections:
+${selectedBlocksContent}
+
+TARGETING RULES:
+- Use the EXACT ADDRESS shown (e.g., "1.1", "2.3.1") in your actions
+- Modify the "text" field for content changes (works for all layout types)
+- For children under a heading, target the child's ADDRESS, not the heading's
+- Never guess addresses - only use what's shown above
+` : `No selections - when adding new content:
+- Use parent: "0" for new top-level sections (0 represents root)
+- Reference the ROOT LEVEL BLOCKS STRUCTURE for existing addresses
+`}
+
+## Available Actions (Backend Use Only)
+
+1. UPDATE: {"action": "update", "id": "ADDRESS", "patch": {"text": "new content"}}
+2. REMOVE: {"action": "remove", "id": "ADDRESS"}
+3. APPEND CHILD: {"action": "appendChild", "parent": "ADDRESS_or_0", "node": {"layout": "list-item", "text": "content"}}
+   - Use parent: "0" for adding root-level sections
+   - Use parent: "1.2" (or any valid address) for adding children
+4. INSERT SIBLING: {"action": "insertSibling", "after": "ADDRESS", "node": {"layout": "paragraph", "text": "content"}}
+5. REORDER: {"action": "reorder", "id": "0", "order": ["1", "2", "3"]}
+   - Use id: "0" to reorder root-level sections
+   - The order array must contain ALL root section addresses
+
+---
+
+# USER'S REQUEST
+
+${userMessage}
+
+---
+
+## Response Format
+
+Respond with TWO distinct parts:
+
+**Part 1 - EXPLANATION (shown to user):**
+Write a natural, conversational response explaining what you're doing and why. Make it sound human and helpful.
+
+**Part 2 - ACTIONS (hidden from user):**
+On a new line, write "ACTIONS:" followed by a JSON array of modifications.
+
+Example:
+EXPLANATION: I'll strengthen your experience bullets to better highlight your achievements and align with the project management focus in the job description.
+
+ACTIONS:
+[{"action": "update", "id": "2.1", "patch": {"text": "Led cross-functional team of 8 to deliver $2M project 3 weeks ahead of schedule"}}]
+
+Important:
+- Use EXACT addresses from the context
+- Keep the same language as the original content
+- Ensure changes align with best practices${jobDescription ? ' and the target job' : ''}
+`;
+    }
+  };
+
   const handleSend = async () => {
     if (!inputMessage.trim() || isProcessing) return;
 
@@ -108,284 +256,188 @@ export const SmallChatAssistant: React.FC<SmallChatAssistantProps> = ({ onClose 
       }
 
       const geminiService = new GeminiService(apiKey);
-      
+
       // Get current resume content for context
       const currentResumeContent = resumeTree.length > 0
         ? serializeResumeForContext(resumeTree)
         : '';
 
-      // Add root blocks structure for reordering operations
-      const rootBlocksStructure = getRootBlocksStructure();
-
-      // Add selected blocks context if any
-      const selectedBlocksContent = getSelectedBlocksContent();
-      const fullResumeContent = currentResumeContent + rootBlocksStructure + selectedBlocksContent;
-      
-      // Build the chat prompt using centralized prompt builder
-      const guidancePrompt = PromptBuilder.buildChatPrompt(
-        userMessage,
-        fullResumeContent,
-        resumeTitle
-      );
-
-      // Build job tailoring section
-      const jobTailoringSection = jobDescription ? `
-
-# JOB TAILORING MODE - TARGET POSITION
-
-${jobDescription}
-
-## Your Enhanced Objectives:
-When making changes, actively tailor the resume to this job by:
-
-1. **Keyword Optimization**: Identify key terms, technologies, and skills from the job description and ensure they appear naturally in the resume
-2. **Experience Prioritization**: Highlight and reorder experiences that most closely match the job requirements
-3. **Skills Alignment**: Emphasize technical and soft skills that directly relate to the position
-4. **Achievement Relevance**: Focus on accomplishments that demonstrate capabilities needed for this specific role
-5. **Language Matching**: Use similar terminology and phrasing as found in the job description
-
-## Tailoring Strategies:
-- Strengthen bullet points that align with job requirements
-- Add missing keywords naturally into existing content
-- Quantify achievements that demonstrate required competencies
-- Adjust emphasis to highlight relevant experience
-
-` : '';
-
-      // Build a prompt that can generate actions if user wants modifications
-      const actionPrompt = selectedBlocksContent.length > 0 ? `
-You are a resume improvement assistant that can make specific changes to resume content.
-
-CURRENT RESUME CONTENT:
-${fullResumeContent}
-${jobTailoringSection}
-USER REQUEST: ${userMessage}
-
-CRITICAL INSTRUCTIONS FOR TARGETING THE CORRECT BLOCKS:
-1. The user has selected specific blocks with their ADDRESSES shown above in the "SELECTED BLOCKS FOR REFERENCE" section
-2. Each block has an ADDRESS (e.g., "1.1", "2.3.1") - this is the EXACT identifier you MUST use in the "id" field
-3. Look at the CONTENT field in the selected blocks to see what content to modify
-4. IMPORTANT: Always modify the "text" field for content changes, regardless of layout type
-   - Headings, containers, list-items, paragraphs all use the "text" field
-   - Example: {"action": "update", "id": "1.1", "patch": {"text": "new content"}}
-5. NEVER guess the address - use the EXACT address shown in the selected blocks
-6. If the user wants to modify content inside a parent, look at the CHILDREN addresses and target those
-
-AVAILABLE ACTIONS:
-1. UPDATE - Modify the content of a block:
-   {"action": "update", "id": "ADDRESS", "patch": {"text": "new content", "title": "new title"}}
-
-2. REMOVE - Delete a block/section:
-   {"action": "remove", "id": "ADDRESS"}
-
-3. APPEND CHILD - Add a new child to a block (or to root with parent: "root"):
-   {"action": "appendChild", "parent": "parent_ADDRESS_or_root", "node": {"layout": "paragraph", "text": "content"}}
-
-4. INSERT SIBLING - Add a new block after another block:
-   {"action": "insertSibling", "after": "reference_ADDRESS", "node": {"layout": "paragraph", "text": "content"}}
-
-5. REORDER - Change the order of root-level sections (use ONLY for root blocks like "1", "2", "3", NOT nested like "1.1"):
-   {"action": "reorder", "id": "", "order": ["new", "order", "of", "addresses"]}
-
-   IMPORTANT FOR REORDER:
-   - Use the "ROOT LEVEL BLOCKS STRUCTURE" section above to see all root addresses
-   - The "id" field should be empty string "" for root-level reordering
-   - The "order" array must contain ALL root addresses in the new desired order
-   - Example: To move section "6" to first position when you have sections ["1", "2", "3", "4", "5", "6"]:
-     {"action": "reorder", "id": "", "order": ["6", "1", "2", "3", "4", "5"]}
-
-RESPONSE FORMAT:
-If making changes, use this format:
-EXPLANATION: [Your explanation of the changes]
-
-ACTIONS:
-[JSON array of actions - use the EXACT ADDRESS from the sections above]
-
-EXAMPLE 1 - UPDATE content:
-If selected block shows: "1. ADDRESS: "1.1" | LAYOUT: [container] | CONTENT: Some text"
-Action: [{"action": "update", "id": "1.1", "patch": {"text": "Improved text"}}]
-
-EXAMPLE 2 - DELETE a section:
-If user wants to delete address "3":
-Action: [{"action": "remove", "id": "3"}]
-
-EXAMPLE 3 - ADD a new section to root:
-If user wants to add a Certifications section:
-Action: [{"action": "appendChild", "parent": "root", "node": {"layout": "heading", "title": "Certifications", "style": {"level": 1, "weight": "bold"}}}]
-
-EXAMPLE 4 - ADD a bullet point to an existing section:
-If user wants to add a bullet to address "2.1":
-Action: [{"action": "appendChild", "parent": "2.1", "node": {"layout": "list-item", "text": "New achievement detail", "style": {"listMarker": "bullet"}}}]
-
-EXAMPLE 5 - REORDER sections:
-If user wants to move "פרטי קשר" (address "6") to be first, and root structure shows ["1", "2", "3", "4", "5", "6"]:
-Action: [{"action": "reorder", "id": "", "order": ["6", "1", "2", "3", "4", "5"]}]
-
-Remember:
-- Use EXACT addresses from the sections above
-- Match field name to layout type (title for headings, text for everything else)
-- For reordering, include ALL root addresses in the new order
-- For adding to root, use parent: "root"
-- Keep the same language (Hebrew/English) as the original
-- Only generate actions if the user is asking for specific changes
-` : guidancePrompt;
+      // Build a prompt based on the selected mode
+      const systemPrompt = getSystemPrompt(mode, userMessage);
 
       // Filter out the initial assistant message and only pass user/assistant pairs
-      // Gemini requires first message to be 'user', so skip the welcome message
       const chatHistory = messages
-        .slice(1) // Skip the initial assistant welcome message
-        .slice(-5) // Only keep last 5 messages for context
+        .slice(1)
+        .slice(-5)
         .map(msg => ({ role: msg.role, content: msg.content }));
 
       const result = await geminiService.processUserMessage(
-        actionPrompt,
+        systemPrompt,
         [],
-        fullResumeContent,
+        currentResumeContent,
         chatHistory
       );
 
-      // Parse the response to extract actions if any
       const response = result.explanation;
-      const actionsMatch = response.match(/ACTIONS:\s*(\[[\s\S]*?\])/);
 
-      if (actionsMatch) {
-        try {
-          const actions = JSON.parse(actionsMatch[1]) as any[];
-          const explanation = response.replace(/ACTIONS:[\s\S]*$/, '').replace('EXPLANATION:', '').trim();
+      // Only parse actions if in Edit mode
+      if (mode === 'edit') {
+        const actionsMatch = response.match(/ACTIONS:\s*(\[[\s\S]*\])\s*$/m);
 
-          console.log('🤖 AI generated actions:', actions);
-          console.log('📍 Selected block addresses:', selectedBlocks);
+        if (actionsMatch) {
+          try {
+            let jsonString = actionsMatch[1].trim();
+            let actions: any[];
 
-          // Validate that AI is targeting the correct blocks
-          const validActions = actions.filter(action => {
-            // Handle reorder action separately
-            if (action.action === 'reorder') {
-              if (!action.order || !Array.isArray(action.order)) {
-                console.warn(`⚠️ Reorder action missing valid 'order' array`);
-                return false;
+            try {
+              actions = JSON.parse(jsonString);
+            } catch (firstError) {
+              console.warn('⚠️ First JSON parse attempt failed, trying to fix common issues...');
+              const arrayStart = jsonString.indexOf('[');
+              const arrayEnd = jsonString.lastIndexOf(']');
+              if (arrayStart !== -1 && arrayEnd !== -1) {
+                jsonString = jsonString.substring(arrayStart, arrayEnd + 1);
+                actions = JSON.parse(jsonString);
+              } else {
+                throw firstError;
               }
+            }
 
-              // Validate that all addresses in order exist
-              const allValid = action.order.every((addr: string) => {
-                const node = getNodeByAddress(addr);
-                if (!node) {
-                  console.warn(`⚠️ Reorder contains non-existent address: ${addr}`);
+            const explanation = response.split(/ACTIONS:\s*\[/)[0].replace('EXPLANATION:', '').trim();
+
+            console.log('🤖 AI generated actions:', actions);
+            console.log('📍 Selected block addresses:', selectedBlocks);
+
+            // Validate that AI is targeting the correct blocks
+            const validActions = actions.filter(action => {
+              if (action.action === 'reorder') {
+                if (!action.order || !Array.isArray(action.order)) {
+                  console.warn(`⚠️ Reorder action missing valid 'order' array`);
                   return false;
                 }
-                return true;
-              });
 
-              if (!allValid) {
-                return false;
-              }
+                const allValid = action.order.every((addr: string) => {
+                  const node = getNodeByAddress(addr);
+                  if (!node) {
+                    console.warn(`⚠️ Reorder contains non-existent address: ${addr}`);
+                    return false;
+                  }
+                  return true;
+                });
 
-              console.log(`✅ Reorder action validated with ${action.order.length} addresses`);
-              return true;
-            }
-
-            // Handle appendChild action
-            if (action.action === 'appendChild') {
-              const parent = action.parent;
-              if (parent === 'root' || parent === '') {
-                console.log(`✅ AppendChild to root validated`);
+                if (!allValid) return false;
+                console.log(`✅ Reorder action validated with ${action.order.length} addresses`);
                 return true;
               }
 
-              const parentNode = getNodeByAddress(parent);
-              if (!parentNode) {
-                console.warn(`⚠️ AppendChild parent not found: ${parent}`);
-                return false;
-              }
+              if (action.action === 'appendChild') {
+                const parent = action.parent;
+                if (parent === '0') {
+                  console.log(`✅ AppendChild to root validated`);
+                  return true;
+                }
 
-              console.log(`✅ AppendChild to ${parent} validated`);
-              return true;
-            }
-
-            // Handle insertSibling action
-            if (action.action === 'insertSibling') {
-              const refNode = getNodeByAddress(action.after);
-              if (!refNode) {
-                console.warn(`⚠️ InsertSibling reference not found: ${action.after}`);
-                return false;
-              }
-
-              console.log(`✅ InsertSibling after ${action.after} validated`);
-              return true;
-            }
-
-            // Handle move action
-            if (action.action === 'move') {
-              const node = getNodeByAddress(action.id);
-              if (!node) {
-                console.warn(`⚠️ Move source not found: ${action.id}`);
-                return false;
-              }
-
-              const newParent = action.newParent;
-              if (newParent !== 'root' && newParent !== '') {
-                const parentNode = getNodeByAddress(newParent);
+                const parentNode = getNodeByAddress(parent);
                 if (!parentNode) {
-                  console.warn(`⚠️ Move target parent not found: ${newParent}`);
+                  console.warn(`⚠️ AppendChild parent not found: ${parent}`);
                   return false;
                 }
+
+                console.log(`✅ AppendChild to ${parent} validated`);
+                return true;
               }
 
-              console.log(`✅ Move ${action.id} to ${action.newParent} validated`);
+              if (action.action === 'insertSibling') {
+                const refNode = getNodeByAddress(action.after);
+                if (!refNode) {
+                  console.warn(`⚠️ InsertSibling reference not found: ${action.after}`);
+                  return false;
+                }
+
+                console.log(`✅ InsertSibling after ${action.after} validated`);
+                return true;
+              }
+
+              if (action.action === 'move') {
+                const node = getNodeByAddress(action.id);
+                if (!node) {
+                  console.warn(`⚠️ Move source not found: ${action.id}`);
+                  return false;
+                }
+
+                const newParent = action.newParent;
+                if (newParent !== '0') {
+                  const parentNode = getNodeByAddress(newParent);
+                  if (!parentNode) {
+                    console.warn(`⚠️ Move target parent not found: ${newParent}`);
+                    return false;
+                  }
+                }
+
+                console.log(`✅ Move ${action.id} to ${action.newParent} validated`);
+                return true;
+              }
+
+              const targetAddr = action.id;
+              const node = getNodeByAddress(targetAddr);
+
+              if (!node) {
+                console.warn(`⚠️ AI tried to target non-existent address: ${targetAddr}`);
+                return false;
+              }
+
+              console.log(`✅ Action ${action.action} on ${targetAddr} validated`);
               return true;
+            });
+
+            if (validActions.length === 0) {
+              console.error('❌ No valid actions to apply');
+              setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: `${explanation}\n\n⚠️ I couldn't apply the changes because the target blocks were not found. Please try selecting the blocks again.`
+              }]);
+              return;
             }
 
-            // Handle update/remove/replaceText actions that need an existing target
-            const targetAddr = action.id;
-            const node = getNodeByAddress(targetAddr);
+            console.log(`✅ Applying ${validActions.length} valid actions`);
 
-            if (!node) {
-              console.warn(`⚠️ AI tried to target non-existent address: ${targetAddr}`);
-              return false;
+            for (const action of validActions) {
+              console.log(`🔧 Applying action to node ${action.id}:`, action.patch);
+              applyAction(action, `AI suggestion: ${userMessage}`);
             }
 
-            console.log(`✅ Action ${action.action} on ${targetAddr} validated`);
-            return true;
-          });
-
-          if (validActions.length === 0) {
-            console.error('❌ No valid actions to apply');
             setMessages(prev => [...prev, {
               role: 'assistant',
-              content: `${explanation}\n\n⚠️ I couldn't apply the changes because the target blocks were not found. Please try selecting the blocks again.`
+              content: `${explanation}\n\n✅ Applied ${validActions.length} change${validActions.length > 1 ? 's' : ''} to your resume.`
             }]);
-            return;
+
+            if (selectedBlocks.length > 0) {
+              clearBlockSelection();
+            }
+          } catch (parseError) {
+            console.error('❌ Failed to parse actions:', parseError);
+            console.error('Raw response:', response);
+
+            const errorExplanation = response.split(/ACTIONS:/)[0].replace('EXPLANATION:', '').trim() ||
+              "I understood your request, but I had trouble formatting the changes properly.";
+
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: `${errorExplanation}\n\n⚠️ I had trouble processing the technical details. Could you try rephrasing your request?`
+            }]);
           }
-
-          console.log(`✅ Applying ${validActions.length} valid actions`);
-
-          // Apply the valid actions
-          for (const action of validActions) {
-            console.log(`🔧 Applying action to node ${action.id}:`, action.patch);
-            applyAction(action, `AI suggestion: ${userMessage}`);
-          }
-
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: `${explanation}\n\n✅ Applied ${validActions.length} change${validActions.length > 1 ? 's' : ''} to your resume.`
-          }]);
-
-          // Clear selection after applying changes
-          if (selectedBlocks.length > 0) {
-            clearBlockSelection();
-          }
-        } catch (parseError) {
-          console.error('❌ Failed to parse actions:', parseError);
-          console.error('Raw response:', response);
+        } else {
           setMessages(prev => [...prev, { role: 'assistant', content: response }]);
         }
       } else {
+        // Ask mode - just show the response
         setMessages(prev => [...prev, { role: 'assistant', content: response }]);
       }
     } catch (error) {
       console.error('Chat error:', error);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.'
       }]);
     } finally {
       setIsProcessing(false);
@@ -398,18 +450,6 @@ Remember:
       handleSend();
     }
   };
-
-  const quickSuggestions = selectedBlocks.length > 0 ? [
-    "Improve the selected content",
-    "Delete this section",
-    "Add a bullet point under this section",
-    "Rewrite with stronger action verbs"
-  ] : [
-    "Add a new Certifications section",
-    "Add more details to my experience",
-    "Delete empty or weak sections",
-    "Reorder my sections to highlight strengths"
-  ];
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -450,6 +490,30 @@ Remember:
           </button>
         </div>
 
+        {/* Mode Toggle */}
+        <div className="mt-3 flex items-center space-x-2 bg-white/20 rounded-lg p-1">
+          <button
+            onClick={() => setMode('ask')}
+            className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+              mode === 'ask'
+                ? 'bg-white text-blue-600 shadow-md'
+                : 'text-white hover:bg-white/10'
+            }`}
+          >
+            📝 Ask Mode
+          </button>
+          <button
+            onClick={() => setMode('edit')}
+            className={`flex-1 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+              mode === 'edit'
+                ? 'bg-white text-blue-600 shadow-md'
+                : 'text-white hover:bg-white/10'
+            }`}
+          >
+            ✏️ Edit Mode
+          </button>
+        </div>
+
         {/* Job Context Indicator */}
         {jobDescription && (
           <div className="mt-3 p-2 bg-purple-100 rounded-lg shadow-md">
@@ -486,7 +550,10 @@ Remember:
               </button>
             </div>
             <p className="text-xs text-gray-600">
-              Ask me to improve, rewrite, or modify the cited content
+              {mode === 'ask'
+                ? 'Ask me about these blocks for guidance'
+                : 'I can modify these cited blocks'
+              }
             </p>
           </div>
         )}
@@ -514,7 +581,7 @@ Remember:
             </div>
           );
         })}
-        
+
         {isProcessing && (
           <div className="flex justify-start">
             <div className="bg-gradient-to-r from-blue-100 to-indigo-100 p-3 rounded-xl border border-blue-200 shadow-md">
@@ -525,30 +592,9 @@ Remember:
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Quick Suggestions */}
-      {messages.length === 1 && (
-        <div className="p-4 border-t-2 border-blue-200 bg-gradient-to-b from-blue-50 to-white">
-          <p className="text-xs font-semibold text-blue-700 mb-3 uppercase tracking-wide">Quick Actions</p>
-          <div className="space-y-2">
-            {quickSuggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => setInputMessage(suggestion)}
-                className="w-full text-left text-xs p-3 bg-white hover:bg-blue-50 border border-blue-200 hover:border-blue-400 rounded-lg text-gray-700 transition-all shadow-sm hover:shadow-md"
-              >
-                <div className="flex items-center space-x-2">
-                  <span className="text-blue-600">→</span>
-                  <span>{suggestion}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Input */}
       <div className="p-4 border-t-2 border-blue-200 bg-white">
@@ -558,18 +604,22 @@ Remember:
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             dir={detectTextDirection(inputMessage || 'en')}
-            placeholder={selectedBlocks.length > 0
-              ? "Ask me to improve the cited blocks..."
-              : "Ask for writing help or guidance..."}
+            placeholder={
+              mode === 'ask'
+                ? (selectedBlocks.length > 0
+                    ? "Ask me about the cited blocks..."
+                    : "Ask for guidance or advice...")
+                : (selectedBlocks.length > 0
+                    ? "Tell me how to modify the cited blocks..."
+                    : "Tell me what changes to make...")
+            }
             className="w-full px-4 py-3 text-sm border-2 border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none bg-blue-50 focus:bg-white transition-colors"
             rows={3}
             disabled={isProcessing}
           />
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">
-              {selectedBlocks.length > 0
-                ? "💡 I can modify the cited blocks"
-                : "💡 Tip: Select blocks first for targeted help"}
+              {mode === 'ask' ? '💡 Get advice and suggestions' : '✏️ AI will make direct edits'}
             </p>
             <button
               onClick={handleSend}

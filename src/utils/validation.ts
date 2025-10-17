@@ -204,7 +204,7 @@ export function validateAction(action: any): ValidationError[] {
 
   switch (action.action) {
     case 'appendChild':
-      if (!action.parent) {
+      if (action.parent === undefined || action.parent === null) {
         errors.push({
           type: 'invalid_address',
           message: 'appendChild action missing required "parent" field',
@@ -288,7 +288,7 @@ export function validateAction(action: any): ValidationError[] {
           severity: 'error'
         });
       }
-      if (!action.newParent) {
+      if (action.newParent === undefined || action.newParent === null) {
         errors.push({
           type: 'invalid_address',
           message: 'move action missing required "newParent" field',
@@ -310,14 +310,8 @@ export function validateAction(action: any): ValidationError[] {
       break;
 
     case 'reorder':
-      if (!action.id) {
-        errors.push({
-          type: 'invalid_address',
-          message: 'reorder action missing required "id" field',
-          path: 'action.id',
-          severity: 'error'
-        });
-      }
+      // Note: id field is optional for root-level reordering (can be "" or undefined)
+      // We only validate that the order array exists
       if (!action.order || !Array.isArray(action.order)) {
         errors.push({
           type: 'invalid_address',

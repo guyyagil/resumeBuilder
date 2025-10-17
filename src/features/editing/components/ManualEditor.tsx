@@ -165,32 +165,37 @@ export const ManualEditor: React.FC = () => {
     }
   };
 
-  const handleAddNode = (parentId: string, nodeType: 'section' | 'item' | 'bullet') => {
-    console.log('🔧 Adding node:', nodeType, 'to parent:', parentId);
+  const handleAddNode = (parentId: string) => {
+    console.log('🔧 Adding node to parent:', parentId);
 
-    const nodeConfig = {
-      section: { layout: 'heading' as const, text: 'New Section', style: { level: 1, weight: 'bold' as const } },
-      item: { layout: 'container' as const, text: 'New Item', style: { weight: 'semibold' as const } },
-      bullet: { layout: 'list-item' as const, text: 'New bullet point', style: { listMarker: 'bullet' as const } }
-    };
+    // Determine the appropriate layout based on depth
+    // Root level (parentId === '0') gets heading layout
+    // Otherwise gets container layout
+    const nodeConfig = parentId === '0'
+      ? { layout: 'heading' as const, title: 'New Section', style: { level: 1, weight: 'bold' as const } }
+      : { layout: 'container' as const, text: 'New Block' };
 
     try {
-      // For root level additions, use appendChild with empty parent
-      if (parentId === 'root') {
+      // For root level additions, use appendChild with parent '0'
+      if (parentId === '0') {
+        console.log('🔧 Appending to root (parent: 0)');
         applyAction({
           action: 'appendChild',
-          parent: '', // Empty string for root level
-          node: nodeConfig[nodeType]
-        }, `Added new ${nodeType} at root level`);
+          parent: '0', // '0' represents root level
+          node: nodeConfig
+        }, `Added new block at root level`);
       } else {
+        console.log('🔧 Appending to parent:', parentId);
         applyAction({
           action: 'appendChild',
           parent: parentId,
-          node: nodeConfig[nodeType]
-        }, `Added new ${nodeType}`);
+          node: nodeConfig
+        }, `Added new child block`);
       }
+      console.log('✅ Node added successfully');
     } catch (error) {
       console.error('❌ Failed to add node:', error);
+      alert(`Failed to add node: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -295,7 +300,7 @@ export const ManualEditor: React.FC = () => {
                 {phase !== 'processing' && (
                   <div className="max-w-xs mx-auto">
                     <AddNodeButton
-                      onAdd={() => handleAddNode('root', 'section')}
+                      onAdd={() => handleAddNode('0')}
                       label="Add First Section"
                       icon="section"
                     />
@@ -323,7 +328,7 @@ export const ManualEditor: React.FC = () => {
                 {/* Add Section Button */}
                 <div className="mt-6 pt-6 border-t-2 border-blue-200">
                   <AddNodeButton
-                    onAdd={() => handleAddNode('root', 'section')}
+                    onAdd={() => handleAddNode('0')}
                     label="Add Section"
                     icon="section"
                   />
