@@ -107,37 +107,74 @@ export class DesignAgent {
 
   private parseResponse(response: string): { html: string; css: string } {
     console.log('🔧 DesignAgent: Parsing response...');
-    
+
+    let rawHtml = '';
+
+    // Try to find HTML in code block
     let htmlMatch = response.match(/```html\s*([\s\S]*?)```/);
-    
+
     if (!htmlMatch) {
       console.log('🔧 DesignAgent: No closed HTML block found, trying open block...');
       htmlMatch = response.match(/```html\s*([\s\S]*)/);
     }
 
-    if (!htmlMatch) {
+    if (htmlMatch) {
+      rawHtml = htmlMatch[1].trim();
+    } else {
       console.log('🔧 DesignAgent: No HTML block found, trying DOCTYPE match...');
       const docMatch = response.match(/(<!DOCTYPE[\s\S]*<\/html>)/i);
       if (docMatch) {
         console.log('🔧 DesignAgent: Found DOCTYPE match');
-        const fullHtml = docMatch[1].trim();
-        const cssMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
-        const css = cssMatch ? cssMatch[1].trim() : '';
-        return { html: fullHtml, css };
+        rawHtml = docMatch[1].trim();
       }
     }
 
-    if (!htmlMatch) {
+    if (!rawHtml) {
       console.error('❌ DesignAgent: Could not parse HTML from response');
       console.error('❌ Response preview:', response.substring(0, 500));
       throw new Error('Could not parse HTML from AI response');
     }
 
-    console.log('✅ DesignAgent: Found HTML match');
-    const fullHtml = htmlMatch[1].trim();
-    const cssMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
-    const css = cssMatch ? cssMatch[1].trim() : '';
+    console.log('✅ DesignAgent: Found HTML, now extracting body and styles...');
 
-    return { html: fullHtml, css };
+    // Extract CSS from all <style> tags
+    let css = '';
+    const styleMatches = rawHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/g);
+    if (styleMatches) {
+      css = styleMatches
+        .map(style => {
+          const match = style.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+          return match ? match[1] : '';
+        })
+        .join('\n\n');
+    }
+
+    // Extract body content ONLY - remove DOCTYPE, html, head, body tags
+    let bodyContent = rawHtml;
+
+    // If full HTML document, extract just the body content
+    const bodyMatch = bodyContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch) {
+      bodyContent = bodyMatch[1];
+      console.log('🔧 DesignAgent: Extracted content from <body> tag');
+    }
+
+    // Remove any remaining document structure tags
+    bodyContent = bodyContent.replace(/<!DOCTYPE[^>]*>/gi, '');
+    bodyContent = bodyContent.replace(/<\/?html[^>]*>/gi, '');
+    bodyContent = bodyContent.replace(/<head>[\s\S]*?<\/head>/gi, '');
+    bodyContent = bodyContent.replace(/<\/?body[^>]*>/gi, '');
+
+    // Remove all <style> tags from the body content (we already extracted them to css)
+    bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+    const finalHtml = bodyContent.trim();
+    const finalCss = css.trim();
+
+    console.log('🔧 DesignAgent: Final HTML length:', finalHtml.length);
+    console.log('🔧 DesignAgent: Final CSS length:', finalCss.length);
+    console.log('🔧 DesignAgent: HTML preview:', finalHtml.substring(0, 200));
+
+    return { html: finalHtml, css: finalCss };
   }
 }

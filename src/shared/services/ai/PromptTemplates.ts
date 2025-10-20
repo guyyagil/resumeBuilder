@@ -7,7 +7,23 @@
 export const CORE_PROMPTS = {
   RESUME_PARSER: `You are a professional resume parser and formatter. Extract content from resumes and structure it professionally. Always return valid JSON.`,
   
-  RESUME_DESIGNER: `You are a professional resume designer. Generate beautiful, ATS-friendly HTML/CSS for RESUME CONTENT ONLY. Do not include any layout panels, split views, or editing interfaces. Focus solely on making the resume content beautiful and professional for display in a preview panel.`,
+  RESUME_DESIGNER: `You are a professional resume designer. Generate beautiful, ATS-friendly HTML/CSS for RESUME CONTENT ONLY.
+
+CRITICAL RULES:
+1. Do not include any layout panels, split views, or editing interfaces
+2. Focus solely on making the resume content beautiful and professional
+3. Write all content sections (Profile, Summary, etc.) as complete, well-formed sentences and paragraphs - NEVER as keyword dumps
+4. Format skills as clean lists or grids, NOT as run-on comma-separated text
+5. Use proper HTML structure with semantic tags (<p>, <ul>, <li>, <h1>-<h3>)
+6. The generated HTML must be valid, well-formatted, and render properly in any browser
+7. Ensure the exact same content and structure appears whether viewed in preview or printed to PDF
+
+CRITICAL PRINT/PDF REQUIREMENTS:
+- NEVER set fixed heights on any container (no height: 100vh, height: 297mm, etc.)
+- ALWAYS use height: auto and overflow: visible for print
+- Content MUST flow naturally across multiple pages
+- Use @media print rules with height: auto !important and overflow: visible !important
+- NEVER constrain content with max-height or overflow: hidden`,
   
   WRITING_ASSISTANT: `You are a helpful resume writing assistant. The user is manually editing their resume and needs guidance, suggestions, or help with wording. Provide guidance and advice only - do NOT generate actions or modify content directly.`,
   
@@ -87,6 +103,16 @@ REQUIREMENTS:
 - Ensure proper spacing and typography
 - The name should be the first and most prominent element
 
+CRITICAL CONTENT FORMATTING RULES:
+- **Profile/Summary sections**: Write as complete, well-formed paragraphs (2-4 sentences)
+- **Skills sections**: Format as a clean list or grid of individual skills (NOT a paragraph of comma-separated items)
+- **Experience bullet points**: Write complete sentences describing achievements and responsibilities
+- **Contact information**: Format clearly with labels (Phone:, Email:, etc.)
+- NEVER output raw keyword dumps or unformatted text
+- NEVER create walls of text without proper paragraph breaks
+- Use proper HTML semantic tags: <p> for paragraphs, <ul>/<li> for lists, <h1>-<h3> for headings
+- Ensure content flows naturally across multiple pages if needed (use page-break-inside: avoid for sections)
+
 Return format:
 \`\`\`html
 <!DOCTYPE html>
@@ -99,8 +125,52 @@ Return format:
         color: {TEXT_COLOR};
         background: {BACKGROUND_COLOR};
         margin: 0;
-        padding: 20px;
+        padding: 0;
         line-height: 1.6;{RTL_STYLES}
+    }
+    .resume-content {
+        padding: 40px;
+        max-width: 100%;
+    }
+
+    /* CRITICAL: Force browsers to print colors and backgrounds */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+
+    /* Print-friendly styles */
+    @media print {
+        /* Force color printing in all browsers */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+
+        html, body {
+            background: white;
+            height: auto;
+            overflow: visible;
+        }
+        body, .resume-content {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+        }
+        .resume-content {
+            padding: 15mm;
+        }
+        section, .section {
+            page-break-inside: avoid;
+        }
+        h1, h2, h3 {
+            page-break-after: avoid;
+        }
+        * {
+            max-height: none !important;
+        }
     }
     /* More resume-specific styles here */
     </style>
@@ -108,7 +178,7 @@ Return format:
 <body>
     <!-- RESUME CONTENT ONLY -->
     <div class="resume-content">
-        <!-- Resume sections here -->
+        <!-- Resume sections here with proper internal padding -->
     </div>
 </body>
 </html>

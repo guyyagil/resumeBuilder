@@ -17,6 +17,17 @@ export const DesignPhase: React.FC = () => {
   const handleDownload = () => {
     if (!resumeDesign) return;
 
+    // DesignAgent already cleaned the HTML and extracted CSS
+    // So we can use resumeDesign.html and resumeDesign.css directly
+    const cleanHTML = resumeDesign.html;
+    const css = resumeDesign.css || '';
+
+    console.log('📄 Download: HTML length:', cleanHTML.length);
+    console.log('🎨 Download: CSS length:', css.length);
+    console.log('🎨 Download: Template:', resumeDesign.template);
+    console.log('📄 Download: HTML preview (first 300 chars):', cleanHTML.substring(0, 300));
+    console.log('🎨 Download: CSS preview (first 300 chars):', css.substring(0, 300));
+
     // Create a new window with just the resume
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -24,29 +35,31 @@ export const DesignPhase: React.FC = () => {
       return;
     }
 
+    // Detect if content is RTL (Hebrew/Arabic)
+    const isRTL = /[\u0590-\u05FF\u0600-\u06FF]/.test(cleanHTML);
+
     // Write the complete HTML document
     printWindow.document.write(`
       <!DOCTYPE html>
-      <html lang="he" dir="rtl">
+      <html${isRTL ? ' lang="he" dir="rtl"' : ''}>
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Resume</title>
         <style>
+          /* Base reset */
           * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
           }
 
+          /* Base container styles */
           body {
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            min-height: 100vh;
             background: #f5f5f5;
           }
 
@@ -54,30 +67,96 @@ export const DesignPhase: React.FC = () => {
             width: 210mm;
             min-height: 297mm;
             background: white;
-            padding: 20mm;
+            margin: 20px auto;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
           }
 
+          /* AI-generated CSS - load in the middle */
+          ${css}
+
+          /* CRITICAL OVERRIDES - These MUST come after AI CSS */
+
+          /* Force browsers to print colors - apply to ALL elements */
+          html, body, div, span, section, header, footer, aside, main, article,
+          h1, h2, h3, h4, h5, h6, p, ul, li, a, img, nav {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+
+          /* Also apply to universal selector */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+
+          /* Print-specific overrides */
           @media print {
+            @page {
+              size: A4;
+              margin: 0;
+            }
+
+            /* Force color printing on ALL elements with specific selectors */
+            html, body, div, span, section, header, footer, aside, main, article,
+            h1, h2, h3, h4, h5, h6, p, ul, li, a, img, nav, table, tr, td, th {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+              max-height: none !important;
+              overflow: visible !important;
+            }
+
+            html {
+              height: auto !important;
+              overflow: visible !important;
+            }
+
             body {
-              background: white;
+              background: white !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 100% !important;
+              height: auto !important;
+              min-height: auto !important;
+              max-height: none !important;
+              overflow: visible !important;
             }
 
             .resume-container {
-              width: 100%;
-              height: 100%;
-              margin: 0;
-              padding: 0;
-              box-shadow: none;
+              width: 100% !important;
+              height: auto !important;
+              min-height: auto !important;
+              max-height: none !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              page-break-after: auto;
+              overflow: visible !important;
+            }
+
+            /* Allow sections to break across pages if needed */
+            section, .section, div[class*="section"] {
+              page-break-inside: auto;
+            }
+
+            /* Keep headings with their content */
+            h1, h2, h3, h4, h5, h6 {
+              page-break-after: avoid;
             }
           }
-
-          ${resumeDesign.css || ''}
         </style>
       </head>
       <body>
         <div class="resume-container">
-          ${resumeDesign.html}
+          ${cleanHTML}
         </div>
         <script>
           // Auto-trigger print dialog after page loads

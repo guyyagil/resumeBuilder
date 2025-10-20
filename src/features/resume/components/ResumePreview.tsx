@@ -47,14 +47,38 @@ export const ResumePreview: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col items-center p-8 overflow-auto">
-      {/* A4 Paper Container - adapts to content */}
+    <div className="h-full flex flex-col items-center py-8 px-4 overflow-auto">
+      {/* Inject CSS styles for the resume - SAME ORDER AS DOWNLOAD */}
+      {resumeDesign.css && (
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            /* AI-generated CSS */
+            ${resumeDesign.css}
+
+            /* CRITICAL: Force browsers to show colors - same as download */
+            html, body, div, span, section, header, footer, aside, main, article,
+            h1, h2, h3, h4, h5, h6, p, ul, li, a, img, nav {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+          `
+        }} />
+      )}
+
+      {/* A4 Paper Container - adapts to content, allows full scrolling */}
       <div
-        className="w-full max-w-[210mm] bg-white shadow-2xl my-auto rounded-lg"
+        className="w-full max-w-[210mm] bg-white shadow-2xl rounded-lg overflow-visible min-h-[297mm]"
       >
-        {/* AI-Generated Resume HTML */}
+        {/* AI-Generated Resume HTML - no padding wrapper, let the AI control spacing */}
         <div
-          className="w-full p-12"
+          className="w-full min-h-full"
           dangerouslySetInnerHTML={{ __html: resumeDesign.html }}
         />
       </div>
