@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store';
-import { AppLayout } from '../shared/components/layout/AppLayout';
-import { ErrorScreen } from '../shared/components/feedback/ErrorScreen';
+import { AppLayout, ErrorScreen } from '../components';
 
 export const App: React.FC = () => {
   const phase = useAppStore(state => state.phase);

@@ -8,13 +8,10 @@ import type {
   AppPhase,
   ProcessingStage,
   TextDirection
-} from '../../shared/types';
-import type { GeneratedResumeDesign, DesignTemplate, LayoutStructure, ColorScheme } from '../../features/design/types/design.types';
-import { AddressMap } from '../../shared/utils/tree/addressMap';
-import { computeNumbering } from '../../shared/utils/tree/numbering';
-import { cloneTree, generateUid } from '../../shared/utils/tree/treeUtils';
-import { validateTreeWithConstraints } from '../../shared/utils/validation/resumeValidator';
-import { ActionHandler } from '../../services/actionHandler';
+} from '../../types';
+import type { GeneratedResumeDesign, DesignTemplate, LayoutStructure, ColorScheme } from '../../phaseUtils/design/types/design.types';
+import { AddressMap, computeNumbering, cloneTree, generateUid, validateTreeWithConstraints } from '../../utils';
+import { ActionHandler } from '../../utils/action-handler';
 
 // Forward declaration for AppStore type
 type AppStore = ResumeSlice & any;
@@ -372,7 +369,7 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
 
       // Stage 1: Extract and structure resume
       set((state) => { state.processingStage = 'structuring'; });
-      const { SimplePDFProcessor } = await import('../../shared/services/pdf/PDFProcessor');
+      const { SimplePDFProcessor } = await import('../../utils/pdf-processor');
       const processor = new SimplePDFProcessor(apiKey);
       const { tree, title, textDirection, language } = await processor.processResume(file);
 
@@ -497,7 +494,7 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
       if (!apiKey) return;
 
-      const { DesignAgent } = await import('../../features/design/services/DesignAgent');
+      const { DesignAgent } = await import('../../ai');
       const designAgent = new DesignAgent(apiKey);
 
       const design = await designAgent.generateResumeHTML(
@@ -566,7 +563,7 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
         throw new Error('Gemini API key is not configured');
       }
 
-      const { DesignAgent } = await import('../../features/design/services/DesignAgent');
+      const { DesignAgent } = await import('../../ai');
       const designAgent = new DesignAgent(apiKey);
 
       const design = await designAgent.generateResumeHTML(

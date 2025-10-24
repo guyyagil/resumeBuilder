@@ -1,6 +1,6 @@
 // UI state slice
 import type { StateCreator } from 'zustand';
-import type { Theme } from '../../shared/types';
+import type { Theme } from '../../types';
 
 export interface UISlice {
   // UI state

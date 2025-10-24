@@ -1,6 +1,6 @@
 // Chat system slice
 import type { StateCreator } from 'zustand';
-import type { ChatMessage, MessageRole } from '../../shared/types';
+import type { ChatMessage, MessageRole } from '../../types';
 
 export interface ChatSlice {
   // Chat state

@@ -1,12 +1,12 @@
 // Editing system slice
 import type { StateCreator } from 'zustand';
-import type { Priority } from '../../shared/types';
+import type { Priority } from '../../types';
 import type {
     EditInstruction,
     EditBatch,
     EditingResult,
     EditingQueueState
-} from '../../features/editing/types/editing.types';
+} from '../../phaseUtils/editing/types/editing.types';
 
 export interface EditingSlice {
     // Editing queue state
@@ -119,7 +119,7 @@ export const createEditingSlice: StateCreator<AppStore, [["zustand/immer", never
 
         try {
             // Import and use editing agent
-            // const { EditingAgent } = await import('../../features/editing/services/EditingAgent');
+            // const { EditingAgent } = await import('../../ai');
             const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
             if (!apiKey) {
