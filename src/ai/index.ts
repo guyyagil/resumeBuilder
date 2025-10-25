@@ -2,14 +2,16 @@
 
 // Agents
 export { DesignAgent } from './agents/DesignAgent';
-export { EditingAgent } from './agents/EditingAgent';
+export { CVProcessingAgent } from './agents/CVProcessingAgent';
+export type { CVProcessingResult } from './agents/CVProcessingAgent';
+export { TailoringAgent } from './agents/TailoringAgent';
 
 // Clients
 export { GeminiService } from './clients/GeminiClient';
 export type { GeminiResponse, ChatMessage } from './clients/GeminiClient';
 
 // Prompts
-export { PromptBuilder, CORE_PROMPTS, LANGUAGE_PROMPTS, TASK_PROMPTS } from './prompts/PromptTemplates';
+export * from './prompts';
 
 // Types
 export type {
@@ -31,7 +33,3 @@ export {
   EDITING_AGENT_SYSTEM_PROMPT 
 } from './prompts/PromptTemplates';
 
-// Additional legacy prompts
-export { 
-  JOB_TAILORING_SYSTEM_ADDITION 
-} from './prompts/legacy-prompts';

@@ -1,7 +1,10 @@
 // UI Components
-export { ApplyChangesButton } from './ui/ApplyChangesButton';
 export { ChatMessage } from './ui/ChatMessage';
-export { EditInstructionCard } from './ui/EditInstructionCard';
+
+// Manual Editing Components
+export { ManualEditor } from './editing/ManualEditor';
+export { EditableNode } from './editing/EditableNode';
+export { AddNodeButton } from './editing/AddNodeButton';
 
 // Form Components
 export { JobDescriptionInput } from './forms/JobDescriptionInput';

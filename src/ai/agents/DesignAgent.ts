@@ -2,7 +2,7 @@
 import type { ResumeNode } from '../../types';
 import type { DesignTemplate, GeneratedResumeDesign } from '../../phaseUtils/design/types/design.types';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { PromptBuilder, CORE_PROMPTS } from '../prompts/PromptTemplates';
+import { PromptBuilder } from '../prompts/PromptTemplates';
 
 export class DesignAgent {
   private genAI: GoogleGenerativeAI;
@@ -32,7 +32,7 @@ export class DesignAgent {
         }
       });
 
-      const fullPrompt = `${CORE_PROMPTS.RESUME_DESIGNER}\n\n${prompt}`;
+      const fullPrompt = prompt;
 
       const result = await designModel.generateContent(fullPrompt);
       const response = result.response.text();

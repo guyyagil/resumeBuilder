@@ -22,12 +22,16 @@ export interface ResumeSlice {
   processingStage: ProcessingStage;
 
   // Core resume data
-  resumeTree: ResumeNode[];
+  originalResumeTree: ResumeNode[]; // Original unmodified tree from upload
+  resumeTree: ResumeNode[]; // Current working tree (may be tailored)
   resumeTitle: string;
   numbering: Numbering;
   jobDescription: string;
   textDirection: TextDirection;
   language: string;
+  isViewingOriginal: boolean; // Toggle between original and tailored view
+  isTailoring: boolean; // AI tailoring in progress
+  hasTailoredVersion: boolean; // Track if tailoring has been done at least once
 
   // Design
   resumeDesign: GeneratedResumeDesign | null;
@@ -52,6 +56,7 @@ export interface ResumeSlice {
   setPhase: (phase: AppPhase) => void;
   setProcessingStage: (stage: ProcessingStage) => void;
   setResumeTree: (tree: ResumeNode[]) => void;
+  setOriginalResumeTree: (tree: ResumeNode[]) => void;
   setResumeTitle: (title: string) => void;
   setJobDescription: (description: string) => void;
   setTextDirection: (direction: TextDirection) => void;
@@ -61,6 +66,12 @@ export interface ResumeSlice {
   setSelectedTemplate: (template: DesignTemplate | null) => void;
   setSelectedLayout: (layout: LayoutStructure | null) => void;
   setSelectedColorScheme: (scheme: ColorScheme | null) => void;
+  setIsViewingOriginal: (viewing: boolean) => void;
+  setIsTailoring: (tailoring: boolean) => void;
+
+  // AI Tailoring
+  tailorResumeToJob: (jobDescription: string) => Promise<void>;
+  resetToOriginal: () => void;
   
   // Tree operations
   applyAction: (action: AgentAction, description: string) => void;
@@ -115,12 +126,16 @@ const createHistoryEntry = (
 const initialResumeState = {
   phase: 'welcome' as AppPhase,
   processingStage: null as ProcessingStage,
+  originalResumeTree: [],
   resumeTree: [],
   resumeTitle: '',
   numbering: { addrToUid: {}, uidToAddr: {} },
   jobDescription: '',
   textDirection: 'ltr' as TextDirection,
   language: 'en',
+  isViewingOriginal: false,
+  isTailoring: false,
+  hasTailoredVersion: false,
   resumeDesign: null as GeneratedResumeDesign | null,
   isRegeneratingDesign: false,
   selectedTemplate: null as DesignTemplate | null,
@@ -159,6 +174,10 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
     state.historyIndex = 0;
   }),
 
+  setOriginalResumeTree: (tree) => set((state) => {
+    state.originalResumeTree = cloneTree(tree);
+  }),
+
   setResumeTitle: (title) => set((state) => {
     state.resumeTitle = title;
   }),
@@ -193,6 +212,25 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
 
   setSelectedColorScheme: (scheme) => set((state) => {
     state.selectedColorScheme = scheme;
+  }),
+
+  setIsViewingOriginal: (viewing) => set((state) => {
+    state.isViewingOriginal = viewing;
+    // Switch the displayed tree
+    if (viewing && state.originalResumeTree.length > 0) {
+      // Show original tree without affecting the working tree
+      const tempTree = cloneTree(state.originalResumeTree);
+      state.numbering = computeNumbering(tempTree);
+      state.addressMap = new AddressMap(tempTree);
+    } else {
+      // Show current working tree
+      state.numbering = computeNumbering(state.resumeTree);
+      state.addressMap = new AddressMap(state.resumeTree);
+    }
+  }),
+
+  setIsTailoring: (tailoring) => set((state) => {
+    state.isTailoring = tailoring;
   }),
 
   applyAction: (action, description) => {
@@ -368,13 +406,15 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       }
 
       // Stage 1: Extract and structure resume
+      const currentJobDescription = get().jobDescription;
       set((state) => { state.processingStage = 'structuring'; });
-      const { SimplePDFProcessor } = await import('../../utils/pdf-processor');
-      const processor = new SimplePDFProcessor(apiKey);
-      const { tree, title, textDirection, language } = await processor.processResume(file);
+      const { CVProcessingAgent } = await import('../../ai');
+      const processor = new CVProcessingAgent(apiKey);
+      const { tree, title, textDirection, language } = await processor.processCV(file, currentJobDescription);
 
       // Complete processing - go directly to editing phase
       set((state) => {
+        state.originalResumeTree = cloneTree(tree); // Store original tree
         state.resumeTree = tree;
         state.resumeTitle = title;
         state.textDirection = textDirection;
@@ -462,6 +502,7 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
     ];
 
     set((state) => {
+      state.originalResumeTree = cloneTree(blankTree); // Store original tree
       state.resumeTree = blankTree;
       state.resumeTitle = 'New Resume';
       state.textDirection = 'ltr';
@@ -608,6 +649,108 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
 
   clearBlockSelection: () => set((state) => {
     state.selectedBlocks = [];
+  }),
+
+  tailorResumeToJob: async (jobDescription) => {
+    const state = get();
+
+    if (!state.originalResumeTree || state.originalResumeTree.length === 0) {
+      throw new Error('No original resume tree found. Cannot tailor resume.');
+    }
+
+    set((draft) => {
+      draft.isTailoring = true;
+      draft.jobDescription = jobDescription;
+    });
+
+    try {
+      console.log('🎯 Starting AI tailoring for job...');
+
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+      if (!apiKey) {
+        throw new Error('Gemini API key is not configured');
+      }
+
+      const { TailoringAgent } = await import('../../ai/agents/TailoringAgent');
+      const tailoringAgent = new TailoringAgent(apiKey);
+
+      // Always tailor based on the original tree, not the current working tree
+      const tailoredTree = await tailoringAgent.tailorResumeToJob(
+        state.originalResumeTree,
+        state.resumeTitle,
+        jobDescription
+      );
+
+      console.log('✅ Tailoring completed, updating tree...');
+
+      set((draft) => {
+        // Clone the tree to ensure it's mutable
+        const clonedTree = cloneTree(tailoredTree);
+
+        draft.resumeTree = clonedTree;
+        draft.numbering = computeNumbering(clonedTree);
+        draft.addressMap = new AddressMap(clonedTree);
+        draft.isTailoring = false;
+        draft.isViewingOriginal = false;
+        draft.hasTailoredVersion = true; // Mark that we now have a tailored version
+
+        // Add to history
+        if (draft.historyIndex < draft.history.length - 1) {
+          draft.history = draft.history.slice(0, draft.historyIndex + 1);
+        }
+
+        draft.history.push(
+          createHistoryEntry(
+            clonedTree,
+            draft.numbering,
+            `Tailored resume for target job`
+          )
+        );
+        draft.historyIndex = draft.history.length - 1;
+
+        if (draft.history.length > draft.maxHistorySize) {
+          draft.history = draft.history.slice(-draft.maxHistorySize);
+          draft.historyIndex = draft.history.length - 1;
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to tailor resume:', error);
+      set((draft) => { draft.isTailoring = false; });
+      throw error;
+    }
+  },
+
+  resetToOriginal: () => set((state) => {
+    if (!state.originalResumeTree || state.originalResumeTree.length === 0) {
+      console.warn('No original tree to reset to');
+      return;
+    }
+
+    const originalTree = cloneTree(state.originalResumeTree);
+    state.resumeTree = originalTree;
+    state.numbering = computeNumbering(originalTree);
+    state.addressMap = new AddressMap(originalTree);
+    state.isViewingOriginal = false;
+
+    // Add to history
+    if (state.historyIndex < state.history.length - 1) {
+      state.history = state.history.slice(0, state.historyIndex + 1);
+    }
+
+    state.history.push(
+      createHistoryEntry(
+        originalTree,
+        state.numbering,
+        'Reset to original resume'
+      )
+    );
+    state.historyIndex = state.history.length - 1;
+
+    if (state.history.length > state.maxHistorySize) {
+      state.history = state.history.slice(-state.maxHistorySize);
+      state.historyIndex = state.history.length - 1;
+    }
   }),
 
   reset: () => set(() => ({

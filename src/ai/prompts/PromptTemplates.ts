@@ -1,12 +1,21 @@
-// Centralized AI Prompt Templates - Single source of truth for all AI interactions
+// ============================================================================
+// CENTRALIZED AI PROMPT TEMPLATES
+// Single source of truth for all AI interactions with improved organization
+// ============================================================================
 
 // ============================================================================
-// CORE SYSTEM PROMPTS - Base instructions for different AI roles
+// 1. CORE SYSTEM PROMPTS - Base AI Role Definitions
 // ============================================================================
 
 export const CORE_PROMPTS = {
+  /**
+   * Resume Parser - Extracts and structures resume content
+   */
   RESUME_PARSER: `You are a professional resume parser and formatter. Extract content from resumes and structure it professionally. Always return valid JSON.`,
-  
+
+  /**
+   * Resume Designer - Generates HTML/CSS for resume content
+   */
   RESUME_DESIGNER: `You are a professional resume designer. Generate beautiful, ATS-friendly HTML/CSS for RESUME CONTENT ONLY.
 
 CRITICAL RULES:
@@ -24,23 +33,88 @@ CRITICAL PRINT/PDF REQUIREMENTS:
 - Content MUST flow naturally across multiple pages
 - Use @media print rules with height: auto !important and overflow: visible !important
 - NEVER constrain content with max-height or overflow: hidden`,
-  
+
+  /**
+   * Writing Assistant - Provides guidance without direct modifications
+   */
   WRITING_ASSISTANT: `You are a helpful resume writing assistant. The user is manually editing their resume and needs guidance, suggestions, or help with wording. Provide guidance and advice only - do NOT generate actions or modify content directly.`,
-  
-  EDITING_AGENT: `You are a specialized resume editing agent. Process multiple editing instructions efficiently and generate precise actions to modify a resume tree structure.`
-};
+
+  /**
+   * Editing Agent - Processes multiple editing instructions efficiently
+   */
+  EDITING_AGENT: `You are a specialized resume editing agent. Process multiple editing instructions efficiently and generate precise actions to modify a resume tree structure.`,
+
+  /**
+   * Tailoring Agent - Specializes in job-specific resume optimization
+   */
+  TAILORING_AGENT: `You are an expert resume writer specializing in tailoring resumes to job descriptions.
+
+# 🚨 CRITICAL RULE: DON'T LIE! NEVER FABRICATE OR INVENT INFORMATION!
+You can ONLY work with what already exists in the resume. Your job is to:
+- EMPHASIZE existing relevant experience
+- REWORD existing content to highlight job-relevant aspects  
+- REORDER sections to prioritize relevant information
+- ADD KEYWORDS naturally to existing descriptions
+- MAKE EXISTING ACHIEVEMENTS SOUND MORE IMPRESSIVE
+
+❌ NEVER ADD: New skills, fake experience, invented achievements, technologies not mentioned
+✅ ALWAYS: Enhance, emphasize, and reorganize what's already there
+
+# Task: Rewrite the resume tree to maximize alignment with the target job.
+
+# Key Actions:
+1. **Rewrite content** to emphasize relevant skills/experience that ALREADY EXISTS
+2. **Add keywords** from job description using **bold** markdown to EXISTING content
+3. **STRATEGICALLY REORDER** sections and items to prioritize what's most relevant
+4. **Adjust styling** (weight: 'bold', emphasis: true) for job-relevant content
+5. **Enhance existing achievements** with better wording and quantification
+
+# 🔄 REORDERING STRATEGY - YOU HAVE FULL CONTROL:
+- **Reorder sections**: Put most job-relevant sections first (e.g., move "Technical Skills" before "Education" for tech jobs)
+- **Reorder experiences**: Within work history, put most relevant jobs/projects first
+- **Reorder bullet points**: Within each job, put most relevant achievements first
+- **Reorder skills**: Within skills sections, prioritize job-relevant technologies/abilities
+- **Think strategically**: What should a recruiter see FIRST to get excited about this candidate?
+
+# Strict Rules:
+- Preserve tree structure format (uid, layout, title, text, style, children)
+- Keep all original UIDs to maintain integrity
+- DO NOT remove personal info or fabricate ANY experiences/skills
+- DO NOT add technologies, skills, or experiences not in the original resume
+- DO modify wording to better highlight existing relevant experience
+- DO reorder everything strategically - sections, jobs, bullet points, skills
+- Use **bold** for keywords (e.g., "Developed **React** applications") ONLY if React was already mentioned
+
+# Required Output:
+Return ONLY valid JSON in this exact format:
+\`\`\`json
+{
+  "tree": [...complete ResumeNode array...],
+  "summary": "Brief summary of changes",
+  "changes": ["List of key changes"]
+}
+\`\`\`
+
+Style properties available: weight ('bold'|'normal'|'light'), emphasis (true|false), fontSize, level (1-3)`
+} as const;
 
 // ============================================================================
-// LANGUAGE DETECTION & INSTRUCTIONS
+// 2. LANGUAGE & LOCALIZATION PROMPTS
 // ============================================================================
 
 export const LANGUAGE_PROMPTS = {
+  /**
+   * Language detection and preservation instructions
+   */
   DETECT_AND_PRESERVE: (detectedLanguage: string) => `
 LANGUAGE INSTRUCTION: The content appears to be in ${detectedLanguage}. 
 - Generate all content in the SAME LANGUAGE as the original
 - Use appropriate section names for the detected language
 - Maintain language consistency throughout`,
 
+  /**
+   * Right-to-left (RTL) layout instructions for Hebrew/Arabic content
+   */
   RTL_DESIGN_INSTRUCTION: `
 CRITICAL RTL REQUIREMENTS:
 - This resume contains Hebrew text - use RTL (right-to-left) layout
@@ -49,17 +123,23 @@ CRITICAL RTL REQUIREMENTS:
 - Use Hebrew-compatible fonts (Arial, Tahoma, or system fonts)
 - Ensure proper Hebrew text rendering and spacing`,
 
+  /**
+   * Chat language matching instructions
+   */
   CHAT_LANGUAGE_INSTRUCTION: (detectedLanguage: string) => `
 LANGUAGE INSTRUCTION: Respond in ${detectedLanguage} to match the resume content.
 - Provide culturally appropriate advice for the detected language/region
 - Match the language of the user's question and resume content`
-};
+} as const;
 
 // ============================================================================
-// TASK-SPECIFIC INSTRUCTIONS
+// 3. TASK-SPECIFIC INSTRUCTION TEMPLATES
 // ============================================================================
 
 export const TASK_PROMPTS = {
+  /**
+   * PDF content extraction and structuring
+   */
   PDF_STRUCTURE_EXTRACTION: `Extract and structure the following resume content into a clean, organized format.
 
 Please return a JSON structure with:
@@ -91,6 +171,9 @@ Format as JSON with this structure:
   ]
 }`,
 
+  /**
+   * HTML/CSS design generation template
+   */
   DESIGN_GENERATION: `Generate professional HTML + CSS for ONLY the resume content. This will be displayed in a preview panel.
 
 REQUIREMENTS:
@@ -184,6 +267,9 @@ Return format:
 </html>
 \`\`\``,
 
+  /**
+   * Writing guidance and suggestions
+   */
   WRITING_GUIDANCE: `Provide helpful, concise advice based on their current resume content. Focus on:
 - Better wording and phrasing for their specific content
 - Professional language suggestions appropriate for their language/region
@@ -193,91 +279,177 @@ Return format:
 - Specific suggestions for their current sections
 
 Keep responses brief and actionable. Do NOT generate any actions or modifications - just provide guidance.`
-};
+} as const;
 
 // ============================================================================
-// CONTEXT BUILDERS - Functions to build complete prompts
+// 4. UTILITY FUNCTIONS - Language & Content Detection
+// ============================================================================
+
+const LanguageUtils = {
+  /**
+   * Detects if content contains Hebrew characters
+   */
+  hasHebrew: (text: string): boolean => /[\u0590-\u05FF]/.test(text),
+
+  /**
+   * Detects primary language of content
+   */
+  detectLanguage: (text: string): string => {
+    return LanguageUtils.hasHebrew(text) ? 'Hebrew' : 'English';
+  },
+
+  /**
+   * Determines if RTL layout is needed
+   */
+  isRTL: (text: string): boolean => LanguageUtils.hasHebrew(text)
+} as const;
+
+// ============================================================================
+// 5. TEMPLATE PROCESSING UTILITIES
+// ============================================================================
+
+const TemplateUtils = {
+  /**
+   * Builds layout description from template structure
+   */
+  buildLayoutDescription: (template: any): string => {
+    const { layout, colorScheme } = template;
+    const colors = colorScheme.colors;
+
+    let description = `${layout.name}: ${layout.description}\n`;
+
+    if (layout.structure.hasSidebar) {
+      description += `- Layout: Two-column with ${layout.structure.sidebarPosition} sidebar\n`;
+      description += `- Sidebar width: ${layout.structure.sidebarWidth}, Main content: ${layout.structure.mainContentWidth}\n`;
+      description += `- Use sidebar background color: ${colors.sidebarBg}\n`;
+      description += `- Place skills, education, and contact info in the sidebar\n`;
+      description += `- Place work experience and summary in main content area\n`;
+    } else if (layout.structure.headerHeight) {
+      description += `- Layout: Large header (${layout.structure.headerHeight}) with content below\n`;
+      description += `- Header should be prominent with background color\n`;
+    } else {
+      description += `- Layout: Single column, clean and traditional\n`;
+    }
+
+    description += `- Name size: ${layout.typography.nameSize}\n`;
+    description += `- Heading style: ${layout.typography.headingStyle}\n`;
+    description += `- Body spacing: ${layout.typography.bodySpacing}\n`;
+
+    return description;
+  },
+
+  /**
+   * Builds color scheme instructions
+   */
+  buildColorInstructions: (colorScheme: any): string => {
+    const { colors } = colorScheme;
+
+    let instructions = `# COLOR SCHEME: ${colorScheme.name}\nYou MUST use these exact colors:\n`;
+    instructions += `- Primary (headings, name): ${colors.primary}\n`;
+    instructions += `- Secondary: ${colors.secondary}\n`;
+    instructions += `- Text color: ${colors.text}\n`;
+    instructions += `- Light text (meta info, dates): ${colors.textLight}\n`;
+    instructions += `- Background: ${colors.background}\n`;
+    instructions += `- Accent (borders, highlights): ${colors.accent}`;
+
+    if (colors.sidebarBg) {
+      instructions += `\n- Sidebar background: ${colors.sidebarBg}`;
+    }
+
+    return instructions;
+  },
+
+  /**
+   * Builds typography instructions
+   */
+  buildTypographyInstructions: (fonts: any): string => {
+    let instructions = `# TYPOGRAPHY\n- Heading font: ${fonts.heading}\n- Body font: ${fonts.body}`;
+
+    if (fonts.accent) {
+      instructions += `\n- Accent font: ${fonts.accent}`;
+    }
+
+    return instructions;
+  }
+} as const;
+
+// ============================================================================
+// 6. MAIN PROMPT BUILDER CLASS - Centralized Prompt Construction
 // ============================================================================
 
 export class PromptBuilder {
+  /**
+   * Builds prompt for PDF content extraction and structuring
+   */
   static buildPDFStructurePrompt(pdfText: string, jobDescription?: string): string {
-    const isHebrew = /[\u0590-\u05FF]/.test(pdfText);
-    const detectedLanguage = isHebrew ? 'Hebrew' : 'English';
-    
-    return [
+    const detectedLanguage = LanguageUtils.detectLanguage(pdfText);
+
+    const sections = [
       CORE_PROMPTS.RESUME_PARSER,
       LANGUAGE_PROMPTS.DETECT_AND_PRESERVE(detectedLanguage),
-      TASK_PROMPTS.PDF_STRUCTURE_EXTRACTION,
-      jobDescription ? `\nJob Description Context:\n${jobDescription}\n\nPlease tailor the content to be relevant for this role.` : '',
-      `\nPDF Content:\n${pdfText}`
-    ].filter(Boolean).join('\n\n');
+      TASK_PROMPTS.PDF_STRUCTURE_EXTRACTION
+    ];
+
+    if (jobDescription) {
+      sections.push(`\nJob Description Context:\n${jobDescription}\n\nPlease tailor the content to be relevant for this role.`);
+    }
+
+    sections.push(`\nPDF Content:\n${pdfText}`);
+
+    return sections.filter(Boolean).join('\n\n');
   }
 
+  /**
+   * Builds comprehensive design generation prompt
+   */
   static buildDesignPrompt(
     resumeText: string,
     title: string,
     template: any,
     jobDescription?: string
   ): string {
-    const hasHebrew = /[\u0590-\u05FF]/.test(resumeText + title);
-    const isRTL = hasHebrew;
+    const isRTL = LanguageUtils.isRTL(resumeText + title);
+    const { colorScheme } = template;
 
-    // Extract layout and color scheme from new template structure
-    const layout = template.layout;
-    const colorScheme = template.colorScheme;
-    const colors = colorScheme.colors;
+    const sections = [
+      CORE_PROMPTS.RESUME_DESIGNER,
+      `# RESUME CONTENT\nTitle: ${title}\n${resumeText}`
+    ];
 
-    // Build layout description
-    let layoutDescription = `${layout.name}: ${layout.description}\n`;
-
-    if (layout.structure.hasSidebar) {
-      layoutDescription += `- Layout: Two-column with ${layout.structure.sidebarPosition} sidebar\n`;
-      layoutDescription += `- Sidebar width: ${layout.structure.sidebarWidth}, Main content: ${layout.structure.mainContentWidth}\n`;
-      layoutDescription += `- Use sidebar background color: ${colors.sidebarBg}\n`;
-      layoutDescription += `- Place skills, education, and contact info in the sidebar\n`;
-      layoutDescription += `- Place work experience and summary in main content area\n`;
-    } else if (layout.structure.headerHeight) {
-      layoutDescription += `- Layout: Large header (${layout.structure.headerHeight}) with content below\n`;
-      layoutDescription += `- Header should be prominent with background color\n`;
-    } else {
-      layoutDescription += `- Layout: Single column, clean and traditional\n`;
+    if (jobDescription) {
+      sections.push(`# JOB DESCRIPTION\n${jobDescription}`);
     }
 
-    layoutDescription += `- Name size: ${layout.typography.nameSize}\n`;
-    layoutDescription += `- Heading style: ${layout.typography.headingStyle}\n`;
-    layoutDescription += `- Body spacing: ${layout.typography.bodySpacing}\n`;
-
-    let designPrompt = [
-      CORE_PROMPTS.RESUME_DESIGNER,
-      `# RESUME CONTENT\nTitle: ${title}\n${resumeText}`,
-      jobDescription ? `# JOB DESCRIPTION\n${jobDescription}` : '',
-      `# LAYOUT STRUCTURE\n${layoutDescription}`,
-      `# COLOR SCHEME: ${colorScheme.name}\nYou MUST use these exact colors:\n- Primary (headings, name): ${colors.primary}\n- Secondary: ${colors.secondary}\n- Text color: ${colors.text}\n- Light text (meta info, dates): ${colors.textLight}\n- Background: ${colors.background}\n- Accent (borders, highlights): ${colors.accent}${colors.sidebarBg ? `\n- Sidebar background: ${colors.sidebarBg}` : ''}`,
-      `# TYPOGRAPHY\n- Heading font: ${template.fonts.heading}\n- Body font: ${template.fonts.body}${template.fonts.accent ? `\n- Accent font: ${template.fonts.accent}` : ''}`,
+    sections.push(
+      `# LAYOUT STRUCTURE\n${TemplateUtils.buildLayoutDescription(template)}`,
+      TemplateUtils.buildColorInstructions(colorScheme),
+      TemplateUtils.buildTypographyInstructions(template.fonts),
       `## Critical Requirements:\n- Follow the EXACT layout structure described above\n- Use the EXACT colors specified - do not change them\n- Ensure the layout matches the selected template (sidebar position, header style, etc.)\n- Maintain excellent readability and ATS compatibility`,
       TASK_PROMPTS.DESIGN_GENERATION
         .replace('{FONT_FAMILY}', template.fonts.body)
-        .replace('{TEXT_COLOR}', colors.text)
-        .replace('{BACKGROUND_COLOR}', colors.background)
+        .replace('{TEXT_COLOR}', colorScheme.colors.text)
+        .replace('{BACKGROUND_COLOR}', colorScheme.colors.background)
         .replace('{RTL_STYLES}', isRTL ? '\n        direction: rtl;\n        text-align: right;' : '')
-    ].filter(Boolean).join('\n\n');
+    );
 
     if (isRTL) {
-      designPrompt += '\n\n' + LANGUAGE_PROMPTS.RTL_DESIGN_INSTRUCTION;
+      sections.push(LANGUAGE_PROMPTS.RTL_DESIGN_INSTRUCTION);
     }
 
-    return designPrompt;
+    return sections.filter(Boolean).join('\n\n');
   }
 
+  /**
+   * Builds chat assistance prompt with context
+   */
   static buildChatPrompt(
     userMessage: string,
     resumeContent: string,
     resumeTitle?: string
   ): string {
-    const hasHebrew = /[\u0590-\u05FF]/.test(resumeContent + userMessage);
-    const detectedLanguage = hasHebrew ? 'Hebrew' : 'English';
-    
-    const currentResumeContext = resumeContent 
+    const detectedLanguage = LanguageUtils.detectLanguage(resumeContent + userMessage);
+
+    const currentResumeContext = resumeContent
       ? `Resume Title: ${resumeTitle || 'Untitled'}\n\nCurrent Resume Content:\n${resumeContent}`
       : 'No resume content loaded yet.';
 
@@ -290,6 +462,9 @@ export class PromptBuilder {
     ].join('\n\n');
   }
 
+  /**
+   * Builds editing instructions processing prompt
+   */
   static buildEditingPrompt(
     instructions: any[],
     resumeContext: string,
@@ -299,8 +474,13 @@ export class PromptBuilder {
       .map((inst, index) => `${index + 1}. [${inst.id}] ${inst.content}`)
       .join('\n');
 
-    const jobTailoringSection = jobDescription ? `
-# JOB TAILORING MODE - TARGET POSITION
+    const sections = [
+      CORE_PROMPTS.EDITING_AGENT,
+      `# CURRENT RESUME CONTEXT\n${resumeContext}`
+    ];
+
+    if (jobDescription) {
+      sections.push(`# JOB TAILORING MODE - TARGET POSITION
 
 ${jobDescription}
 
@@ -320,23 +500,68 @@ When processing edits, actively tailor the resume to this job by:
 - **Quantify achievements** that demonstrate required competencies
 - **Adjust emphasis** to highlight relevant experience over less relevant items
 
-Always explain how your suggested changes improve alignment with the target position.
-` : '';
+Always explain how your suggested changes improve alignment with the target position.`);
+    }
 
-    return [
-      CORE_PROMPTS.EDITING_AGENT,
-      `# CURRENT RESUME CONTEXT\n${resumeContext}`,
-      jobTailoringSection,
+    sections.push(
       `# EDITING INSTRUCTIONS TO PROCESS\n${instructionsText}`,
       `# TASK\nProcess these editing instructions and generate the appropriate actions to modify the resume.\nReturn the JSON response with the actions and summary.`
-    ].filter(Boolean).join('\n\n');
+    );
+
+    return sections.filter(Boolean).join('\n\n');
+  }
+
+  /**
+   * Builds job-specific resume tailoring prompt
+   */
+  static buildTailoringPrompt(
+    originalTree: any[],
+    resumeTitle: string,
+    jobDescription: string
+  ): string {
+    // Compress the tree JSON to save tokens
+    const treeJson = JSON.stringify(originalTree);
+
+    return [
+      CORE_PROMPTS.TAILORING_AGENT,
+      `# Original Resume`,
+      `Title: ${resumeTitle}`,
+      ``,
+      `Resume Tree: ${treeJson}`,
+      ``,
+      `# Target Job Description`,
+      jobDescription,
+      ``,
+      `# CRITICAL OUTPUT INSTRUCTIONS`,
+      `You MUST return ONLY a valid JSON object in this exact format:`,
+      `\`\`\`json`,
+      `{`,
+      `  "tree": [...your modified ResumeNode array...],`,
+      `  "summary": "Brief summary of changes made",`,
+      `  "changes": ["List of key changes made"]`,
+      `}`,
+      `\`\`\``,
+      ``,
+      `IMPORTANT: Ensure the JSON is complete and properly closed. Do not truncate the response.`
+    ].join('\n');
   }
 }
 
 // ============================================================================
-// LEGACY EXPORTS - For backward compatibility (will be removed)
+// 7. LEGACY EXPORTS - Backward Compatibility
 // ============================================================================
 
+/**
+ * @deprecated Use CORE_PROMPTS.RESUME_PARSER instead
+ */
 export const RESUME_STRUCTURING_PROMPT = CORE_PROMPTS.RESUME_PARSER;
+
+/**
+ * @deprecated Use CORE_PROMPTS.WRITING_ASSISTANT instead
+ */
 export const RESUME_AGENT_SYSTEM_PROMPT = CORE_PROMPTS.WRITING_ASSISTANT;
+
+/**
+ * @deprecated Use CORE_PROMPTS.EDITING_AGENT instead
+ */
 export const EDITING_AGENT_SYSTEM_PROMPT = CORE_PROMPTS.EDITING_AGENT;

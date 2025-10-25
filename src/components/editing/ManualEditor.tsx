@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
-import { useAppStore } from '../../../store';
+import { useAppStore } from '../../store';
 import { EditableNode } from './EditableNode';
 import { AddNodeButton } from './AddNodeButton';
-import { SmallChatAssistant } from './SmallChatAssistant';
-import { JobDescriptionInput } from '../../../components';
-import type { ResumeNode } from '../../../types';
+import { JobDescriptionInput } from '../forms/JobDescriptionInput';
+import type { ResumeNode } from '../../types';
 
 export const ManualEditor: React.FC = () => {
   console.log('🔧 ManualEditor: Component rendering');
-  const { resumeTree, applyAction, phase, resumeTitle, selectedBlocks, clearBlockSelection } = useAppStore();
+  const {
+    resumeTree,
+    originalResumeTree,
+    applyAction,
+    phase,
+    resumeTitle,
+    isViewingOriginal,
+    setIsViewingOriginal,
+    isTailoring,
+    hasTailoredVersion
+  } = useAppStore();
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const [showChat, setShowChat] = useState(true); // Chat visible by default
   const autoScrollIntervalRef = React.useRef<number | null>(null);
 
   console.log('🔧 ManualEditor: Resume tree has', resumeTree.length, 'nodes');
@@ -199,78 +207,71 @@ export const ManualEditor: React.FC = () => {
     }
   };
 
-  return (
-    <div className="h-full flex bg-gradient-to-br from-blue-50 via-white to-blue-100">
-      {/* Chat Toggle Button - Fixed position */}
-      {!showChat && (
-        <button
-          onClick={() => setShowChat(true)}
-          className="fixed right-6 bottom-6 p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-2xl hover:from-blue-600 hover:to-indigo-700 transition-all z-50 group hover:scale-110 border-2 border-white"
-          title="Open AI Assistant"
-        >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-          <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-xl border border-blue-500">
-            AI Assistant
-          </span>
-        </button>
-      )}
+  // Determine which tree to display
+  const displayTree = isViewingOriginal ? originalResumeTree : resumeTree;
 
+  return (
+    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 via-white to-blue-100">
       {/* Main Editing Area */}
       <div className="flex-1 p-6 overflow-y-auto">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             {/* Job Description Input */}
             <JobDescriptionInput className="mb-4" />
 
-            {/* Selected Blocks Indicator */}
-            {selectedBlocks.length > 0 && (
-              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-400 rounded-2xl p-5 mb-6 shadow-xl">
+            {/* Unified Status & View Toggle - Only show after first tailoring or during tailoring */}
+            {(hasTailoredVersion || isTailoring) && (
+              <div className={`border-2 rounded-xl p-4 mb-4 shadow-lg ${
+                isTailoring
+                  ? 'bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-300'
+                  : 'bg-white border-blue-300'
+              }`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                        <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-emerald-900 font-bold text-xl">
-                          {selectedBlocks.length} block{selectedBlocks.length > 1 ? 's' : ''} cited
-                        </span>
-                        <span className="px-2 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-full shadow-md">
-                          AI Ready
-                        </span>
-                      </div>
-                      <p className="text-emerald-700 text-sm mt-1 flex items-center space-x-1">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <div className="flex items-center space-x-3">
+                    {isTailoring ? (
+                      <div className="animate-spin">
+                        <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>Use the AI chat to improve, rewrite, or modify these blocks</span>
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </div>
+                    )}
+                    <div>
+                      <h3 className={`text-sm font-semibold ${
+                        isTailoring ? 'text-purple-900' : 'text-gray-900'
+                      }`}>
+                        {isTailoring
+                          ? 'AI Tailoring in Progress'
+                          : `Viewing: ${isViewingOriginal ? 'Original Resume' : 'Tailored Resume'}`
+                        }
+                      </h3>
+                      <p className={`text-xs ${
+                        isTailoring ? 'text-purple-700' : 'text-gray-600'
+                      }`}>
+                        {isTailoring
+                          ? 'Optimizing your resume for the target job...'
+                          : isViewingOriginal
+                            ? 'Your original uploaded resume'
+                            : 'AI-tailored version for target job'
+                        }
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    {!showChat && (
-                      <button
-                        onClick={() => setShowChat(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl flex items-center space-x-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        <span>Open Chat</span>
-                      </button>
-                    )}
+                  {!isTailoring && hasTailoredVersion && (
                     <button
-                      onClick={clearBlockSelection}
-                      className="px-4 py-2 bg-white text-gray-700 text-sm font-medium rounded-lg border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-md"
+                      onClick={() => setIsViewingOriginal(!isViewingOriginal)}
+                      className="px-4 py-2 rounded-lg font-semibold transition-all shadow-md bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
                     >
-                      Clear
+                      {isViewingOriginal ? 'View Tailored' : 'View Original'}
                     </button>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -278,7 +279,7 @@ export const ManualEditor: React.FC = () => {
 
           {/* Resume Content Editor */}
           <div className="space-y-4">
-            {resumeTree.length === 0 ? (
+            {displayTree.length === 0 ? (
               <div className="text-center py-20 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-blue-200">
                 <div className="mb-6">
                   <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center shadow-xl">
@@ -297,7 +298,7 @@ export const ManualEditor: React.FC = () => {
                      'Upload a new resume or add content manually'}
                   </p>
                 </div>
-                {phase !== 'processing' && (
+                {phase !== 'processing' && !isViewingOriginal && (
                   <div className="max-w-xs mx-auto">
                     <AddNodeButton
                       onAdd={() => handleAddNode('0')}
@@ -309,42 +310,45 @@ export const ManualEditor: React.FC = () => {
               </div>
             ) : (
               <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border-2 border-blue-200 p-6">
+                {isViewingOriginal && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                    <p className="text-amber-800 text-sm font-medium">
+                      📌 You are viewing the original resume in read-only mode. Switch to tailored view to make edits.
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-3">
-                  {resumeTree.map((node: ResumeNode) => (
+                  {displayTree.map((node: ResumeNode) => (
                     <EditableNode
                       key={node.uid}
                       node={node}
                       depth={0}
-                      onUpdate={handleNodeUpdate}
-                      onRemove={handleNodeRemove}
-                      onMove={handleNodeMove}
-                      onAddChild={handleAddNode}
+                      onUpdate={isViewingOriginal ? () => {} : handleNodeUpdate}
+                      onRemove={isViewingOriginal ? () => {} : handleNodeRemove}
+                      onMove={isViewingOriginal ? () => {} : handleNodeMove}
+                      onAddChild={isViewingOriginal ? () => {} : handleAddNode}
                       draggedNode={draggedNode}
                       setDraggedNode={setDraggedNode}
                     />
                   ))}
                 </div>
 
-                {/* Add Section Button */}
-                <div className="mt-6 pt-6 border-t-2 border-blue-200">
-                  <AddNodeButton
-                    onAdd={() => handleAddNode('0')}
-                    label="Add Section"
-                    icon="section"
-                  />
-                </div>
+                {/* Add Section Button - Only in tailored view */}
+                {!isViewingOriginal && (
+                  <div className="mt-6 pt-6 border-t-2 border-blue-200">
+                    <AddNodeButton
+                      onAdd={() => handleAddNode('0')}
+                      label="Add Section"
+                      icon="section"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {/* AI Chat Assistant Panel */}
-      {showChat && (
-        <div className="w-96 border-l-2 border-blue-300 bg-white shadow-2xl flex flex-col">
-          <SmallChatAssistant onClose={() => setShowChat(false)} />
-        </div>
-      )}
     </div>
   );
 };

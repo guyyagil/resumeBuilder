@@ -6,6 +6,3 @@ export * from './validation/resume-validator';
 
 // Action handling
 export { ActionHandler } from './action-handler';
-
-// PDF processing
-export { SimplePDFProcessor } from './pdf-processor';

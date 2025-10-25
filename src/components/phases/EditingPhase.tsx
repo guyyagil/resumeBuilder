@@ -1,5 +1,5 @@
 import React from 'react';
-import { ManualEditor } from '../../phaseUtils/editing/components/ManualEditor';
+import { ManualEditor } from '../editing/ManualEditor';
 
 export const EditingPhase: React.FC = () => {
   return (

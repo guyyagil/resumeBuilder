@@ -6,22 +6,40 @@ interface JobDescriptionInputProps {
 }
 
 export const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({ className = '' }) => {
-  const { jobDescription, setJobDescription } = useAppStore();
+  const { jobDescription, setJobDescription, tailorResumeToJob, isTailoring, originalResumeTree } = useAppStore();
   const [isExpanded, setIsExpanded] = useState(!!jobDescription);
   const [localValue, setLocalValue] = useState(jobDescription);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
-    setJobDescription(localValue);
+  const handleTailorResume = async () => {
     if (!localValue.trim()) {
+      setError('Please enter a job description first');
+      return;
+    }
+
+    if (!originalResumeTree || originalResumeTree.length === 0) {
+      setError('No resume to tailor. Please upload a resume first.');
+      return;
+    }
+
+    setError(null);
+
+    try {
+      // Save the job description before tailoring
+      setJobDescription(localValue);
+
+      await tailorResumeToJob(localValue);
+      // Collapse after successful tailoring
       setIsExpanded(false);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to tailor resume');
     }
   };
 
-  const handleClear = () => {
-    setLocalValue('');
-    setJobDescription('');
+  // Collapse when tailoring starts
+  if (isTailoring && isExpanded) {
     setIsExpanded(false);
-  };
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -35,30 +53,39 @@ export const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({ classN
       <div className={className}>
         <button
           onClick={() => setIsExpanded(true)}
-          className="w-full p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl hover:from-purple-100 hover:to-indigo-100 transition-all group"
+          disabled={isTailoring}
+          className={`w-full p-3 border-2 rounded-xl transition-all group ${
+            isTailoring
+              ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+              : 'bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 hover:from-purple-100 hover:to-indigo-100'
+          }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                isTailoring ? 'bg-gray-400' : 'bg-purple-500'
+              }`}>
                 <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
               <div className="text-left">
-                <div className="font-semibold text-purple-900 text-sm">
-                  {jobDescription ? 'Job Description Set' : 'Add Job Description'}
+                <div className={`font-semibold text-sm ${isTailoring ? 'text-gray-600' : 'text-purple-900'}`}>
+                  {jobDescription ? 'Target Job Set' : 'Add Job Description'}
                 </div>
-                <div className="text-xs text-purple-600">
+                <div className={`text-xs ${isTailoring ? 'text-gray-500' : 'text-purple-600'}`}>
                   {jobDescription
-                    ? 'AI will tailor edits to this role'
-                    : 'Help AI optimize your resume for a specific job'
+                    ? 'Click to view or modify'
+                    : 'Paste job posting to optimize resume'
                   }
                 </div>
               </div>
             </div>
-            <svg className="w-5 h-5 text-purple-500 group-hover:text-purple-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            {!isTailoring && (
+              <svg className="w-5 h-5 text-purple-500 group-hover:text-purple-700 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
           </div>
         </button>
       </div>
@@ -100,38 +127,41 @@ export const JobDescriptionInput: React.FC<JobDescriptionInputProps> = ({ classN
         className="w-full h-32 px-3 py-2 text-sm border-2 border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 resize-none bg-white"
       />
 
-      <div className="mt-3 flex items-center justify-between">
-        <div className="text-xs text-purple-600">
+      <div className="mt-3">
+        <div className="text-xs text-purple-600 text-center mb-2">
           {localValue.length > 0 ? `${localValue.length} characters` : 'No job description yet'}
-        </div>
-        <div className="flex space-x-2">
-          {localValue && (
-            <button
-              onClick={handleClear}
-              className="px-3 py-1.5 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-lg transition-all font-medium"
-            >
-              Clear
-            </button>
-          )}
-          <button
-            onClick={handleSave}
-            className="px-4 py-1.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xs font-bold rounded-lg hover:from-purple-600 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg"
-          >
-            {jobDescription ? 'Update' : 'Save'}
-          </button>
         </div>
       </div>
 
-      {jobDescription && localValue === jobDescription && (
-        <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded-lg">
+      {/* Error Message */}
+      {error && (
+        <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded-lg">
           <div className="flex items-center space-x-2">
-            <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-xs text-green-800 font-medium">
-              AI will now tailor suggestions to this job role
-            </span>
+            <span className="text-xs text-red-800 font-medium">{error}</span>
           </div>
+        </div>
+      )}
+
+      {/* Tailor Resume Button */}
+      {localValue.trim() && !isTailoring && (
+        <div className="mt-3">
+          <button
+            onClick={handleTailorResume}
+            className="w-full py-3 px-4 rounded-lg font-bold text-sm shadow-lg transition-all bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 hover:shadow-xl"
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span>Tailor Resume to This Job</span>
+            </div>
+          </button>
+          <p className="text-xs text-purple-600 mt-2 text-center">
+            AI will optimize your resume specifically for this job posting
+          </p>
         </div>
       )}
     </div>

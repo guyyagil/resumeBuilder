@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../../../store';
-import type { ResumeNode } from '../../../types';
-import { detectTextDirection } from '../../../utils';
+import { useAppStore } from '../../store';
+import type { ResumeNode } from '../../types';
+import { detectTextDirection } from '../../utils';
 
 interface EditableNodeProps {
   node: ResumeNode;
@@ -29,6 +29,8 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(node.text || node.title || '');
   const [dropZone, setDropZone] = useState<DropZone>(null);
+  // Start collapsed if node has children
+  const [isCollapsed, setIsCollapsed] = useState(node.children && node.children.length > 0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
   const isDragTargetRef = useRef<boolean>(false);
@@ -330,6 +332,21 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
     return detectTextDirection(content);
   };
 
+  // Render text with markdown bold support (**text** -> <strong>text</strong>)
+  const renderTextWithBold = (text: string) => {
+    // Split by ** markers, handling edge cases
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+
+    return parts.map((part, index) => {
+      // Check if this part is bold (wrapped in **)
+      if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+        const boldText = part.slice(2, -2);
+        return <strong key={index} className="font-bold">{boldText}</strong>;
+      }
+      return <React.Fragment key={index}>{part}</React.Fragment>;
+    });
+  };
+
   const getDropZoneIndicator = () => {
     if (!dropZone) return null;
 
@@ -436,7 +453,9 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
                 dir={getTextDir()}
                 className={`${getTextStyle()} cursor-text hover:bg-white/50 p-3 rounded-lg min-h-[3rem] whitespace-pre-wrap transition-colors`}
               >
-                {node.text || node.title || (
+                {node.text || node.title ? (
+                  renderTextWithBold(node.text || node.title || '')
+                ) : (
                   <span className="text-gray-400 italic">Click to edit...</span>
                 )}
               </div>
@@ -458,6 +477,29 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
             {/* Action Buttons - Show on Hover */}
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Collapse/Expand Button - Only show if node has children */}
+              {node.children && node.children.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsCollapsed(!isCollapsed);
+                  }}
+                  className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-all shadow-sm hover:shadow-md"
+                  title={isCollapsed ? 'Expand children' : 'Collapse children'}
+                >
+                  {isCollapsed ? (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
+              )}
+
               {/* Add Child Button */}
               <button
                 onClick={(e) => {
@@ -495,8 +537,8 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
       </div>
 
-      {/* Render Children with Indentation */}
-      {node.children && node.children.length > 0 && (
+      {/* Render Children with Indentation - Only show if not collapsed */}
+      {!isCollapsed && node.children && node.children.length > 0 && (
         <div className="ml-8 space-y-2 pl-4 border-l-2 border-blue-200">
           {node.children.map((child) => (
             <EditableNode
@@ -511,6 +553,18 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
               setDraggedNode={setDraggedNode}
             />
           ))}
+        </div>
+      )}
+
+      {/* Collapsed indicator - show how many children are hidden */}
+      {isCollapsed && node.children && node.children.length > 0 && (
+        <div className="ml-8 mt-2">
+          <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <span className="font-medium">{node.children.length} item{node.children.length !== 1 ? 's' : ''} hidden</span>
+          </div>
         </div>
       )}
     </div>
