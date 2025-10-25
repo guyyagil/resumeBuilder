@@ -64,11 +64,11 @@ export const LayoutSelectionPhase: React.FC = () => {
                       // Sidebar Layout
                       <div className={`flex h-full gap-3 ${layout.structure.sidebarPosition === 'right' ? 'flex-row-reverse' : ''}`}>
                         {/* Sidebar */}
-                        <div className="w-1/3 bg-gray-50 p-3 space-y-3 border-r border-gray-200">
+                        <div className="w-1/3 bg-gray-200 p-3 space-y-3 border-r border-black">
                           {/* Contact Info */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px]">CONTACT</div>
-                            <div className="text-gray-600 space-y-1">
+                            <div className="font-bold text-black mb-1.5 text-[9px]">CONTACT</div>
+                            <div className="text-black space-y-1">
                               <div>📧 john@email.com</div>
                               <div>📱 (555) 123-4567</div>
                               <div>📍 New York, NY</div>
@@ -77,8 +77,8 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                           {/* Skills */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px]">SKILLS</div>
-                            <div className="space-y-1 text-gray-600">
+                            <div className="font-bold text-black mb-1.5 text-[9px]">SKILLS</div>
+                            <div className="space-y-1 text-black">
                               <div>• JavaScript</div>
                               <div>• React</div>
                               <div>• Node.js</div>
@@ -91,19 +91,19 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                           {/* Education */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px]">EDUCATION</div>
-                            <div className="text-gray-600">
+                            <div className="font-bold text-black mb-1.5 text-[9px]">EDUCATION</div>
+                            <div className="text-black">
                               <div className="font-semibold">B.S. Computer Science</div>
                               <div>University Name</div>
-                              <div className="text-[7px] text-gray-500 mt-0.5">2018 - 2022</div>
+                              <div className="text-[7px] text-gray-600 mt-0.5">2018 - 2022</div>
                               <div className="text-[7px] mt-0.5">GPA: 3.8/4.0</div>
                             </div>
                           </div>
 
                           {/* Certifications */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px]">CERTIFICATIONS</div>
-                            <div className="text-gray-600 space-y-0.5">
+                            <div className="font-bold text-black mb-1.5 text-[9px]">CERTIFICATIONS</div>
+                            <div className="text-black space-y-0.5">
                               <div>AWS Certified</div>
                               <div>React Developer</div>
                             </div>
@@ -113,27 +113,27 @@ export const LayoutSelectionPhase: React.FC = () => {
                         {/* Main Content */}
                         <div className="flex-1 space-y-2.5 py-1">
                           {/* Header */}
-                          <div className="text-center pb-2.5 border-b-2 border-gray-300">
-                            <div className="text-[12px] font-bold text-gray-900 tracking-wide">JOHN DOE</div>
-                            <div className="text-gray-600 text-[9px] mt-0.5">Software Engineer</div>
+                          <div className="text-center pb-2.5 border-b-2 border-black">
+                            <div className="text-[12px] font-bold text-black tracking-wide">JOHN DOE</div>
+                            <div className="text-black text-[9px] mt-0.5">Software Engineer</div>
                           </div>
 
                           {/* Profile */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px]">PROFESSIONAL SUMMARY</div>
-                            <div className="text-gray-600 leading-relaxed">
+                            <div className="font-bold text-black mb-1.5 text-[9px]">PROFESSIONAL SUMMARY</div>
+                            <div className="text-black leading-relaxed">
                               Results-driven software engineer with 3+ years of experience building scalable web applications. Specialized in React, Node.js, and cloud infrastructure. Passionate about creating elegant solutions to complex problems. Proven track record of delivering high-quality software on time.
                             </div>
                           </div>
 
                           {/* Experience */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px]">WORK EXPERIENCE</div>
+                            <div className="font-bold text-black mb-1.5 text-[9px]">WORK EXPERIENCE</div>
                             <div className="space-y-2.5">
                               <div>
-                                <div className="font-semibold text-gray-800">Senior Software Engineer | TechCorp Inc.</div>
-                                <div className="text-gray-500 text-[7px]">2021 - Present</div>
-                                <div className="text-gray-600 mt-1 space-y-0.5">
+                                <div className="font-semibold text-black">Senior Software Engineer | TechCorp Inc.</div>
+                                <div className="text-gray-600 text-[7px]">2021 - Present</div>
+                                <div className="text-black mt-1 space-y-0.5">
                                   <div>• Led development of microservices architecture serving 10M+ users</div>
                                   <div>• Improved API response time by 40% through optimization</div>
                                   <div>• Mentored 3 junior developers and conducted code reviews</div>
@@ -141,9 +141,9 @@ export const LayoutSelectionPhase: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <div className="font-semibold text-gray-800">Software Engineer | StartupXYZ</div>
-                                <div className="text-gray-500 text-[7px]">2019 - 2021</div>
-                                <div className="text-gray-600 mt-1 space-y-0.5">
+                                <div className="font-semibold text-black">Software Engineer | StartupXYZ</div>
+                                <div className="text-gray-600 text-[7px]">2019 - 2021</div>
+                                <div className="text-black mt-1 space-y-0.5">
                                   <div>• Built responsive web applications using React and TypeScript</div>
                                   <div>• Implemented CI/CD pipelines reducing deployment time by 60%</div>
                                   <div>• Collaborated with design team to improve UX</div>
@@ -157,10 +157,10 @@ export const LayoutSelectionPhase: React.FC = () => {
                       // Bold Header Layout - Large header with content below
                       <div className="h-full flex flex-col">
                         {/* Large Bold Header Section */}
-                        <div className="bg-gradient-to-r from-gray-800 to-gray-700 text-white p-4 text-center">
-                          <div className="text-[16px] font-extrabold tracking-wide mb-1.5">JOHN DOE</div>
-                          <div className="text-[10px] mb-2 font-light">Software Engineer</div>
-                          <div className="text-[7px] space-x-2 opacity-90">
+                        <div className="bg-gray-200 border-b-2 border-black p-4 text-center">
+                          <div className="text-[16px] font-extrabold tracking-wide mb-1.5 text-black">JOHN DOE</div>
+                          <div className="text-[10px] mb-2 text-black">Software Engineer</div>
+                          <div className="text-[7px] space-x-2 text-gray-600">
                             <span>📧 john@email.com</span>
                             <span>•</span>
                             <span>📱 (555) 123-4567</span>
@@ -175,16 +175,16 @@ export const LayoutSelectionPhase: React.FC = () => {
                           <div className="space-y-2.5">
                             {/* Profile */}
                             <div>
-                              <div className="font-bold text-gray-700 mb-1.5 text-[9px]">PROFESSIONAL SUMMARY</div>
-                              <div className="text-gray-600 leading-relaxed">
+                              <div className="font-bold text-black mb-1.5 text-[9px]">PROFESSIONAL SUMMARY</div>
+                              <div className="text-black leading-relaxed">
                                 Results-driven software engineer with 3+ years of experience building scalable web applications. Specialized in React, Node.js, and cloud infrastructure. Passionate about creating elegant solutions.
                               </div>
                             </div>
 
                             {/* Skills */}
                             <div>
-                              <div className="font-bold text-gray-700 mb-1.5 text-[9px]">TECHNICAL SKILLS</div>
-                              <div className="text-gray-600 leading-relaxed space-y-0.5">
+                              <div className="font-bold text-black mb-1.5 text-[9px]">TECHNICAL SKILLS</div>
+                              <div className="text-black leading-relaxed space-y-0.5">
                                 <div><span className="font-semibold">Languages:</span> JavaScript, Python, TypeScript</div>
                                 <div><span className="font-semibold">Frameworks:</span> React, Node.js, Express</div>
                                 <div><span className="font-semibold">Tools:</span> Git, Docker, AWS</div>
@@ -193,18 +193,18 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                             {/* Education */}
                             <div>
-                              <div className="font-bold text-gray-700 mb-1.5 text-[9px]">EDUCATION</div>
-                              <div className="text-gray-600">
+                              <div className="font-bold text-black mb-1.5 text-[9px]">EDUCATION</div>
+                              <div className="text-black">
                                 <div className="font-semibold">B.S. Computer Science</div>
                                 <div>University of Technology</div>
-                                <div className="text-[7px] text-gray-500 mt-0.5">2018 - 2022 | GPA: 3.8/4.0</div>
+                                <div className="text-[7px] text-gray-600 mt-0.5">2018 - 2022 | GPA: 3.8/4.0</div>
                               </div>
                             </div>
 
                             {/* Certifications */}
                             <div>
-                              <div className="font-bold text-gray-700 mb-1.5 text-[9px]">CERTIFICATIONS</div>
-                              <div className="text-gray-600 space-y-0.5">
+                              <div className="font-bold text-black mb-1.5 text-[9px]">CERTIFICATIONS</div>
+                              <div className="text-black space-y-0.5">
                                 <div>AWS Certified Solutions Architect</div>
                                 <div>React Professional Developer</div>
                               </div>
@@ -215,12 +215,12 @@ export const LayoutSelectionPhase: React.FC = () => {
                           <div>
                             {/* Experience */}
                             <div>
-                              <div className="font-bold text-gray-700 mb-1.5 text-[9px]">WORK EXPERIENCE</div>
+                              <div className="font-bold text-black mb-1.5 text-[9px]">WORK EXPERIENCE</div>
                               <div className="space-y-2.5">
                                 <div>
-                                  <div className="font-semibold text-gray-800">Senior Software Engineer</div>
-                                  <div className="text-gray-500 text-[7px]">TechCorp Inc. | 2021 - Present</div>
-                                  <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                                  <div className="font-semibold text-black">Senior Software Engineer</div>
+                                  <div className="text-gray-600 text-[7px]">TechCorp Inc. | 2021 - Present</div>
+                                  <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                     <div>• Led development of microservices architecture serving 10M+ users</div>
                                     <div>• Improved API response time by 40% through optimization</div>
                                     <div>• Mentored 3 junior developers and conducted code reviews</div>
@@ -228,18 +228,18 @@ export const LayoutSelectionPhase: React.FC = () => {
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="font-semibold text-gray-800">Software Engineer</div>
-                                  <div className="text-gray-500 text-[7px]">StartupXYZ | 2019 - 2021</div>
-                                  <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                                  <div className="font-semibold text-black">Software Engineer</div>
+                                  <div className="text-gray-600 text-[7px]">StartupXYZ | 2019 - 2021</div>
+                                  <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                     <div>• Built responsive web applications using React and TypeScript</div>
                                     <div>• Implemented CI/CD pipelines reducing deployment time by 60%</div>
                                     <div>• Collaborated with design team to improve UX</div>
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="font-semibold text-gray-800">Junior Developer</div>
-                                  <div className="text-gray-500 text-[7px]">TechStart | 2018 - 2019</div>
-                                  <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                                  <div className="font-semibold text-black">Junior Developer</div>
+                                  <div className="text-gray-600 text-[7px]">TechStart | 2018 - 2019</div>
+                                  <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                     <div>• Developed web features using modern JavaScript</div>
                                     <div>• Participated in agile development processes</div>
                                   </div>
@@ -253,10 +253,10 @@ export const LayoutSelectionPhase: React.FC = () => {
                       // Modern Split Layout - Centered header with mixed content
                       <div className="h-full flex flex-col">
                         {/* Centered Header */}
-                        <div className="text-center py-4 border-b-2 border-gray-300">
-                          <div className="text-[15px] font-bold text-gray-900 tracking-wide mb-1">JOHN DOE</div>
-                          <div className="text-[9px] text-gray-600 mb-1.5">Software Engineer</div>
-                          <div className="text-[7px] text-gray-500 space-x-2">
+                        <div className="text-center py-4 border-b-2 border-black">
+                          <div className="text-[15px] font-bold text-black tracking-wide mb-1">JOHN DOE</div>
+                          <div className="text-[9px] text-black mb-1.5">Software Engineer</div>
+                          <div className="text-[7px] text-gray-600 space-x-2">
                             <span>john@email.com</span>
                             <span>•</span>
                             <span>(555) 123-4567</span>
@@ -269,8 +269,8 @@ export const LayoutSelectionPhase: React.FC = () => {
                         <div className="flex-1 p-3 space-y-3 overflow-hidden">
                           {/* Profile - Full width */}
                           <div>
-                            <div className="font-bold text-gray-700 mb-1.5 text-[9px] bg-gray-100 px-2 py-1 rounded">PROFESSIONAL SUMMARY</div>
-                            <div className="text-gray-600 leading-relaxed">
+                            <div className="font-bold text-black mb-1.5 text-[9px] bg-gray-200 px-2 py-1 rounded">PROFESSIONAL SUMMARY</div>
+                            <div className="text-black leading-relaxed">
                               Results-driven software engineer with 3+ years of experience building scalable web applications. Specialized in React, Node.js, and cloud infrastructure. Passionate about creating elegant solutions to complex problems.
                             </div>
                           </div>
@@ -279,21 +279,21 @@ export const LayoutSelectionPhase: React.FC = () => {
                           <div className="grid grid-cols-2 gap-3">
                             {/* Experience - Left */}
                             <div>
-                              <div className="font-bold text-gray-700 mb-1.5 text-[9px] bg-gray-100 px-2 py-1 rounded">WORK EXPERIENCE</div>
+                              <div className="font-bold text-black mb-1.5 text-[9px] bg-gray-200 px-2 py-1 rounded">WORK EXPERIENCE</div>
                               <div className="space-y-2">
                                 <div>
-                                  <div className="font-semibold text-gray-800">Senior Software Engineer</div>
-                                  <div className="text-gray-500 text-[7px]">TechCorp Inc. | 2021 - Present</div>
-                                  <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                                  <div className="font-semibold text-black">Senior Software Engineer</div>
+                                  <div className="text-gray-600 text-[7px]">TechCorp Inc. | 2021 - Present</div>
+                                  <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                     <div>• Led microservices serving 10M+ users</div>
                                     <div>• Improved API performance by 40%</div>
                                     <div>• Mentored junior developers</div>
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="font-semibold text-gray-800">Software Engineer</div>
-                                  <div className="text-gray-500 text-[7px]">StartupXYZ | 2019 - 2021</div>
-                                  <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                                  <div className="font-semibold text-black">Software Engineer</div>
+                                  <div className="text-gray-600 text-[7px]">StartupXYZ | 2019 - 2021</div>
+                                  <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                     <div>• Built responsive web apps</div>
                                     <div>• Reduced deployment time by 60%</div>
                                   </div>
@@ -304,24 +304,24 @@ export const LayoutSelectionPhase: React.FC = () => {
                             {/* Skills & Education - Right */}
                             <div className="space-y-2.5">
                               <div>
-                                <div className="font-bold text-gray-700 mb-1.5 text-[9px] bg-gray-100 px-2 py-1 rounded">TECHNICAL SKILLS</div>
-                                <div className="text-gray-600 leading-relaxed space-y-0.5">
+                                <div className="font-bold text-black mb-1.5 text-[9px] bg-gray-200 px-2 py-1 rounded">TECHNICAL SKILLS</div>
+                                <div className="text-black leading-relaxed space-y-0.5">
                                   <div><span className="font-semibold">Languages:</span> JavaScript, Python, TypeScript</div>
                                   <div><span className="font-semibold">Frameworks:</span> React, Node.js, Express</div>
                                   <div><span className="font-semibold">Tools:</span> Git, Docker, AWS</div>
                                 </div>
                               </div>
                               <div>
-                                <div className="font-bold text-gray-700 mb-1.5 text-[9px] bg-gray-100 px-2 py-1 rounded">EDUCATION</div>
-                                <div className="text-gray-600 leading-relaxed">
+                                <div className="font-bold text-black mb-1.5 text-[9px] bg-gray-200 px-2 py-1 rounded">EDUCATION</div>
+                                <div className="text-black leading-relaxed">
                                   <div className="font-semibold">B.S. Computer Science</div>
                                   <div>University of Technology</div>
-                                  <div className="text-[7px] text-gray-500 mt-0.5">2018 - 2022 | GPA: 3.8/4.0</div>
+                                  <div className="text-[7px] text-gray-600 mt-0.5">2018 - 2022 | GPA: 3.8/4.0</div>
                                 </div>
                               </div>
                               <div>
-                                <div className="font-bold text-gray-700 mb-1.5 text-[9px] bg-gray-100 px-2 py-1 rounded">CERTIFICATIONS</div>
-                                <div className="text-gray-600 space-y-0.5 leading-relaxed">
+                                <div className="font-bold text-black mb-1.5 text-[9px] bg-gray-200 px-2 py-1 rounded">CERTIFICATIONS</div>
+                                <div className="text-black space-y-0.5 leading-relaxed">
                                   <div>AWS Certified</div>
                                   <div>React Developer</div>
                                 </div>
@@ -334,13 +334,13 @@ export const LayoutSelectionPhase: React.FC = () => {
                       // Classic Single Column Layout
                       <div className="h-full space-y-2.5 py-1">
                         {/* Header */}
-                        <div className={`text-center pb-3 border-b-2 border-gray-300 ${layout.structure.hasLargeName ? 'pb-4' : ''}`}>
-                          <div className={`font-bold text-gray-900 tracking-wide ${layout.structure.hasLargeName ? 'text-[14px] mb-1.5' : 'text-[12px] mb-1'}`}>
+                        <div className={`text-center pb-3 border-b-2 border-black ${layout.structure.hasLargeName ? 'pb-4' : ''}`}>
+                          <div className={`font-bold text-black tracking-wide ${layout.structure.hasLargeName ? 'text-[14px] mb-1.5' : 'text-[12px] mb-1'}`}>
                             JOHN DOE
                           </div>
-                          <div className="text-gray-600 text-[9px]">Software Engineer</div>
+                          <div className="text-black text-[9px]">Software Engineer</div>
                           {layout.structure.hasLargeName && (
-                            <div className="mt-1.5 text-gray-500 space-x-2 text-[7px]">
+                            <div className="mt-1.5 text-gray-600 space-x-2 text-[7px]">
                               <span>📧 john@email.com</span>
                               <span>•</span>
                               <span>📱 (555) 123-4567</span>
@@ -352,20 +352,20 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                         {/* Profile */}
                         <div>
-                          <div className="font-bold text-gray-700 mb-1.5 text-[9px] border-b border-gray-200 pb-0.5">PROFESSIONAL SUMMARY</div>
-                          <div className="text-gray-600 leading-relaxed">
+                          <div className="font-bold text-black mb-1.5 text-[9px] border-b border-black pb-0.5">PROFESSIONAL SUMMARY</div>
+                          <div className="text-black leading-relaxed">
                             Results-driven software engineer with 3+ years of experience building scalable web applications. Specialized in React, Node.js, and cloud infrastructure. Passionate about creating elegant solutions to complex problems.
                           </div>
                         </div>
 
                         {/* Experience */}
                         <div>
-                          <div className="font-bold text-gray-700 mb-1.5 text-[9px] border-b border-gray-200 pb-0.5">WORK EXPERIENCE</div>
+                          <div className="font-bold text-black mb-1.5 text-[9px] border-b border-black pb-0.5">WORK EXPERIENCE</div>
                           <div className="space-y-2.5">
                             <div>
-                              <div className="font-semibold text-gray-800">Senior Software Engineer | TechCorp Inc.</div>
-                              <div className="text-gray-500 text-[7px]">2021 - Present</div>
-                              <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                              <div className="font-semibold text-black">Senior Software Engineer | TechCorp Inc.</div>
+                              <div className="text-gray-600 text-[7px]">2021 - Present</div>
+                              <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                 <div>• Led development of microservices architecture serving 10M+ users</div>
                                 <div>• Improved API response time by 40% through optimization</div>
                                 <div>• Mentored 3 junior developers and conducted code reviews</div>
@@ -373,9 +373,9 @@ export const LayoutSelectionPhase: React.FC = () => {
                               </div>
                             </div>
                             <div>
-                              <div className="font-semibold text-gray-800">Software Engineer | StartupXYZ</div>
-                              <div className="text-gray-500 text-[7px]">2019 - 2021</div>
-                              <div className="text-gray-600 mt-1 space-y-0.5 leading-relaxed">
+                              <div className="font-semibold text-black">Software Engineer | StartupXYZ</div>
+                              <div className="text-gray-600 text-[7px]">2019 - 2021</div>
+                              <div className="text-black mt-1 space-y-0.5 leading-relaxed">
                                 <div>• Built responsive web applications using React and TypeScript</div>
                                 <div>• Implemented CI/CD pipelines reducing deployment time by 60%</div>
                                 <div>• Collaborated with design team to improve UX</div>
@@ -386,8 +386,8 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                         {/* Skills */}
                         <div>
-                          <div className="font-bold text-gray-700 mb-1.5 text-[9px] border-b border-gray-200 pb-0.5">TECHNICAL SKILLS</div>
-                          <div className="text-gray-600 leading-relaxed space-y-0.5">
+                          <div className="font-bold text-black mb-1.5 text-[9px] border-b border-black pb-0.5">TECHNICAL SKILLS</div>
+                          <div className="text-black leading-relaxed space-y-0.5">
                             <div><span className="font-semibold">Languages:</span> JavaScript, Python, TypeScript, Java</div>
                             <div><span className="font-semibold">Frameworks:</span> React, Node.js, Express, Django</div>
                             <div><span className="font-semibold">Tools:</span> Git, Docker, AWS, Jenkins</div>
@@ -396,10 +396,10 @@ export const LayoutSelectionPhase: React.FC = () => {
 
                         {/* Education */}
                         <div>
-                          <div className="font-bold text-gray-700 mb-1.5 text-[9px] border-b border-gray-200 pb-0.5">EDUCATION</div>
+                          <div className="font-bold text-black mb-1.5 text-[9px] border-b border-black pb-0.5">EDUCATION</div>
                           <div>
-                            <div className="font-semibold text-gray-800">B.S. Computer Science | University of Technology</div>
-                            <div className="text-gray-500 text-[7px] mt-0.5">2018 - 2022 | GPA: 3.8/4.0</div>
+                            <div className="font-semibold text-black">B.S. Computer Science | University of Technology</div>
+                            <div className="text-gray-600 text-[7px] mt-0.5">2018 - 2022 | GPA: 3.8/4.0</div>
                           </div>
                         </div>
                       </div>
