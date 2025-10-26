@@ -1,4 +1,3 @@
-import React from "react";
 import { A4Preview } from "./A4Preview";
 
 export function TemplateCard({
