@@ -1,7 +1,7 @@
 // AI Agent for tailoring resumes to specific job descriptions
 import { GoogleGenAI } from '@google/genai';
 import type { ResumeNode } from '../../types';
-import { generateUid } from '../../utils';
+import { ensureUids } from '../../utils';
 import { PromptBuilder } from '../prompts/PromptTemplates';
 
 interface TailoringResult {
@@ -39,22 +39,13 @@ export class TailoringAgent {
       const result = await this.genAI.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
-        config: {
-          temperature: 0.5,
-          topP: 0.9,
-          topK: 10,
-          maxOutputTokens: 12000,
-          thinkingConfig: {
-            thinkingBudget: 8192,
-          },
-        },
       });
       const response = result.text || '';
 
       if (!response) {
         throw new Error('No response from AI');
       }
-
+      console.log(response) ; 
       console.log('📥 Received tailoring response');
 
       const parsed = this.parseResponse(response);
@@ -161,8 +152,8 @@ export class TailoringAgent {
       // Deep clone to avoid read-only issues
       const clonedTree = JSON.parse(JSON.stringify(parsed.tree));
 
-      // Ensure all nodes have UIDs
-      this.ensureUids(clonedTree);
+      // Ensure all nodes have UIDs (system-generated, not from AI)
+      ensureUids(clonedTree);
 
       return {
         tree: clonedTree,
@@ -210,14 +201,4 @@ export class TailoringAgent {
     }
   }
 
-  private ensureUids(nodes: ResumeNode[]): void {
-    for (const node of nodes) {
-      if (!node.uid) {
-        node.uid = generateUid();
-      }
-      if (node.children && node.children.length > 0) {
-        this.ensureUids(node.children);
-      }
-    }
-  }
 }

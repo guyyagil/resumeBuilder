@@ -286,7 +286,7 @@ export class ActionHandler {
 
       // Add any remaining nodes not in the order
       tree.forEach(node => {
-        if (!orderUids.includes(node.uid)) {
+        if (node.uid && !orderUids.includes(node.uid)) {
           newTree.push(node);
         }
       });
@@ -329,7 +329,7 @@ export class ActionHandler {
 
         // Add any remaining nodes not in the order
         tree.forEach(node => {
-          if (!orderUids.includes(node.uid)) {
+          if (node.uid && !orderUids.includes(node.uid)) {
             newTree.push(node);
           }
         });
@@ -358,7 +358,7 @@ export class ActionHandler {
 
     // Add any children not in the order list
     parent.children.forEach(child => {
-      if (!orderUids.includes(child.uid)) {
+      if (child.uid && !orderUids.includes(child.uid)) {
         newChildren.push(child);
       }
     });

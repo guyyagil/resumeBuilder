@@ -13,8 +13,14 @@ export function computeNumbering(tree: ResumeNode[]): Numbering {
     nodes.forEach((node, idx) => {
       const addr = [...prefix, idx + 1].join('.');
       node.addr = addr;
-      addrToUid[addr] = node.uid;
-      uidToAddr[node.uid] = addr;
+
+      // Only add to mapping if uid exists (it should always exist after ensureUids)
+      if (node.uid) {
+        addrToUid[addr] = node.uid;
+        uidToAddr[node.uid] = addr;
+      } else {
+        console.warn(`⚠️ Node at ${addr} is missing uid - this should not happen`);
+      }
 
       if (node.children && node.children.length > 0) {
         walk(node.children, [...prefix, idx + 1]);

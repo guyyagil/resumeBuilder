@@ -57,6 +57,24 @@ export function generateUid(): string {
 }
 
 /**
+ * Ensure all nodes in the tree have UIDs (mutates tree in place)
+ * This should be called after parsing AI responses to add system fields
+ */
+export function ensureUids(tree: ResumeNode[]): void {
+  function walk(nodes: ResumeNode[]): void {
+    for (const node of nodes) {
+      if (!node.uid) {
+        node.uid = generateUid();
+      }
+      if (node.children && node.children.length > 0) {
+        walk(node.children);
+      }
+    }
+  }
+  walk(tree);
+}
+
+/**
  * Get the depth of a node in the tree
  */
 export function getNodeDepth(tree: ResumeNode[], uid: string): number {

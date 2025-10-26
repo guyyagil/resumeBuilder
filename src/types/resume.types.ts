@@ -3,11 +3,10 @@
 /**
  * Single unified node type for all resume content
  * Presentation is controlled by layout and style, not node type
+ *
+ * Note: uid and addr are added automatically by the system after AI parsing
  */
 export type ResumeNode = {
-  uid: string;                 // Stable unique identifier
-  addr?: string;               // Computed address (e.g., "2.1.3")
-
   // Content
   title?: string;              // Short title/heading for the block (optional)
   text?: string;               // Rich/plain text content (optional)
@@ -20,6 +19,10 @@ export type ResumeNode = {
   meta?: Record<string, any>;  // e.g., dateRange, role, company, tags, etc.
 
   children?: ResumeNode[];     // Recursive tree
+
+  // System fields (generated automatically, not from AI)
+  uid?: string;                // Stable unique identifier (auto-generated)
+  addr?: string;               // Computed address from tree position (auto-computed)
 };
 
 /**
@@ -34,29 +37,15 @@ export type LayoutKind =
   | 'container';     // Generic group (no inherent visual bullets)
 
 /**
- * Style hints for typography and spacing
+ * Style hints for basic typography formatting
+ * Simplified to only include essential formatting options
  */
 export type StyleHints = {
   level?: number;              // e.g., heading level (1..4), or list nesting level
   listMarker?: 'bullet' | 'number' | 'dash' | 'none';
-  indent?: number;             // px/em indentation hint
   weight?: 'regular' | 'medium' | 'semibold' | 'bold';
   italic?: boolean;
   align?: 'left' | 'center' | 'right';
-  
-  // Extended style properties
-  fontSize?: string;           // e.g., "16px", "1.2em"
-  color?: string;              // Text color
-  backgroundColor?: string;    // Background color
-  marginTop?: string;          // Spacing above
-  marginBottom?: string;       // Spacing below
-  paddingLeft?: string;        // Left padding
-  paddingRight?: string;       // Right padding
-  borderBottom?: string;       // Bottom border
-  lineHeight?: string | number; // Line spacing
-  
-  // Extensible for additional properties
-  [key: string]: any;
 };
 
 /**

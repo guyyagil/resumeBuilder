@@ -49,22 +49,93 @@ CRITICAL PRINT/PDF REQUIREMENTS:
    */
   TAILORING_AGENT: `Expert resume writer. Tailor resume to job by ONLY enhancing existing content - NEVER invent information.
 
-RULES:
-✅ DO: Reword content, add **bold** keywords, reorder sections/items, enhance styling, improve wording
+CRITICAL RULES:
+✅ DO: Reorder items, bold keywords, rewrite for clarity/impact, emphasize relevant experience
 ❌ DON'T: Add new skills/experience, fabricate info, remove content
 
-ACTIONS:
-1. Reorder: Most relevant sections/jobs/bullets first
-2. Reword: Emphasize job-relevant existing experience
-3. Style: Use weight:'bold', emphasis:true for key terms
-4. Keywords: Add **bold** only if already mentioned
+REWRITING GUIDELINES:
+You CAN rewrite sentences to express them better, more professionally, or more impactfully:
+- "Made the system faster" → "Optimized system performance"
+- "Worked with team" → "Collaborated with cross-functional team"
+- "Fixed bugs" → "Resolved critical production issues"
+
+But NEVER invent facts or add information that wasn't there:
+- ❌ DON'T add technologies not mentioned (if they used React, don't add Vue)
+- ❌ DON'T add achievements that didn't happen (if they led 3 people, don't say 5)
+- ❌ DON'T add responsibilities they didn't have
+- ✅ DO improve how existing facts are expressed
+- ✅ DO use stronger action verbs for existing actions
+- ✅ DO make existing achievements sound more professional
+
+PRIORITY & ORDERING STRATEGY:
+1. SECTION ORDER: Reorder sections to put most relevant first
+   - If "Projects" is highly relevant to the job → move Projects section before Education
+   - If "Skills" matches job requirements → move Skills section higher up
+   - Most relevant sections should appear earlier in the resume
+
+2. ITEM ORDER WITHIN SECTIONS: Reorder items by relevance
+   - Work Experience: Most relevant jobs FIRST (even if not chronologically first)
+   - Skills: Most relevant skills FIRST in the list
+   - Projects: Most relevant projects FIRST
+   - Education: Most relevant degree/certification FIRST
+
+3. BULLET POINT ORDER: Reorder achievements by relevance
+   - Put job-relevant achievements at the TOP of each job's bullet list
+   - Less relevant bullets go at the bottom
+
+KEYWORD BOLDING STRATEGY:
+- Identify keywords from the job description (technologies, skills, methodologies, tools)
+- Use **double asterisks** to bold keywords that appear in the resume text
+- ONLY bold keywords that are ALREADY in the resume - don't add new ones
+- Examples:
+  * "Developed applications using React" → "Developed applications using **React**"
+  * "Led team of 5 engineers" → "**Led** team of 5 engineers"
+  * "Managed AWS infrastructure" → "Managed **AWS** infrastructure"
+
+EXAMPLE TRANSFORMATION:
+Job requires: Python, Machine Learning, AWS, Team Leadership
+
+BEFORE (original order):
+- Education
+- Work Experience
+  * Junior Developer at Company A (2020-2021)
+    - Built web apps with React
+    - Worked with databases
+  * Senior ML Engineer at Company B (2021-2023)
+    - Developed ML models using Python
+    - Deployed on AWS
+    - Led team of 3 engineers
+
+AFTER (tailored order + bolded):
+- Work Experience
+  * Senior ML Engineer at Company B (2021-2023)  ← MOST RELEVANT JOB FIRST
+    - Developed **ML models** using **Python**  ← MOST RELEVANT BULLETS FIRST
+    - **Led team** of 3 engineers
+    - Deployed on **AWS**
+  * Junior Developer at Company A (2020-2021)  ← LESS RELEVANT JOB SECOND
+    - Built web apps with React
+    - Worked with databases
+- Education
 
 OUTPUT (JSON only):
 {
-  "tree": [...ResumeNode[] with uid, layout, title, text, style, children...],
+  "tree": [...array of resume nodes with reordered items and **bolded keywords**...],
   "summary": "Brief changes summary",
-  "changes": ["key changes"]
-}`
+  "changes": ["key changes made"]
+}
+
+NODE STRUCTURE - Include ONLY these fields:
+- type: 'heading' | 'paragraph' | 'list-item' | 'key-value' | 'grid' | 'container'
+- title: (optional) heading text
+- text: (optional) content text with **bold keywords**
+- meta: (optional) metadata like dates, company, location
+- children: (optional) array of child nodes (REORDERED by relevance!)
+
+DO NOT INCLUDE:
+- NO uid or addr (system generates these)
+- NO style, fontSize, color, margins, padding, borders
+- NO layout or formatting properties
+- Focus ONLY on content, structure, ordering, and **keyword bolding**!`
 } as const;
 
 // ============================================================================
@@ -153,7 +224,7 @@ METADATA EXTRACTION:
 - Store metadata in a "meta" object within each node
 
 RESPONSE FORMAT:
-Return a JSON object with:
+Return a JSON object with ONLY these fields:
 {
   "title": "Person's Full Name from Resume",
   "sections": [
@@ -180,19 +251,24 @@ Return a JSON object with:
         {
           "type": "paragraph",
           "text": "Continuous paragraph text for summaries/descriptions"
-        },
-        {
-          "type": "text",
-          "text": "Simple text content like contact details",
-          "meta": {
-            "email": "email@example.com",
-            "phone": "+1234567890"
-          }
         }
       ]
     }
   ]
 }
+
+WHAT YOU MUST INCLUDE:
+- type: The layout type (heading, paragraph, list-item, container, etc.)
+- text: The actual content text
+- title: (optional) For headings or labeled items
+- meta: (optional) Structured data like dates, company, location, email, phone
+- children: (optional) Nested content
+
+WHAT YOU MUST NOT INCLUDE:
+- NO uid or addr fields (system will generate these)
+- NO style, fontSize, color, margins, padding, borders
+- NO complex formatting or layout properties
+- Only include the content and structure!
 
 VALIDATION CHECKLIST - Before responding, verify:
 ✓ Did I extract the person's name?

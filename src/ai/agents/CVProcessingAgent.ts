@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { GoogleGenAI } from '@google/genai';
 import type { ResumeNode } from '../../types';
-import { detectTextDirection, detectLanguage } from '../../utils';
+import { detectTextDirection, detectLanguage, ensureUids } from '../../utils';
 import { PromptBuilder } from '../prompts/PromptTemplates';
 
 // Configure PDF.js worker
@@ -46,10 +46,7 @@ export class CVProcessingAgent {
         const { tree, title } = await this.structureResumeWithAI(text, jobDescription);
         console.log('✅ CVProcessingAgent: AI generated tree with', this.countNodes(tree), 'nodes');
 
-        // Step 3: Apply basic styling
-        this.applyBasicStyling(tree);
-
-        // Step 4: Detect language and text direction
+        // Step 3: Detect language and text direction
         const textDirection = detectTextDirection(text);
         const language = detectLanguage(text);
 
@@ -147,6 +144,9 @@ export class CVProcessingAgent {
 
             const tree = this.convertToResumeNodes(parsed.sections);
 
+            // Add UIDs to all nodes (system-generated, not from AI)
+            ensureUids(tree);
+
             console.log('🌳 Converted to tree with', this.countNodes(tree), 'total nodes');
 
             return {
@@ -159,8 +159,10 @@ export class CVProcessingAgent {
 
             // Fallback: create a simple structure
             console.warn('⚠️ Using fallback structure');
+            const fallbackTree = this.createFallbackStructure(text);
+            ensureUids(fallbackTree);
             return {
-                tree: this.createFallbackStructure(text),
+                tree: fallbackTree,
                 title: 'Resume'
             };
         }
@@ -168,22 +170,23 @@ export class CVProcessingAgent {
 
     /**
      * Convert AI response sections to ResumeNode tree with full metadata support
+     * Note: uid and addr are NOT generated here - they're added later by the system
      */
     private convertToResumeNodes(sections: any[]): ResumeNode[] {
-        return sections.map((section, index) => {
+        return sections.map((section) => {
             const node: ResumeNode = {
-                uid: this.generateUid(),
-                addr: (index + 1).toString(),
                 layout: section.type as any,
                 text: section.text,
                 title: section.title,
+                style: section.style,
                 meta: section.meta,
-                children: section.children ? this.convertChildNodes(section.children, (index + 1).toString()) : undefined
+                children: section.children ? this.convertChildNodes(section.children) : undefined
             };
 
             // Clean up undefined fields
             if (!node.text) delete node.text;
             if (!node.title) delete node.title;
+            if (!node.style) delete node.style;
             if (!node.meta) delete node.meta;
             if (!node.children || node.children.length === 0) delete node.children;
 
@@ -193,23 +196,23 @@ export class CVProcessingAgent {
 
     /**
      * Convert child nodes recursively with full metadata and content support
+     * Note: uid and addr are NOT generated here - they're added later by the system
      */
-    private convertChildNodes(children: any[], parentAddr: string): ResumeNode[] {
-        return children.map((child, index) => {
-            const childAddr = `${parentAddr}.${index + 1}`;
+    private convertChildNodes(children: any[]): ResumeNode[] {
+        return children.map((child) => {
             const node: ResumeNode = {
-                uid: this.generateUid(),
-                addr: childAddr,
                 layout: child.type as any,
                 text: child.text,
                 title: child.title,
+                style: child.style,
                 meta: child.meta,
-                children: child.children ? this.convertChildNodes(child.children, childAddr) : undefined
+                children: child.children ? this.convertChildNodes(child.children) : undefined
             };
 
             // Clean up undefined fields
             if (!node.text) delete node.text;
             if (!node.title) delete node.title;
+            if (!node.style) delete node.style;
             if (!node.meta) delete node.meta;
             if (!node.children || node.children.length === 0) delete node.children;
 
@@ -219,70 +222,19 @@ export class CVProcessingAgent {
 
     /**
      * Create a fallback structure when AI fails
+     * Note: uid and addr will be added by the system later
      */
     private createFallbackStructure(text: string): ResumeNode[] {
         const lines = text.split('\n').filter(line => line.trim().length > 0);
 
         return [{
-            uid: this.generateUid(),
-            addr: '1',
             layout: 'heading',
             text: 'Resume Content',
-            children: lines.slice(0, 10).map((line, index) => ({
-                uid: this.generateUid(),
-                addr: `1.${index + 1}`,
+            children: lines.slice(0, 10).map((line) => ({
                 layout: 'paragraph' as const,
                 text: line.trim()
             }))
         }];
-    }
-
-    /**
-     * Apply basic styling to the resume tree
-     */
-    private applyBasicStyling(tree: ResumeNode[]): void {
-        const applyStyles = (nodes: ResumeNode[], depth: number) => {
-            for (const node of nodes) {
-                if (!node.style) {
-                    if (depth === 0) {
-                        // Section headers
-                        node.style = {
-                            level: 1,
-                            weight: 'bold',
-                            fontSize: '18px',
-                            color: '#1a1a1a',
-                            marginBottom: '16px',
-                            borderBottom: '2px solid #333',
-                            paddingBottom: '4px'
-                        };
-                    } else if (depth === 1) {
-                        // Sub-items
-                        node.style = {
-                            level: 2,
-                            weight: 'semibold',
-                            fontSize: '14px',
-                            color: '#2d3748',
-                            marginBottom: '8px'
-                        };
-                    } else {
-                        // Details
-                        node.style = {
-                            weight: 'regular',
-                            fontSize: '12px',
-                            color: '#4a5568',
-                            marginBottom: '4px',
-                            lineHeight: 1.6
-                        };
-                    }
-                }
-
-                if (node.children) {
-                    applyStyles(node.children, depth + 1);
-                }
-            }
-        };
-
-        applyStyles(tree, 0);
     }
 
     /**
@@ -298,12 +250,5 @@ export class CVProcessingAgent {
         };
         walk(tree);
         return count;
-    }
-
-    /**
-     * Generate a unique identifier
-     */
-    private generateUid(): string {
-        return `uid_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     }
 }

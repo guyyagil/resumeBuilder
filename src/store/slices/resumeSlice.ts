@@ -455,13 +455,12 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
             uid: generateUid(),
             layout: 'paragraph',
             text: 'Your Name',
-            style: { weight: 'bold', fontSize: '20px' }
+            style: { weight: 'bold' }
           },
           {
             uid: generateUid(),
             layout: 'paragraph',
-            text: 'Email | Phone | Location',
-            style: { fontSize: '14px' }
+            text: 'Email | Phone | Location'
           }
         ]
       },
