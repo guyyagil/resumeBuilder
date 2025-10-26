@@ -72,13 +72,14 @@ export const ResumePreview: React.FC = () => {
         }} />
       )}
 
-      {/* A4 Paper Container - adapts to content, allows full scrolling */}
+      {/* Dynamic Paper Container - adapts to content size, no fixed dimensions */}
       <div
-        className="w-full max-w-[210mm] bg-white shadow-2xl rounded-lg overflow-visible min-h-[297mm]"
+        className="w-full max-w-[210mm] bg-white shadow-2xl rounded-lg overflow-visible"
+        style={{ minHeight: 'auto' }}
       >
         {/* AI-Generated Resume HTML - no padding wrapper, let the AI control spacing */}
         <div
-          className="w-full min-h-full"
+          className="w-full"
           dangerouslySetInnerHTML={{ __html: resumeDesign.html }}
         />
       </div>

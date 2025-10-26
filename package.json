@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.27.0",
     "@google/generative-ai": "^0.5.0",
     "@thednp/dommatrix": "^2.0.12",
     "html2canvas": "^1.4.1",

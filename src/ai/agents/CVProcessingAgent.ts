@@ -1,7 +1,7 @@
 // CV/Resume Processing Agent - Handles PDF extraction and AI structuring
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type { ResumeNode } from '../../types';
 import { detectTextDirection, detectLanguage } from '../../utils';
 import { PromptBuilder } from '../prompts/PromptTemplates';
@@ -22,10 +22,10 @@ export interface CVProcessingResult {
 }
 
 export class CVProcessingAgent {
-    private genAI: GoogleGenerativeAI;
+    private genAI: GoogleGenAI;
 
     constructor(apiKey: string) {
-        this.genAI = new GoogleGenerativeAI(apiKey);
+        this.genAI = new GoogleGenAI({ apiKey });
     }
 
     /**
@@ -98,28 +98,31 @@ export class CVProcessingAgent {
      */
     private async structureResumeWithAI(text: string, jobDescription?: string): Promise<{ tree: ResumeNode[]; title: string }> {
         console.log('🤖 CVProcessingAgent: Structuring resume with AI...');
+        console.log('📊 Input text length:', text.length);
 
         const prompt = PromptBuilder.buildPDFStructurePrompt(text, jobDescription);
 
-        const structureModel = this.genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            generationConfig: {
-                temperature: 0.3,
-                topP: 0.95,
-                topK: 40,
-                maxOutputTokens: 12000
-            }
-        });
-
-        const fullPrompt = prompt;
-
         try {
-            const result = await structureModel.generateContent(fullPrompt);
-            const response = result.response.text();
+            const result = await this.genAI.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    temperature: 0.2, // Lower for more accurate extraction
+                    topP: 0.9,
+                    topK: 30,
+                    maxOutputTokens: 16384, // Increased for larger resumes
+                    thinkingConfig: {
+                        thinkingBudget: 8192,
+                    },
+                },
+            });
+            const response = result.text || '';
 
             if (!response) {
                 throw new Error('No response from AI');
             }
+
+            console.log('📥 Received AI response, length:', response.length);
 
             // Clean and parse the response
             let cleanResponse = response.trim();
@@ -130,7 +133,21 @@ export class CVProcessingAgent {
             }
 
             const parsed = JSON.parse(cleanResponse);
+
+            // Validation logging
+            console.log('✅ JSON parsed successfully');
+            console.log('📋 Extracted title:', parsed.title);
+            console.log('📂 Number of sections:', parsed.sections?.length || 0);
+
+            if (parsed.sections) {
+                parsed.sections.forEach((section: any, index: number) => {
+                    console.log(`  Section ${index + 1}: ${section.text || section.title || 'Unnamed'} (${section.children?.length || 0} children)`);
+                });
+            }
+
             const tree = this.convertToResumeNodes(parsed.sections);
+
+            console.log('🌳 Converted to tree with', this.countNodes(tree), 'total nodes');
 
             return {
                 tree,
@@ -138,8 +155,10 @@ export class CVProcessingAgent {
             };
         } catch (error) {
             console.error('❌ CVProcessingAgent: AI structuring failed:', error);
+            console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
 
             // Fallback: create a simple structure
+            console.warn('⚠️ Using fallback structure');
             return {
                 tree: this.createFallbackStructure(text),
                 title: 'Resume'
@@ -148,7 +167,7 @@ export class CVProcessingAgent {
     }
 
     /**
-     * Convert AI response sections to ResumeNode tree
+     * Convert AI response sections to ResumeNode tree with full metadata support
      */
     private convertToResumeNodes(sections: any[]): ResumeNode[] {
         return sections.map((section, index) => {
@@ -157,14 +176,23 @@ export class CVProcessingAgent {
                 addr: (index + 1).toString(),
                 layout: section.type as any,
                 text: section.text,
+                title: section.title,
+                meta: section.meta,
                 children: section.children ? this.convertChildNodes(section.children, (index + 1).toString()) : undefined
             };
+
+            // Clean up undefined fields
+            if (!node.text) delete node.text;
+            if (!node.title) delete node.title;
+            if (!node.meta) delete node.meta;
+            if (!node.children || node.children.length === 0) delete node.children;
+
             return node;
         });
     }
 
     /**
-     * Convert child nodes recursively
+     * Convert child nodes recursively with full metadata and content support
      */
     private convertChildNodes(children: any[], parentAddr: string): ResumeNode[] {
         return children.map((child, index) => {
@@ -174,8 +202,17 @@ export class CVProcessingAgent {
                 addr: childAddr,
                 layout: child.type as any,
                 text: child.text,
+                title: child.title,
+                meta: child.meta,
                 children: child.children ? this.convertChildNodes(child.children, childAddr) : undefined
             };
+
+            // Clean up undefined fields
+            if (!node.text) delete node.text;
+            if (!node.title) delete node.title;
+            if (!node.meta) delete node.meta;
+            if (!node.children || node.children.length === 0) delete node.children;
+
             return node;
         });
     }

@@ -1,14 +1,14 @@
 // Design generation service - moved from features/design/services
 import type { ResumeNode } from '../../types';
 import type { DesignTemplate, GeneratedResumeDesign } from '../../phaseUtils/design/types/design.types';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { PromptBuilder } from '../prompts/PromptTemplates';
 
 export class DesignAgent {
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenAI;
 
   constructor(apiKey: string) {
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.genAI = new GoogleGenAI({ apiKey });
   }
 
   async generateResumeHTML(
@@ -22,27 +22,31 @@ export class DesignAgent {
     const prompt = this.buildDesignPrompt(tree, title, template, jobDescription);
 
     try {
-      const designModel = this.genAI.getGenerativeModel({
+      const result = await this.genAI.models.generateContent({
         model: 'gemini-2.5-pro',
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.95,
-          topK: 40,
+        contents: prompt,
+        config: {
+          temperature: 0.3, // Lower temperature for more accurate, consistent output
+          topP: 0.9, // More focused sampling
+          topK: 20, // Narrower token selection for precision
           maxOutputTokens: 16384,
-        }
+          thinkingConfig: {
+            thinkingBudget: -1, // Unlimited thinking for maximum quality
+          },
+        },
       });
+      const response = result.text || '';
 
-      const fullPrompt = prompt;
+      if (!response) {
+        throw new Error('No response from AI');
+      }
 
-      const result = await designModel.generateContent(fullPrompt);
-      const response = result.response.text();
-      
       console.log('🎨 DesignAgent: Raw response length:', response.length);
       console.log('🎨 DesignAgent: First 200 chars:', response.substring(0, 200));
       console.log('🎨 DesignAgent: Last 200 chars:', response.substring(response.length - 200));
-      
+
       const { html, css } = this.parseResponse(response);
-      
+
       console.log('🎨 DesignAgent: Parsed HTML length:', html.length);
       console.log('🎨 DesignAgent: Parsed CSS length:', css.length);
 

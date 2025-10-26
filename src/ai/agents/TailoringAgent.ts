@@ -1,5 +1,5 @@
 // AI Agent for tailoring resumes to specific job descriptions
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import type { ResumeNode } from '../../types';
 import { generateUid } from '../../utils';
 import { PromptBuilder } from '../prompts/PromptTemplates';
@@ -11,10 +11,10 @@ interface TailoringResult {
 }
 
 export class TailoringAgent {
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenAI;
 
   constructor(apiKey: string) {
-    this.genAI = new GoogleGenerativeAI(apiKey);
+    this.genAI = new GoogleGenAI({apiKey});
   }
 
   /**
@@ -28,16 +28,6 @@ export class TailoringAgent {
   ): Promise<ResumeNode[]> {
     console.log('🎯 TailoringAgent: Starting job-specific tailoring');
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: {
-        temperature: 0.4,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 16384  // Increased token limit for larger resumes
-      }
-    });
-
     // Build the prompt using PromptBuilder
     const prompt = PromptBuilder.buildTailoringPrompt(
       originalTree,
@@ -46,8 +36,24 @@ export class TailoringAgent {
     );
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = result.response.text();
+      const result = await this.genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          temperature: 0.5,
+          topP: 0.9,
+          topK: 10,
+          maxOutputTokens: 12000,
+          thinkingConfig: {
+            thinkingBudget: 8192,
+          },
+        },
+      });
+      const response = result.text || '';
+
+      if (!response) {
+        throw new Error('No response from AI');
+      }
 
       console.log('📥 Received tailoring response');
 

@@ -1,16 +1,36 @@
-// Generate layout-specific previews (without color - showing structure only)
-import type { LayoutStructure } from '../types/design.types';
-import { JOHN_DOE_DATA, JOHN_DOE_TITLE } from './exampleData';
+// Generate layout-specific previews with optional color schemes
+import type { LayoutStructure, ColorScheme } from '../types/design.types';
+import { getLayoutExampleData, JOHN_DOE_TITLE } from './exampleData';
 import type { ResumeNode } from '../../../types';
 
 /**
- * Generate a grayscale preview showing only the layout structure
- * Colors will be applied after user selects color scheme
+ * Generate a preview showing the layout structure with optional colors
+ * @param layout - The layout structure to preview
+ * @param colorScheme - Optional color scheme to apply (defaults to grayscale)
  */
-export function generateLayoutPreview(layout: LayoutStructure): string {
+export function generateLayoutPreview(layout: LayoutStructure, colorScheme?: ColorScheme): string {
   const { structure, typography } = layout;
 
-  // Base styles - grayscale to show structure
+  // Use provided color scheme or default to grayscale
+  const colors = colorScheme ? {
+    primary: colorScheme.colors.primary,
+    secondary: colorScheme.colors.secondary,
+    text: colorScheme.colors.text,
+    textLight: colorScheme.colors.textLight,
+    background: colorScheme.colors.background,
+    accent: colorScheme.colors.accent,
+    sidebarBg: colorScheme.colors.sidebarBg || colorScheme.colors.secondary,
+  } : {
+    primary: '#000000',
+    secondary: '#f5f5f5',
+    text: '#333333',
+    textLight: '#666666',
+    background: '#ffffff',
+    accent: '#dddddd',
+    sidebarBg: '#f5f5f5',
+  };
+
+  // Base styles using dynamic colors
   const baseStyles = `
     * {
       margin: 0;
@@ -20,14 +40,18 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
 
     body {
       font-family: Arial, sans-serif;
-      color: #333;
-      background: #ffffff;
+      color: ${colors.text};
+      background: ${colors.background};
       line-height: 1.5;
+      width: 210mm;
+      height: 297mm;
+      overflow: hidden;
     }
 
     .resume-container {
       padding: 1.5rem;
-      max-width: 210mm;
+      width: 100%;
+      height: 100%;
       margin: 0 auto;
       ${structure.hasSidebar ? 'display: flex; gap: 1.5rem;' : ''}
     }
@@ -35,13 +59,19 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
     ${structure.hasSidebar && structure.sidebarPosition === 'left' ? `
       .sidebar {
         width: ${structure.sidebarWidth};
-        background: #f5f5f5;
+        background: ${colors.sidebarBg};
         padding: 1.5rem;
         order: 1;
+        flex-shrink: 0;
+        height: 100%;
+        overflow: auto;
       }
       .main-content {
         width: ${structure.mainContentWidth};
         order: 2;
+        flex-shrink: 0;
+        height: 100%;
+        overflow: auto;
       }
     ` : ''}
 
@@ -49,30 +79,36 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
       .main-content {
         width: ${structure.mainContentWidth};
         order: 1;
+        flex-shrink: 0;
+        height: 100%;
+        overflow: auto;
       }
       .sidebar {
         width: ${structure.sidebarWidth};
-        background: #f5f5f5;
+        background: ${colors.sidebarBg};
         padding: 1.5rem;
         order: 2;
+        flex-shrink: 0;
+        height: 100%;
+        overflow: auto;
       }
     ` : ''}
 
     .resume-header {
       margin-bottom: 1.5rem;
-      ${structure.headerHeight ? `min-height: ${structure.headerHeight}; background: #f0f0f0; padding: 1.5rem; margin: -1.5rem -1.5rem 1.5rem -1.5rem;` : 'border-bottom: 2px solid #ddd; padding-bottom: 0.75rem;'}
+      ${structure.headerHeight ? `min-height: ${structure.headerHeight}; background: ${colors.primary}; color: ${colors.background}; padding: 1.5rem; margin: -1.5rem -1.5rem 1.5rem -1.5rem;` : `border-bottom: 2px solid ${colors.accent}; padding-bottom: 0.75rem;`}
     }
 
     .resume-name {
       font-size: ${typography.nameSize === 'xxlarge' ? '2.5rem' : typography.nameSize === 'xlarge' ? '2rem' : '1.75rem'};
       font-weight: bold;
-      color: #000;
+      color: ${structure.headerHeight ? colors.background : colors.primary};
       margin-bottom: 0.5rem;
     }
 
     .resume-title {
       font-size: 1.1rem;
-      color: #666;
+      color: ${structure.headerHeight ? colors.background : colors.textLight};
       ${layout.type === 'header-focus' ? 'font-size: 1.3rem;' : ''}
     }
 
@@ -82,7 +118,7 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
       flex-wrap: wrap;
       margin-top: 0.5rem;
       font-size: 0.9rem;
-      color: #666;
+      color: ${structure.headerHeight ? colors.background : colors.textLight};
     }
 
     .section {
@@ -92,10 +128,10 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
     .section-heading {
       font-size: 1.15rem;
       font-weight: bold;
-      color: #000;
+      color: ${colors.primary};
       margin-bottom: 0.75rem;
-      ${typography.headingStyle === 'underline' ? 'border-bottom: 2px solid #ddd; padding-bottom: 0.25rem;' : ''}
-      ${typography.headingStyle === 'background' ? 'background: #f0f0f0; padding: 0.5rem; border-radius: 0.25rem;' : ''}
+      ${typography.headingStyle === 'underline' ? `border-bottom: 2px solid ${colors.accent}; padding-bottom: 0.25rem;` : ''}
+      ${typography.headingStyle === 'background' ? `background: ${colors.secondary}; padding: 0.5rem; border-radius: 0.25rem;` : ''}
       ${typography.headingStyle === 'bold' ? 'text-transform: uppercase; letter-spacing: 0.5px;' : ''}
     }
 
@@ -105,19 +141,19 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
 
     .container-text {
       font-weight: 600;
-      color: #333;
+      color: ${colors.text};
       margin-bottom: 0.5rem;
       font-size: 0.95rem;
     }
 
     .job-meta {
       font-size: 0.85rem;
-      color: #666;
+      color: ${colors.textLight};
       margin-bottom: 0.5rem;
     }
 
     .list-item {
-      color: #555;
+      color: ${colors.text};
       padding-left: 1.25rem;
       position: relative;
       margin-bottom: 0.25rem;
@@ -128,11 +164,12 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
       content: "•";
       position: absolute;
       left: 0;
-      color: #999;
+      color: ${colors.accent};
     }
 
     .skill-tag {
-      background: #e5e5e5;
+      background: ${colors.primary};
+      color: ${colors.background};
       padding: 0.25rem 0.75rem;
       border-radius: 0.25rem;
       font-size: 0.85rem;
@@ -190,6 +227,9 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
     }
   };
 
+  // Get layout-specific example data
+  const exampleData = getLayoutExampleData(layout.type);
+
   // Build content based on layout
   let bodyHtml = '';
   let sidebarContentHtml = '';
@@ -197,11 +237,11 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
 
   if (structure.hasSidebar) {
     // Split into sidebar and main content
-    const sidebarNodes = JOHN_DOE_DATA.filter(node =>
+    const sidebarNodes = exampleData.filter(node =>
       sidebarSections.some(s => (node.text || node.title || '').includes(s))
     );
 
-    const mainNodes = JOHN_DOE_DATA.filter(node =>
+    const mainNodes = exampleData.filter(node =>
       mainSections.some(s => (node.text || node.title || '').includes(s)) ||
       (!sidebarSections.some(s => (node.text || node.title || '').includes(s)) &&
        !mainSections.some(s => (node.text || node.title || '').includes(s)))
@@ -211,8 +251,8 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
     mainContentHtml = mainNodes.map(node => renderNode(node)).join('');
   } else if (structure.sectionArrangement === 'grid' && layout.type === 'header-focus') {
     // Header-focus with grid below
-    const mainSections = JOHN_DOE_DATA.slice(0, 2).map(node => renderNode(node)).join('');
-    const gridSections = JOHN_DOE_DATA.slice(2).map(node => renderNode(node)).join('');
+    const mainSections = exampleData.slice(0, 2).map(node => renderNode(node)).join('');
+    const gridSections = exampleData.slice(2).map(node => renderNode(node)).join('');
 
     bodyHtml = `
       ${mainSections}
@@ -222,7 +262,7 @@ export function generateLayoutPreview(layout: LayoutStructure): string {
     `;
   } else {
     // Single column
-    bodyHtml = JOHN_DOE_DATA.map(node => renderNode(node)).join('');
+    bodyHtml = exampleData.map(node => renderNode(node)).join('');
   }
 
   return `

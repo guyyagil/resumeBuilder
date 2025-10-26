@@ -47,55 +47,24 @@ CRITICAL PRINT/PDF REQUIREMENTS:
   /**
    * Tailoring Agent - Specializes in job-specific resume optimization
    */
-  TAILORING_AGENT: `You are an expert resume writer specializing in tailoring resumes to job descriptions.
+  TAILORING_AGENT: `Expert resume writer. Tailor resume to job by ONLY enhancing existing content - NEVER invent information.
 
-# 🚨 CRITICAL RULE: DON'T LIE! NEVER FABRICATE OR INVENT INFORMATION!
-You can ONLY work with what already exists in the resume. Your job is to:
-- EMPHASIZE existing relevant experience
-- REWORD existing content to highlight job-relevant aspects  
-- REORDER sections to prioritize relevant information
-- ADD KEYWORDS naturally to existing descriptions
-- MAKE EXISTING ACHIEVEMENTS SOUND MORE IMPRESSIVE
+RULES:
+✅ DO: Reword content, add **bold** keywords, reorder sections/items, enhance styling, improve wording
+❌ DON'T: Add new skills/experience, fabricate info, remove content
 
-❌ NEVER ADD: New skills, fake experience, invented achievements, technologies not mentioned
-✅ ALWAYS: Enhance, emphasize, and reorganize what's already there
+ACTIONS:
+1. Reorder: Most relevant sections/jobs/bullets first
+2. Reword: Emphasize job-relevant existing experience
+3. Style: Use weight:'bold', emphasis:true for key terms
+4. Keywords: Add **bold** only if already mentioned
 
-# Task: Rewrite the resume tree to maximize alignment with the target job.
-
-# Key Actions:
-1. **Rewrite content** to emphasize relevant skills/experience that ALREADY EXISTS
-2. **Add keywords** from job description using **bold** markdown to EXISTING content
-3. **STRATEGICALLY REORDER** sections and items to prioritize what's most relevant
-4. **Adjust styling** (weight: 'bold', emphasis: true) for job-relevant content
-5. **Enhance existing achievements** with better wording and quantification
-
-# 🔄 REORDERING STRATEGY - YOU HAVE FULL CONTROL:
-- **Reorder sections**: Put most job-relevant sections first (e.g., move "Technical Skills" before "Education" for tech jobs)
-- **Reorder experiences**: Within work history, put most relevant jobs/projects first
-- **Reorder bullet points**: Within each job, put most relevant achievements first
-- **Reorder skills**: Within skills sections, prioritize job-relevant technologies/abilities
-- **Think strategically**: What should a recruiter see FIRST to get excited about this candidate?
-
-# Strict Rules:
-- Preserve tree structure format (uid, layout, title, text, style, children)
-- Keep all original UIDs to maintain integrity
-- DO NOT remove personal info or fabricate ANY experiences/skills
-- DO NOT add technologies, skills, or experiences not in the original resume
-- DO modify wording to better highlight existing relevant experience
-- DO reorder everything strategically - sections, jobs, bullet points, skills
-- Use **bold** for keywords (e.g., "Developed **React** applications") ONLY if React was already mentioned
-
-# Required Output:
-Return ONLY valid JSON in this exact format:
-\`\`\`json
+OUTPUT (JSON only):
 {
-  "tree": [...complete ResumeNode array...],
-  "summary": "Brief summary of changes",
-  "changes": ["List of key changes"]
-}
-\`\`\`
-
-Style properties available: weight ('bold'|'normal'|'light'), emphasis (true|false), fontSize, level (1-3)`
+  "tree": [...ResumeNode[] with uid, layout, title, text, style, children...],
+  "summary": "Brief changes summary",
+  "changes": ["key changes"]
+}`
 } as const;
 
 // ============================================================================
@@ -138,43 +107,131 @@ LANGUAGE INSTRUCTION: Respond in ${detectedLanguage} to match the resume content
 
 export const TASK_PROMPTS = {
   /**
-   * PDF content extraction and structuring
+   * PDF content extraction and structuring - DYNAMIC APPROACH
    */
-  PDF_STRUCTURE_EXTRACTION: `Extract and structure the following resume content into a clean, organized format.
+  PDF_STRUCTURE_EXTRACTION: `You are an expert resume parser. Extract and structure ALL content from the resume with ZERO information loss.
 
-Please return a JSON structure with:
-1. A professional title/name for the resume (in detected language)
-2. Organized sections with names in the appropriate language
-3. Bullet points under each section (preserving original language)
-4. Clean, professional language consistent with the detected language
+CRITICAL REQUIREMENTS - 100% DATA CAPTURE:
+⚠️ YOU MUST CAPTURE EVERY PIECE OF INFORMATION - MISSING ANYTHING IS UNACCEPTABLE
+- Extract ALL text exactly as written - phone numbers, emails, addresses, links, names, dates, everything
+- Identify ALL sections dynamically (do NOT assume specific section names)
+- Preserve ALL bullet points, paragraphs, and list items exactly as they appear
+- Capture ALL metadata like dates, locations, URLs, email addresses, phone numbers
+- Do NOT summarize, skip, or omit ANY content
+- Do NOT make assumptions about what's important - include EVERYTHING
 
-Format as JSON with this structure:
+DYNAMIC SECTION DETECTION:
+- Automatically detect all section types (contact info, summary, experience, education, skills, certifications, projects, etc.)
+- Use the ACTUAL section names from the resume (in original language)
+- If there's no clear section name, infer it from the content
+- Common sections include but are NOT limited to:
+  * Contact Information / Personal Details (name, phone, email, address, LinkedIn, website, etc.)
+  * Summary / Profile / About / Objective
+  * Work Experience / Professional Experience / Employment History
+  * Education / Academic Background
+  * Skills / Technical Skills / Core Competencies
+  * Certifications / Licenses
+  * Projects / Portfolio
+  * Languages / Language Proficiency
+  * Achievements / Awards / Honors
+  * Volunteer Work / Community Service
+  * Publications / Research
+  * References
+
+STRUCTURE GUIDELINES:
+- Use "heading" layout for section titles
+- Use "paragraph" for continuous text (summaries, descriptions)
+- Use "container" for grouped items (job entries, education entries)
+- Use "list-item" for bullet points
+- Use "text" for simple text content
+- Nest content logically: sections → containers → items
+
+METADATA EXTRACTION:
+- For work experience: capture job title, company, location, dates
+- For education: capture degree, institution, location, dates, GPA if present
+- For contact info: capture ALL contact methods (phone, email, address, LinkedIn, GitHub, portfolio, etc.)
+- Store metadata in a "meta" object within each node
+
+RESPONSE FORMAT:
+Return a JSON object with:
 {
-  "title": "Professional Name or Title",
+  "title": "Person's Full Name from Resume",
   "sections": [
     {
       "type": "heading",
-      "text": "Section Name",
+      "text": "Actual Section Name from Resume",
       "children": [
         {
-          "type": "container", 
-          "text": "Job Title at Company",
+          "type": "container",
+          "text": "Main item heading (e.g., Job Title, Degree Name)",
+          "meta": {
+            "company": "Company Name",
+            "location": "City, State",
+            "startDate": "Start Date",
+            "endDate": "End Date or Present"
+          },
           "children": [
             {
               "type": "list-item",
-              "text": "Achievement or responsibility"
+              "text": "Bullet point or detail exactly as written"
             }
           ]
+        },
+        {
+          "type": "paragraph",
+          "text": "Continuous paragraph text for summaries/descriptions"
+        },
+        {
+          "type": "text",
+          "text": "Simple text content like contact details",
+          "meta": {
+            "email": "email@example.com",
+            "phone": "+1234567890"
+          }
         }
       ]
     }
   ]
-}`,
+}
+
+VALIDATION CHECKLIST - Before responding, verify:
+✓ Did I extract the person's name?
+✓ Did I extract ALL contact information (email, phone, address, links)?
+✓ Did I extract ALL work experience entries with dates and locations?
+✓ Did I extract ALL education entries with dates?
+✓ Did I extract ALL skills mentioned?
+✓ Did I preserve ALL bullet points under each job/project?
+✓ Did I include ALL sections found in the resume?
+✓ Is every word from the original resume present in my JSON output?
+
+If the answer to ANY question is NO, go back and add the missing information.`,
 
   /**
    * HTML/CSS design generation template
    */
   DESIGN_GENERATION: `Generate professional HTML + CSS for ONLY the resume content. This will be displayed in a preview panel.
+
+CRITICAL DATA COMPLETENESS REQUIREMENTS:
+⚠️ YOU MUST INCLUDE 100% OF ALL CONTENT FROM THE RESUME - NO OMISSIONS ALLOWED
+- Every section header must be included
+- Every bullet point must be included
+- Every skill, job title, company name, date, location must be included
+- Every sentence from the summary/profile must be included
+- Do NOT skip, shorten, or summarize ANY content
+- Do NOT use ellipsis (...) or "etc."
+- Include EVERYTHING exactly as provided in the resume data
+
+CRITICAL COLOR ACCURACY REQUIREMENTS:
+⚠️ YOU MUST USE THE EXACT COLORS SPECIFIED - DO NOT MODIFY OR APPROXIMATE
+- Use the EXACT hex codes provided for each color
+- Do NOT lighten, darken, or adjust any colors
+- Do NOT use color names like "blue" or "gray" - only hex codes
+- Test all color combinations for sufficient contrast (WCAG AA minimum)
+- Primary color: Use ONLY for name, section headings as specified
+- Secondary color: Use ONLY where explicitly stated
+- Text colors: Use exact values for body text and light text
+- Background colors: Use exact values, no gradients unless specified
+- Accent colors: Use exact values for borders and highlights only
 
 REQUIREMENTS:
 - Generate ONLY the resume content HTML/CSS
@@ -316,24 +373,197 @@ const TemplateUtils = {
     const { layout, colorScheme } = template;
     const colors = colorScheme.colors;
 
-    let description = `${layout.name}: ${layout.description}\n`;
+    let description = `${layout.name}: ${layout.description}\n\n`;
+    description += `## CRITICAL LAYOUT STRUCTURE - FOLLOW EXACTLY:\n\n`;
 
+    // Layout type specific instructions
     if (layout.structure.hasSidebar) {
-      description += `- Layout: Two-column with ${layout.structure.sidebarPosition} sidebar\n`;
-      description += `- Sidebar width: ${layout.structure.sidebarWidth}, Main content: ${layout.structure.mainContentWidth}\n`;
-      description += `- Use sidebar background color: ${colors.sidebarBg}\n`;
-      description += `- Place skills, education, and contact info in the sidebar\n`;
-      description += `- Place work experience and summary in main content area\n`;
+      const isLeftSidebar = layout.structure.sidebarPosition === 'left';
+
+      description += `### TWO-COLUMN LAYOUT WITH ${layout.structure.sidebarPosition.toUpperCase()} SIDEBAR\n\n`;
+      description += `**CSS Implementation:**\n`;
+      description += `\`\`\`css\n`;
+      description += `.resume-container {\n`;
+      description += `  display: flex;\n`;
+      description += `  gap: 2rem;\n`;
+      description += `  max-width: 210mm;\n`;
+      description += `}\n\n`;
+
+      if (isLeftSidebar) {
+        description += `.sidebar {\n`;
+        description += `  width: ${layout.structure.sidebarWidth};\n`;
+        description += `  background: ${colors.sidebarBg || colors.secondary};\n`;
+        description += `  padding: 2rem 1.5rem;\n`;
+        description += `  order: 1;  /* LEFT SIDE - MUST BE FIRST */\n`;
+        description += `}\n\n`;
+        description += `.main-content {\n`;
+        description += `  width: ${layout.structure.mainContentWidth};\n`;
+        description += `  order: 2;  /* RIGHT SIDE - MUST BE SECOND */\n`;
+        description += `}\n`;
+      } else {
+        description += `.main-content {\n`;
+        description += `  width: ${layout.structure.mainContentWidth};\n`;
+        description += `  order: 1;  /* LEFT SIDE - MUST BE FIRST */\n`;
+        description += `}\n\n`;
+        description += `.sidebar {\n`;
+        description += `  width: ${layout.structure.sidebarWidth};\n`;
+        description += `  background: ${colors.sidebarBg || colors.secondary};\n`;
+        description += `  padding: 2rem 1.5rem;\n`;
+        description += `  order: 2;  /* RIGHT SIDE - MUST BE SECOND */\n`;
+        description += `}\n`;
+      }
+      description += `\`\`\`\n\n`;
+
+      description += `**Content Distribution - CRITICAL:**\n`;
+      description += `📌 SIDEBAR (${layout.structure.sidebarPosition}) MUST CONTAIN:\n`;
+      description += `  - Contact information (email, phone, address, LinkedIn)\n`;
+      description += `  - Skills (display as colored rounded boxes with padding: 0.5rem 1rem, border-radius: 0.5rem)\n`;
+      description += `  - Education\n`;
+      description += `  - Certifications/Licenses (if present)\n`;
+      description += `  - Languages (if present)\n\n`;
+      description += `📌 MAIN CONTENT MUST CONTAIN:\n`;
+      description += `  - Professional Summary/Profile\n`;
+      description += `  - Work Experience (most important section)\n`;
+      description += `  - Projects (if present)\n`;
+      description += `  - Publications (if present)\n\n`;
+      description += `⚠️ DO NOT mix these sections - sidebar sections stay in sidebar, main sections stay in main!\n\n`;
+
     } else if (layout.structure.headerHeight) {
-      description += `- Layout: Large header (${layout.structure.headerHeight}) with content below\n`;
-      description += `- Header should be prominent with background color\n`;
+      // Bold Header / Header-focus layout
+      description += `### BOLD HEADER LAYOUT WITH GRID CONTENT BELOW\n\n`;
+      description += `**CSS Implementation:**\n`;
+      description += `\`\`\`css\n`;
+      description += `.resume-header {\n`;
+      description += `  min-height: ${layout.structure.headerHeight};\n`;
+      description += `  background: ${colors.primary};\n`;
+      description += `  color: ${colors.background};\n`;
+      description += `  padding: 2rem 2.5rem;\n`;
+      description += `  margin: -2rem -2rem 2rem -2rem;\n`;
+      description += `  display: flex;\n`;
+      description += `  flex-direction: column;\n`;
+      description += `  justify-content: center;\n`;
+      description += `}\n\n`;
+      description += `.resume-name {\n`;
+      description += `  font-size: 3rem;  /* XXLARGE - very prominent */\n`;
+      description += `  font-weight: bold;\n`;
+      description += `  color: ${colors.background};\n`;
+      description += `  margin-bottom: 0.5rem;\n`;
+      description += `}\n\n`;
+      description += `.contact-info {\n`;
+      description += `  display: flex;\n`;
+      description += `  gap: 1.5rem;\n`;
+      description += `  flex-wrap: wrap;\n`;
+      description += `  color: ${colors.background};\n`;
+      description += `  font-size: 1rem;\n`;
+      description += `}\n\n`;
+
+      if (layout.structure.sectionArrangement === 'grid') {
+        description += `/* CRITICAL: Content below header uses TWO-COLUMN GRID */\n`;
+        description += `.content-grid {\n`;
+        description += `  display: grid;\n`;
+        description += `  grid-template-columns: 1fr 1fr;  /* EQUAL width columns */\n`;
+        description += `  gap: 3rem;\n`;
+        description += `  margin-top: 2rem;\n`;
+        description += `}\n\n`;
+        description += `/* Place grid items explicitly */\n`;
+        description += `.grid-left {\n`;
+        description += `  grid-column: 1;  /* LEFT column */\n`;
+        description += `}\n\n`;
+        description += `.grid-right {\n`;
+        description += `  grid-column: 2;  /* RIGHT column */\n`;
+        description += `}\n`;
+      }
+      description += `\`\`\`\n\n`;
+
+      description += `**HTML Structure - CRITICAL:**\n`;
+      description += `\`\`\`html\n`;
+      description += `<div class="resume-header">\n`;
+      description += `  <h1 class="resume-name">[Name]</h1>\n`;
+      description += `  <div class="resume-title">[Job Title]</div>\n`;
+      description += `  <div class="contact-info">\n`;
+      description += `    <span>📧 [email]</span>\n`;
+      description += `    <span>📱 [phone]</span>\n`;
+      description += `    <span>📍 [location]</span>\n`;
+      description += `  </div>\n`;
+      description += `</div>\n\n`;
+
+      if (layout.structure.sectionArrangement === 'grid') {
+        description += `<!-- First 1-2 full-width sections (Summary, Experience) -->\n`;
+        description += `<section>[Professional Summary]</section>\n`;
+        description += `<section>[Work Experience - FULL WIDTH]</section>\n\n`;
+        description += `<!-- Remaining sections in TWO-COLUMN GRID -->\n`;
+        description += `<div class="content-grid">\n`;
+        description += `  <div class="grid-left">\n`;
+        description += `    <section>[Education - LEFT COLUMN]</section>\n`;
+        description += `    <section>[Certifications - LEFT COLUMN]</section>\n`;
+        description += `  </div>\n`;
+        description += `  <div class="grid-right">\n`;
+        description += `    <section>[Skills - RIGHT COLUMN]</section>\n`;
+        description += `    <!-- Skills as colored SQUARE boxes with border-radius: 0.25rem -->\n`;
+        description += `    <section>[Languages - RIGHT COLUMN]</section>\n`;
+        description += `  </div>\n`;
+        description += `</div>\n`;
+        description += `\`\`\`\n\n`;
+
+        description += `**Section Distribution - EXACTLY AS SHOWN:**\n`;
+        description += `1. Header section (full width): Name, title, contact info\n`;
+        description += `2. Professional Summary (full width below header)\n`;
+        description += `3. Work Experience (full width)\n`;
+        description += `4. TWO-COLUMN GRID for remaining sections:\n`;
+        description += `   - LEFT COLUMN: Education, Certifications, Projects\n`;
+        description += `   - RIGHT COLUMN: Skills (as SQUARED colored boxes), Languages, Interests\n\n`;
+        description += `⚠️ Skills MUST be displayed as squared colored boxes:\n`;
+        description += `   - background: ${colors.primary}\n`;
+        description += `   - color: ${colors.background}\n`;
+        description += `   - padding: 0.5rem 1rem\n`;
+        description += `   - border-radius: 0.25rem  /* SQUARE corners, not rounded */\n`;
+        description += `   - display: inline-block\n`;
+        description += `   - margin: 0.25rem\n\n`;
+      }
+
     } else {
-      description += `- Layout: Single column, clean and traditional\n`;
+      // Single column layout
+      description += `### SINGLE COLUMN LAYOUT\n\n`;
+      description += `**CSS Implementation:**\n`;
+      description += `\`\`\`css\n`;
+      description += `.resume-container {\n`;
+      description += `  max-width: 210mm;\n`;
+      description += `  margin: 0 auto;\n`;
+      description += `  padding: 2rem;\n`;
+      description += `}\n\n`;
+      description += `.resume-header {\n`;
+      description += `  border-bottom: 2px solid ${colors.accent};\n`;
+      description += `  padding-bottom: 1rem;\n`;
+      description += `  margin-bottom: 2rem;\n`;
+      description += `}\n`;
+      description += `\`\`\`\n\n`;
+      description += `**Content Flow:**\n`;
+      description += `All sections flow vertically in a single column:\n`;
+      description += `1. Name and contact info\n`;
+      description += `2. Professional Summary\n`;
+      description += `3. Work Experience\n`;
+      description += `4. Education\n`;
+      description += `5. Skills\n`;
+      description += `6. Other sections\n\n`;
     }
 
-    description += `- Name size: ${layout.typography.nameSize}\n`;
-    description += `- Heading style: ${layout.typography.headingStyle}\n`;
-    description += `- Body spacing: ${layout.typography.bodySpacing}\n`;
+    // Typography instructions
+    description += `## TYPOGRAPHY STYLING:\n`;
+    const nameSizes = { 'large': '2rem', 'xlarge': '2.5rem', 'xxlarge': '3rem' };
+    description += `- Name font-size: ${nameSizes[layout.typography.nameSize as keyof typeof nameSizes] || '2rem'}\n`;
+
+    if (layout.typography.headingStyle === 'bold') {
+      description += `- Section headings: UPPERCASE, bold, letter-spacing: 1px\n`;
+    } else if (layout.typography.headingStyle === 'underline') {
+      description += `- Section headings: Bold with bottom border (border-bottom: 2px solid ${colors.accent})\n`;
+    } else if (layout.typography.headingStyle === 'background') {
+      description += `- Section headings: Background color (background: ${colors.secondary}, padding: 0.75rem, border-radius: 0.25rem)\n`;
+    } else {
+      description += `- Section headings: Minimal styling, bold text only\n`;
+    }
+
+    const spacingValues = { 'compact': '1rem', 'normal': '1.5rem', 'spacious': '2.5rem' };
+    description += `- Section spacing (margin-bottom): ${spacingValues[layout.typography.bodySpacing as keyof typeof spacingValues] || '1.5rem'}\n`;
 
     return description;
   },
@@ -424,7 +654,36 @@ export class PromptBuilder {
       `# LAYOUT STRUCTURE\n${TemplateUtils.buildLayoutDescription(template)}`,
       TemplateUtils.buildColorInstructions(colorScheme),
       TemplateUtils.buildTypographyInstructions(template.fonts),
-      `## Critical Requirements:\n- Follow the EXACT layout structure described above\n- Use the EXACT colors specified - do not change them\n- Ensure the layout matches the selected template (sidebar position, header style, etc.)\n- Maintain excellent readability and ATS compatibility`,
+      `## Critical Requirements:
+⚠️ DATA COMPLETENESS - YOU WILL BE PENALIZED FOR MISSING CONTENT:
+- Count all sections, bullets, and content items in the resume data
+- Verify every single item appears in your generated HTML
+- Do a final check: Does your HTML contain every word from the resume? If not, ADD IT.
+- Missing even ONE bullet point or skill is UNACCEPTABLE
+
+⚠️ COLOR ACCURACY - YOU WILL BE PENALIZED FOR WRONG COLORS:
+- Copy-paste the EXACT hex codes provided (${colorScheme.colors.primary}, ${colorScheme.colors.secondary}, ${colorScheme.colors.text}, etc.)
+- Do NOT invent new colors or shades
+- Do NOT use rgba() or color names - ONLY the exact hex codes specified
+- Verify: Does each CSS color property use the exact hex from the color scheme? If not, FIX IT.
+
+⚠️ LAYOUT STRUCTURE - VALIDATION CHECKLIST:
+Before generating the HTML/CSS, verify:
+✓ CSS classes match EXACTLY the structure described (e.g., .content-grid, .grid-left, .grid-right for Bold Header)
+✓ Sections are placed in the CORRECT containers (sidebar vs main content)
+✓ Column widths match exactly (e.g., sidebar: 35%, main: 65%)
+✓ Grid layouts use the exact grid-template-columns specified
+✓ Skills display style matches the layout requirement (rounded boxes vs squared boxes)
+✓ Header structure follows the layout exactly (colored background for Bold Header)
+✓ Visual hierarchy matches the nameSize specification (xxlarge = 3rem, xlarge = 2.5rem)
+✓ Flexbox order properties are used correctly for sidebar positioning
+
+COMMON MISTAKES TO AVOID:
+❌ DO NOT place Experience in the grid - it should be full-width above the grid (Bold Header layout)
+❌ DO NOT use rounded skills (border-radius > 0.3rem) for Bold Header - use squared boxes (0.25rem)
+❌ DO NOT swap sidebar content with main content
+❌ DO NOT ignore the sectionArrangement: 'grid' instruction
+❌ DO NOT create new layout structures - follow the template exactly`,
       TASK_PROMPTS.DESIGN_GENERATION
         .replace('{FONT_FAMILY}', template.fonts.body)
         .replace('{TEXT_COLOR}', colorScheme.colors.text)
@@ -519,30 +778,15 @@ Always explain how your suggested changes improve alignment with the target posi
     resumeTitle: string,
     jobDescription: string
   ): string {
-    // Compress the tree JSON to save tokens
+    // Compress the tree JSON maximally to save tokens (no whitespace)
     const treeJson = JSON.stringify(originalTree);
 
     return [
       CORE_PROMPTS.TAILORING_AGENT,
-      `# Original Resume`,
-      `Title: ${resumeTitle}`,
-      ``,
-      `Resume Tree: ${treeJson}`,
-      ``,
-      `# Target Job Description`,
-      jobDescription,
-      ``,
-      `# CRITICAL OUTPUT INSTRUCTIONS`,
-      `You MUST return ONLY a valid JSON object in this exact format:`,
-      `\`\`\`json`,
-      `{`,
-      `  "tree": [...your modified ResumeNode array...],`,
-      `  "summary": "Brief summary of changes made",`,
-      `  "changes": ["List of key changes made"]`,
-      `}`,
-      `\`\`\``,
-      ``,
-      `IMPORTANT: Ensure the JSON is complete and properly closed. Do not truncate the response.`
+      `\nRESUME: ${resumeTitle}`,
+      `TREE: ${treeJson}`,
+      `\nJOB:\n${jobDescription}`,
+      `\nReturn complete JSON. No truncation.`
     ].join('\n');
   }
 }
