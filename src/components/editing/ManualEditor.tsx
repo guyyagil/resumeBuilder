@@ -5,6 +5,91 @@ import { AddNodeButton } from './AddNodeButton';
 import { JobDescriptionInput } from '../forms/JobDescriptionInput';
 import type { ResumeNode } from '../../types';
 
+// Engaging loading UI for the tailoring process
+const TailoringLoadingUI: React.FC = () => {
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
+
+  const tips = [
+    { icon: '🎯', text: 'Analyzing job requirements and matching relevant experience' },
+    { icon: '✨', text: 'Highlighting key skills that align with the position' },
+    { icon: '📊', text: 'Reordering sections to emphasize most relevant qualifications' },
+    { icon: '💡', text: 'Optimizing language to match job description keywords' },
+    { icon: '🔍', text: 'Enhancing bullet points for maximum impact' },
+  ];
+
+  // Rotate tips every 3 seconds
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTipIndex((prev) => (prev + 1) % tips.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentTip = tips[currentTipIndex];
+
+  return (
+    <div className="p-5">
+      <div className="flex items-start space-x-4">
+        {/* Animated icon section */}
+        <div className="flex-shrink-0 relative">
+          <div className="absolute inset-0 animate-ping">
+            <div className="w-16 h-16 bg-purple-400 rounded-full opacity-30"></div>
+          </div>
+          <div className="relative w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+            <svg className="w-8 h-8 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Content section */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-bold text-purple-900 mb-1 flex items-center space-x-2">
+            <span>AI Tailoring in Progress</span>
+            <span className="inline-flex space-x-1">
+              <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+              <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+            </span>
+          </h3>
+
+          {/* Progress bar */}
+          <div className="mb-3">
+            <div className="h-2 bg-purple-200 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-500 rounded-full animate-pulse bg-[length:200%_100%]"></div>
+            </div>
+          </div>
+
+          {/* Rotating tips with smooth transition */}
+          <div className="relative h-12 overflow-hidden">
+            <div
+              key={currentTipIndex}
+              className="absolute inset-0 flex items-center space-x-2 animate-[slideIn_0.5s_ease-out]"
+            >
+              <span className="text-2xl flex-shrink-0">{currentTip.icon}</span>
+              <p className="text-sm text-purple-700 font-medium">{currentTip.text}</p>
+            </div>
+          </div>
+
+          {/* Tip indicators */}
+          <div className="flex items-center space-x-1.5 mt-2">
+            {tips.map((_, index) => (
+              <div
+                key={index}
+                className={`h-1 rounded-full transition-all duration-300 ${
+                  index === currentTipIndex
+                    ? 'w-6 bg-purple-600'
+                    : 'w-1 bg-purple-300'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ManualEditor: React.FC = () => {
   console.log('🔧 ManualEditor: Component rendering');
   const {
@@ -221,58 +306,44 @@ export const ManualEditor: React.FC = () => {
 
             {/* Unified Status & View Toggle - Only show after first tailoring or during tailoring */}
             {(hasTailoredVersion || isTailoring) && (
-              <div className={`border-2 rounded-xl p-4 mb-4 shadow-lg ${
+              <div className={`border-2 rounded-xl mb-4 shadow-lg overflow-hidden ${
                 isTailoring
                   ? 'bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-300'
                   : 'bg-white border-blue-300'
               }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    {isTailoring ? (
-                      <div className="animate-spin">
-                        <svg className="w-8 h-8 text-purple-600" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    ) : (
+                {isTailoring ? (
+                  <TailoringLoadingUI />
+                ) : (
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center space-x-3">
                       <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
                         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
                       </div>
-                    )}
-                    <div>
-                      <h3 className={`text-sm font-semibold ${
-                        isTailoring ? 'text-purple-900' : 'text-gray-900'
-                      }`}>
-                        {isTailoring
-                          ? 'AI Tailoring in Progress'
-                          : `Viewing: ${isViewingOriginal ? 'Original Resume' : 'Tailored Resume'}`
-                        }
-                      </h3>
-                      <p className={`text-xs ${
-                        isTailoring ? 'text-purple-700' : 'text-gray-600'
-                      }`}>
-                        {isTailoring
-                          ? 'Optimizing your resume for the target job...'
-                          : isViewingOriginal
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">
+                          Viewing: {isViewingOriginal ? 'Original Resume' : 'Tailored Resume'}
+                        </h3>
+                        <p className="text-xs text-gray-600">
+                          {isViewingOriginal
                             ? 'Your original uploaded resume'
                             : 'AI-tailored version for target job'
-                        }
-                      </p>
+                          }
+                        </p>
+                      </div>
                     </div>
+                    {hasTailoredVersion && (
+                      <button
+                        onClick={() => setIsViewingOriginal(!isViewingOriginal)}
+                        className="px-4 py-2 rounded-lg font-semibold transition-all shadow-md bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
+                      >
+                        {isViewingOriginal ? 'View Tailored' : 'View Original'}
+                      </button>
+                    )}
                   </div>
-                  {!isTailoring && hasTailoredVersion && (
-                    <button
-                      onClick={() => setIsViewingOriginal(!isViewingOriginal)}
-                      className="px-4 py-2 rounded-lg font-semibold transition-all shadow-md bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700"
-                    >
-                      {isViewingOriginal ? 'View Tailored' : 'View Original'}
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             )}
           </div>

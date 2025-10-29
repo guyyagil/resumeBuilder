@@ -45,6 +45,7 @@ export class CVProcessingAgent {
         // Step 2: Use AI to structure the resume
         const { tree, title } = await this.structureResumeWithAI(text, jobDescription);
         console.log('✅ CVProcessingAgent: AI generated tree with', this.countNodes(tree), 'nodes');
+        console.log(tree)
 
         // Step 3: Detect language and text direction
         const textDirection = detectTextDirection(text);
@@ -108,9 +109,6 @@ export class CVProcessingAgent {
                     topP: 0.9,
                     topK: 30,
                     maxOutputTokens: 16384, // Increased for larger resumes
-                    thinkingConfig: {
-                        thinkingBudget: 8192,
-                    },
                 },
             });
             const response = result.text || '';
@@ -128,7 +126,7 @@ export class CVProcessingAgent {
             } else if (cleanResponse.startsWith('```')) {
                 cleanResponse = cleanResponse.replace(/```\s*/, '').replace(/```\s*$/, '');
             }
-
+            console.log(cleanResponse)
             const parsed = JSON.parse(cleanResponse);
 
             // Validation logging
