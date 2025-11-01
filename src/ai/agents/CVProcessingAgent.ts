@@ -108,8 +108,12 @@ export class CVProcessingAgent {
                     temperature: 0.2, // Lower for more accurate extraction
                     topP: 0.9,
                     topK: 30,
-                    maxOutputTokens: 16384, // Increased for larger resumes
+                    maxOutputTokens: 16384,
+                    thinkingConfig : {
+                        thinkingBudget: 2000, // Unlimited thinking for best results
+                    }, // Increased for larger resumes
                 },
+                
             });
             const response = result.text || '';
 

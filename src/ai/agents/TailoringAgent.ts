@@ -44,7 +44,11 @@ export class TailoringAgent {
           maxOutputTokens: 16384,  // Same as CV agent
           topP: 0.9,
           topK: 30,
+           thinkingConfig : {
+              thinkingBudget: 2000, 
+           }
         },
+       
       });
       const response = result.text || '';
 
