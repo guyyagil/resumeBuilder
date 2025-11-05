@@ -109,9 +109,6 @@ export class CVProcessingAgent {
                     topP: 0.9,
                     topK: 30,
                     maxOutputTokens: 16384,
-                    thinkingConfig : {
-                        thinkingBudget: 2000, // Unlimited thinking for best results
-                    }, // Increased for larger resumes
                 },
                 
             });

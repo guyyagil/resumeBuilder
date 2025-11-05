@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../../store';
 import type { ResumeNode } from '../../types';
 import { detectTextDirection } from '../../utils';
 
@@ -35,9 +34,6 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
   const nodeRef = useRef<HTMLDivElement>(null);
   const isDragTargetRef = useRef<boolean>(false);
 
-  // Block selection state
-  const { selectedBlocks, toggleBlockSelection } = useAppStore();
-  const isSelected = node.addr ? selectedBlocks.includes(node.addr) : false;
   const isDragging = draggedNode === node.addr;
 
   // Sync editText with node changes from external updates (like AI edits)
@@ -277,26 +273,13 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
     // Different styles based on depth
     if (depth === 0) {
       // Top level - prominent heading style
-      baseClasses += " bg-gradient-to-r from-blue-100 via-blue-50 to-white border-2";
-      if (isSelected) {
-        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-200";
-      } else {
-        baseClasses += " border-blue-300 hover:border-blue-500 hover:shadow-lg";
-      }
+      baseClasses += " bg-gradient-to-r from-blue-100 via-blue-50 to-white border-2 border-blue-300 hover:border-blue-500 hover:shadow-lg";
     } else if (depth === 1) {
       // Second level - container style
-      baseClasses += " bg-white border-2";
-      if (isSelected) {
-        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
-      } else {
-        baseClasses += " border-blue-200 hover:border-blue-400 hover:shadow-lg";
-      }
+      baseClasses += " bg-white border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg";
     } else {
       // Deeper levels - bullet/list item style
       baseClasses += " bg-white border-l-4 border-blue-200 hover:border-indigo-400";
-      if (isSelected) {
-        baseClasses += " border-emerald-500 shadow-xl ring-4 ring-emerald-100";
-      }
     }
 
     // Drop zone: inside - increase shadow only (no scale/layout change)
@@ -408,13 +391,6 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={(e) => {
-          // Only handle selection if not clicking on editable content or buttons
-          if (!isEditing && !e.defaultPrevented && node.addr) {
-            e.stopPropagation();
-            toggleBlockSelection(node.addr);
-          }
-        }}
       >
         {/* Node Content */}
         <div className="flex items-start space-x-3">
@@ -464,17 +440,6 @@ export const EditableNode: React.FC<EditableNodeProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-1 flex-shrink-0">
-            {/* Citation Indicator */}
-            {isSelected && (
-              <div className="flex items-center space-x-1 px-2 py-1 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full shadow-lg" title="Cited for AI chat">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                  <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                </svg>
-                <span className="text-xs font-bold">Cited</span>
-              </div>
-            )}
-
             {/* Action Buttons - Show on Hover */}
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {/* Collapse/Expand Button - Only show if node has children */}

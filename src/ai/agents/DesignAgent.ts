@@ -30,9 +30,6 @@ export class DesignAgent {
           topP: 0.9, // More focused sampling
           topK: 20, // Narrower token selection for precision
           maxOutputTokens: 16384,
-          thinkingConfig: {
-            thinkingBudget: -1, // Unlimited thinking for maximum quality
-          },
         },
       });
       const response = result.text || '';

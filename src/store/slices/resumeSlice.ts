@@ -92,13 +92,7 @@ export interface ResumeSlice {
 
   // Phase transitions
   startDesignPhase: () => Promise<void>;
-  
-  // Block selection for chat
-  selectedBlocks: string[]; // Array of node addresses
-  setSelectedBlocks: (blocks: string[]) => void;
-  toggleBlockSelection: (blockAddr: string) => void;
-  clearBlockSelection: () => void;
-  
+
   // Design regeneration
   regenerateDesign: () => Promise<void>;
   
@@ -147,7 +141,6 @@ const initialResumeState = {
   maxHistorySize: 50,
   isInitializing: false,
   initializationError: null,
-  selectedBlocks: [] as string[],
 };
 
 export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]], [], ResumeSlice> = (set, get) => ({
@@ -631,24 +624,6 @@ export const createResumeSlice: StateCreator<AppStore, [["zustand/immer", never]
       throw error;
     }
   },
-
-  // Block selection methods
-  setSelectedBlocks: (blocks) => set((state) => {
-    state.selectedBlocks = blocks;
-  }),
-
-  toggleBlockSelection: (blockAddr) => set((state) => {
-    const index = state.selectedBlocks.indexOf(blockAddr);
-    if (index === -1) {
-      state.selectedBlocks.push(blockAddr);
-    } else {
-      state.selectedBlocks.splice(index, 1);
-    }
-  }),
-
-  clearBlockSelection: () => set((state) => {
-    state.selectedBlocks = [];
-  }),
 
   tailorResumeToJob: async (jobDescription) => {
     const state = get();
