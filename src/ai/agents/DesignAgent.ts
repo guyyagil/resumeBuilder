@@ -29,7 +29,6 @@ export class DesignAgent {
           temperature: 0.3, // Lower temperature for more accurate, consistent output
           topP: 0.9, // More focused sampling
           topK: 20, // Narrower token selection for precision
-          maxOutputTokens: 16384,
         },
       });
       const response = result.text || '';

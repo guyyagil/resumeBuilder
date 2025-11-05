@@ -40,8 +40,7 @@ export class TailoringAgent {
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
-          temperature: 0.3,  // Slightly higher than CV agent for creativity
-          maxOutputTokens: 16384,  // Same as CV agent
+          temperature: 0.3,  // Slightly higher than CV agent for creativity  // Same as CV agent
           topP: 0.9,
           topK: 30,
 
